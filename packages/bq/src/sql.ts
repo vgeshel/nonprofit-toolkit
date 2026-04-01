@@ -24,19 +24,28 @@ USING (
   SELECT * EXCEPT(row_num) FROM (
     SELECT *,
       ROW_NUMBER() OVER (PARTITION BY source, external_id ORDER BY ingested_at DESC) AS row_num
-    FROM \`${datasetRaw}.stg_events\`
-    WHERE run_id = @run_id
+    FROM \`${datasetRaw}.stg_events\` AS stg
+    WHERE stg.run_id = @run_id
       -- Mercury-specific filtering: only external incoming donations
-      -- Note: Account-level filtering is intentionally not implemented here.
-      -- Mercury account names are masked (e.g., "Mercury Checking ••9832") and
-      -- don't match user-friendly names. All accounts are included for now.
       AND NOT (
-        source = 'mercury'
+        stg.source = 'mercury'
         AND (
-          payment_method = 'internal'  -- Exclude internal transfers
-          -- JSON_VALUE returns strings, so we compare against 'false' (string)
-          OR JSON_VALUE(source_metadata, '$.isCredit') = 'false'  -- Exclude debits
-          OR payment_method = 'check'  -- Exclude checks (tracked via check_deposits source)
+          stg.payment_method = 'internal'  -- Exclude internal transfers
+          OR JSON_VALUE(stg.source_metadata, '$.isCredit') = 'false'  -- Exclude debits
+          OR stg.payment_method = 'check'  -- Exclude checks (tracked via check_deposits source)
+          -- Exclude inter-bank transfers (not donations)
+          OR LOWER(stg.description) LIKE '%transfer from another bank account%'
+          -- Exclude platform disbursements when we have that source's own data.
+          -- Uses source_coverage table to know which sources are active and from when.
+          -- This is time-sensitive: only excludes disbursements after the source's
+          -- coverage start date. Disbursements before a source was active are kept.
+          OR EXISTS (
+            SELECT 1
+            FROM \`${datasetRaw}.source_coverage\` sc
+            WHERE sc.source != 'mercury'
+              AND LOWER(stg.description) LIKE CONCAT('%', LOWER(sc.source), '%')
+              AND stg.event_ts >= sc.covers_from
+          )
         )
       )
   )
@@ -147,4 +156,32 @@ SELECT run_id, mode, status, started_at, completed_at, from_ts, to_ts, metrics, 
 FROM \`${datasetRaw}.etl_runs\`
 WHERE run_id = @run_id
 LIMIT 1`.trim()
+}
+
+/**
+ * Generate SQL to update source coverage from canonical data.
+ *
+ * Computes MIN(event_ts) per non-mercury source and upserts into
+ * source_coverage. This runs after each merge to keep coverage dates
+ * current as new sources are added or backfills extend coverage.
+ */
+export function generateUpdateSourceCoverageSql(
+  config: BigQueryConfig,
+): string {
+  const { datasetRaw, datasetCanon } = config
+
+  return `
+MERGE \`${datasetRaw}.source_coverage\` AS target
+USING (
+  SELECT source, MIN(event_ts) AS covers_from
+  FROM \`${datasetCanon}.events\`
+  WHERE status = 'succeeded' AND source != 'mercury'
+  GROUP BY source
+) AS src
+ON target.source = src.source
+WHEN MATCHED AND target.covers_from != src.covers_from THEN UPDATE SET
+  covers_from = src.covers_from,
+  updated_at = CURRENT_TIMESTAMP()
+WHEN NOT MATCHED THEN INSERT (source, covers_from)
+  VALUES (src.source, src.covers_from)`.trim()
 }

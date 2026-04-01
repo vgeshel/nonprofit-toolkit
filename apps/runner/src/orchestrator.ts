@@ -562,7 +562,7 @@ export class Orchestrator {
     return this.bq
       .merge(runId)
       .mapErr((e) => createError('bigquery', e.message, e))
-      .map((result) => {
+      .andThen((result) => {
         this.logger.info(
           {
             runId,
@@ -571,6 +571,10 @@ export class Orchestrator {
           },
           'Merge completed',
         )
+        // Update source coverage dates for disbursement deduplication
+        return this.bq
+          .updateSourceCoverage()
+          .mapErr((e) => createError('bigquery', e.message, e))
       })
   }
 

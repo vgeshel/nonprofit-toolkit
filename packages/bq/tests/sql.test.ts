@@ -8,6 +8,7 @@ import {
   generateInsertRunSql,
   generateMergeSql,
   generateUpdateRunSql,
+  generateUpdateSourceCoverageSql,
   generateUpsertWatermarkSql,
 } from '../src/sql'
 import type { BigQueryConfig } from '../src/types'
@@ -27,7 +28,7 @@ describe('SQL generation', () => {
       expect(sql).toContain('MERGE')
       expect(sql).toContain('`donations.events`')
       expect(sql).toContain('`donations_raw.stg_events`')
-      expect(sql).toContain('WHERE run_id = @run_id')
+      expect(sql).toContain('stg.run_id = @run_id')
     })
 
     it('includes all columns in UPDATE SET', () => {
@@ -63,12 +64,12 @@ describe('SQL generation', () => {
       const sql = generateMergeSql(config)
 
       // Verify Mercury source filtering is present
-      expect(sql).toContain("source = 'mercury'")
+      expect(sql).toContain("stg.source = 'mercury'")
       // Verify internal transfer exclusion
-      expect(sql).toContain("payment_method = 'internal'")
+      expect(sql).toContain("stg.payment_method = 'internal'")
       // Verify debit exclusion (JSON_VALUE returns strings, so we compare against 'false')
       expect(sql).toContain(
-        "JSON_VALUE(source_metadata, '$.isCredit') = 'false'",
+        "JSON_VALUE(stg.source_metadata, '$.isCredit') = 'false'",
       )
     })
 
@@ -186,6 +187,69 @@ describe('SQL generation', () => {
 
       const runSql = generateInsertRunSql(customConfig)
       expect(runSql).toContain('`my_raw_data.etl_runs`')
+    })
+  })
+
+  describe('generateMergeSql - disbursement deduplication', () => {
+    it('excludes Mercury inter-bank transfers', () => {
+      const sql = generateMergeSql(config)
+      expect(sql).toContain('transfer from another bank account')
+    })
+
+    it('references source_coverage table for disbursement filtering', () => {
+      const sql = generateMergeSql(config)
+      expect(sql).toContain('source_coverage')
+    })
+
+    it('filters disbursements based on covers_from date', () => {
+      const sql = generateMergeSql(config)
+      expect(sql).toContain('sc.covers_from')
+    })
+
+    it('matches Mercury description against source names', () => {
+      const sql = generateMergeSql(config)
+      expect(sql).toContain(
+        "LOWER(stg.description) LIKE CONCAT('%', LOWER(sc.source), '%')",
+      )
+    })
+
+    it('uses correct dataset for source_coverage', () => {
+      const sql = generateMergeSql(config)
+      expect(sql).toContain('`donations_raw.source_coverage`')
+    })
+
+    it('uses stg alias for staging table', () => {
+      const sql = generateMergeSql(config)
+      expect(sql).toContain('AS stg')
+      expect(sql).toContain('stg.run_id')
+      expect(sql).toContain('stg.source')
+    })
+  })
+
+  describe('generateUpdateSourceCoverageSql', () => {
+    it('generates valid source coverage update SQL', () => {
+      const sql = generateUpdateSourceCoverageSql(config)
+      expect(sql).toContain('MERGE')
+      expect(sql).toContain('`donations_raw.source_coverage`')
+      expect(sql).toContain('MIN(event_ts)')
+      expect(sql).toContain("source != 'mercury'")
+    })
+
+    it('uses canonical dataset for source data', () => {
+      const sql = generateUpdateSourceCoverageSql(config)
+      expect(sql).toContain('`donations.events`')
+    })
+
+    it('updates covers_from when changed', () => {
+      const sql = generateUpdateSourceCoverageSql(config)
+      expect(sql).toContain(
+        'WHEN MATCHED AND target.covers_from != src.covers_from',
+      )
+    })
+
+    it('inserts new sources', () => {
+      const sql = generateUpdateSourceCoverageSql(config)
+      expect(sql).toContain('WHEN NOT MATCHED THEN INSERT')
     })
   })
 })

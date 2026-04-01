@@ -23,6 +23,7 @@ import {
   generateInsertRunSql,
   generateMergeSql,
   generateUpdateRunSql,
+  generateUpdateSourceCoverageSql,
   generateUpsertWatermarkSql,
 } from './sql'
 import { ensureLimit, validateReadOnlySql } from './sql-safety'
@@ -437,6 +438,21 @@ export class BigQueryClient {
           rowsUpdated: stats?.updatedRowCount ?? 0,
         })
       })
+  }
+
+  /**
+   * Update source coverage dates after a merge.
+   *
+   * Computes MIN(event_ts) per non-mercury source and upserts into
+   * source_coverage. This keeps the disbursement deduplication filter
+   * current as new sources are added or backfills extend coverage.
+   */
+  updateSourceCoverage(): ResultAsync<void, BigQueryError> {
+    const sql = generateUpdateSourceCoverageSql(this.config)
+
+    return ResultAsync.fromPromise(this.bq.query({ query: sql }), (error) =>
+      createError('query', 'Failed to update source coverage', error),
+    ).map(() => undefined)
   }
 
   /**

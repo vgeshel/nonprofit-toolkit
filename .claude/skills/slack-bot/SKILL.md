@@ -122,16 +122,16 @@ cold starts and duplicates across instances.
 
 Required scopes depend on features used:
 
-| Feature        | Scopes                              |
-| -------------- | ----------------------------------- |
-| Slash commands | `commands`                          |
-| Post messages  | `chat:write`                        |
-| DMs            | `im:write`, `im:history`            |
-| File uploads   | `files:write`                       |
-| @mentions      | `app_mentions:read`                 |
-| Thread history | `channels:history`                  |
-| Reactions      | `reactions:read`, `reactions:write` |
-| Assistant API  | `assistant:write`, `im:history`     |
+| Feature        | Scopes                               |
+| -------------- | ------------------------------------ |
+| Slash commands | `commands`                           |
+| Post messages  | `chat:write`                         |
+| DMs            | `im:write`, `im:history`             |
+| File uploads   | `files:write`                        |
+| @mentions      | `app_mentions:read`                  |
+| Thread history | `channels:history`, `groups:history` |
+| Reactions      | `reactions:read`, `reactions:write`  |
+| Assistant API  | `assistant:write`, `im:history`      |
 
 Event Subscriptions (set Request URL to `https://<service>/slack/events`):
 
@@ -175,7 +175,7 @@ if (url.pathname === '/slack/events') {
 1. **Duplicate messages**: Slack retries if no 200 within 3s. Filter `x-slack-retry-num` header.
 2. **Cold start retries**: Cloud Run cold starts delay the first ack. The retry filter is essential.
 3. **Assistant API is DM-only**: Cannot be used in channels. Use @mention for shared visibility.
-4. **Thread history scopes**: `channels:history` is required to read thread replies in channels.
+4. **Thread history scopes**: `channels:history` for public channels, `groups:history` for private channels. Both are needed to read thread replies.
 5. **Bun receiver, not Bolt server**: Bolt's built-in server doesn't run — Bun.serve() handles HTTP.
 6. **Scheduled messages go in the runner**: Not the service. Use Cloud Scheduler, not `setInterval`.
 7. **Ephemeral vs public**: Use `respond()` for status/info commands visible only to the requester.

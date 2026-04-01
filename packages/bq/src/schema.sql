@@ -29,6 +29,18 @@ CREATE TABLE IF NOT EXISTS donations_raw.etl_watermarks (
 )
 OPTIONS (description = 'Per-source watermarks for incremental fetching');
 
+-- === Source Coverage ===
+-- Tracks when each source's data coverage begins (earliest event_ts).
+-- Used by the merge SQL to exclude Mercury disbursements that overlap
+-- with sources that have their own connectors. Time-sensitive: only
+-- excludes disbursements after the source's coverage start date.
+CREATE TABLE IF NOT EXISTS donations_raw.source_coverage (
+  source STRING NOT NULL,
+  covers_from TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+)
+OPTIONS (description = 'Per-source coverage start dates for disbursement deduplication');
+
 -- === Staging ===
 -- Note: No partitioning on staging table to avoid BigQuery quota limits.
 -- The staging table is temporary - data is merged into canonical and doesn't

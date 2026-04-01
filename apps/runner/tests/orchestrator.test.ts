@@ -64,6 +64,7 @@ const mockBqClient = {
   writeEventsToGcs: vi.fn<WriteEventsToGcsFn>(),
   loadFromGcs: vi.fn<LoadFromGcsFn>(),
   merge: vi.fn<MergeFn>(),
+  updateSourceCoverage: vi.fn<() => ResultAsync<void, BigQueryError>>(),
   healthCheck: vi.fn<HealthCheckFn>(),
 }
 
@@ -109,6 +110,7 @@ vi.mock('@donations-etl/bq', () => ({
     writeEventsToGcs = mockBqClient.writeEventsToGcs
     loadFromGcs = mockBqClient.loadFromGcs
     merge = mockBqClient.merge
+    updateSourceCoverage = mockBqClient.updateSourceCoverage
     healthCheck = mockBqClient.healthCheck
   },
 }))
@@ -151,6 +153,7 @@ describe('Orchestrator', () => {
     mockBqClient.merge.mockReturnValue(
       okAsync({ rowsInserted: 10, rowsUpdated: 5 }),
     )
+    mockBqClient.updateSourceCoverage.mockReturnValue(okAsync(undefined))
     mockBqClient.healthCheck.mockReturnValue(okAsync(undefined))
 
     mockMercuryConnector.fetchAll.mockReturnValue(okAsync([]))
@@ -429,6 +432,83 @@ describe('Orchestrator', () => {
       )
       mockBqClient.merge.mockReturnValue(
         errAsync({ type: 'query', message: 'Merge failed' }),
+      )
+
+      const orchestrator = new Orchestrator(config, logger)
+
+      const result = await orchestrator.runDaily({ sources: ['mercury'] })
+
+      expect(result.isErr()).toBe(true)
+      expect(result._unsafeUnwrapErr().type).toBe('bigquery')
+    })
+
+    it('updates source coverage after merge', async () => {
+      mockMercuryConnector.fetchAll.mockReturnValue(
+        okAsync([
+          {
+            source: 'mercury',
+            external_id: 'txn-123',
+            event_ts: '2024-01-15T10:00:00Z',
+            created_at: '2024-01-15T10:00:00Z',
+            ingested_at: '2024-01-15T10:05:00Z',
+            amount_cents: 10000,
+            fee_cents: 0,
+            net_amount_cents: 10000,
+            currency: 'USD',
+            donor_name: 'John Doe',
+            payer_name: null,
+            donor_email: 'john@example.com',
+            donor_phone: null,
+            donor_address: null,
+            status: 'succeeded',
+            payment_method: 'ach',
+            description: 'Test donation',
+            attribution: null,
+            attribution_human: null,
+            source_metadata: {},
+            run_id: '00000000-0000-0000-0000-000000000001',
+          },
+        ]),
+      )
+
+      const orchestrator = new Orchestrator(config, logger)
+
+      const result = await orchestrator.runDaily({ sources: ['mercury'] })
+
+      expect(result.isOk()).toBe(true)
+      expect(mockBqClient.updateSourceCoverage).toHaveBeenCalled()
+    })
+
+    it('returns error when source coverage update fails', async () => {
+      mockMercuryConnector.fetchAll.mockReturnValue(
+        okAsync([
+          {
+            source: 'mercury',
+            external_id: 'txn-123',
+            event_ts: '2024-01-15T10:00:00Z',
+            created_at: '2024-01-15T10:00:00Z',
+            ingested_at: '2024-01-15T10:05:00Z',
+            amount_cents: 10000,
+            fee_cents: 0,
+            net_amount_cents: 10000,
+            currency: 'USD',
+            donor_name: 'John Doe',
+            payer_name: null,
+            donor_email: 'john@example.com',
+            donor_phone: null,
+            donor_address: null,
+            status: 'succeeded',
+            payment_method: 'ach',
+            description: 'Test donation',
+            attribution: null,
+            attribution_human: null,
+            source_metadata: {},
+            run_id: '00000000-0000-0000-0000-000000000001',
+          },
+        ]),
+      )
+      mockBqClient.updateSourceCoverage.mockReturnValue(
+        errAsync({ type: 'query', message: 'Coverage update failed' }),
       )
 
       const orchestrator = new Orchestrator(config, logger)

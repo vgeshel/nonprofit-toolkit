@@ -1061,4 +1061,27 @@ describe('BigQueryClient', () => {
       }
     })
   })
+
+  describe('updateSourceCoverage', () => {
+    it('executes source coverage update query', async () => {
+      mockQuery.mockResolvedValue([[], null])
+
+      const result = await client.updateSourceCoverage()
+
+      expect(result.isOk()).toBe(true)
+      expect(mockQuery).toHaveBeenCalled()
+    })
+
+    it('returns error when query fails', async () => {
+      mockQuery.mockRejectedValue(new Error('Coverage update failed'))
+
+      const result = await client.updateSourceCoverage()
+
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.type).toBe('query')
+        expect(result.error.message).toContain('source coverage')
+      }
+    })
+  })
 })

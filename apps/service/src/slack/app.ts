@@ -216,14 +216,6 @@ export function createSlackApp(config: Config, logger: Logger) {
 
     // Build history from thread if this is a follow-up
     let history: ConversationMessage[] = []
-    logger.info(
-      {
-        thread_ts: event.thread_ts,
-        event_ts: event.ts,
-        channel: event.channel,
-      },
-      'app_mention event details',
-    )
     if (event.thread_ts) {
       try {
         const thread = await client.conversations.replies({
@@ -231,35 +223,11 @@ export function createSlackApp(config: Config, logger: Logger) {
           ts: event.thread_ts,
           limit: 20,
         })
-        logger.info(
-          {
-            messageCount: thread.messages?.length ?? 0,
-            messages: thread.messages?.map((m) => ({
-              ts: m.ts,
-              bot_id: m.bot_id,
-              text: m.text?.slice(0, 50),
-            })),
-          },
-          'Thread replies fetched',
-        )
         history = buildThreadHistory(thread.messages ?? [], event.ts)
-        logger.info(
-          {
-            historyLength: history.length,
-            history: history.map((h) => ({
-              role: h.role,
-              content: h.content.slice(0, 50),
-            })),
-          },
-          'Built thread history',
-        )
       } catch (error) {
-        logger.error(
-          {
-            error: error instanceof Error ? error.message : String(error),
-            thread_ts: event.thread_ts,
-          },
-          'Failed to fetch thread replies',
+        logger.warn(
+          { error: error instanceof Error ? error.message : String(error) },
+          'Failed to fetch thread history',
         )
       }
     }

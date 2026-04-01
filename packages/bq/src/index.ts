@@ -44,6 +44,7 @@ export {
   generateInsertRunSql,
   generateMergeSql,
   generateUpdateRunSql,
+  generateUpdateSourceCoverageSql,
   generateUpsertWatermarkSql,
 } from './sql'
 
