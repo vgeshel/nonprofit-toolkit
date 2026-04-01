@@ -28,7 +28,7 @@ USING (
     LEFT JOIN \`${datasetRaw}.source_coverage\` AS sc
       ON stg.source = 'mercury'
       AND sc.source != 'mercury'
-      AND LOWER(stg.description) LIKE CONCAT('%', LOWER(sc.source), '%')
+      AND LOWER(stg.description) LIKE CONCAT(LOWER(sc.source), ';%')
       AND stg.event_ts >= sc.covers_from
     WHERE stg.run_id = @run_id
       -- Mercury-specific filtering: only external incoming donations

@@ -206,7 +206,7 @@ describe('SQL generation', () => {
     it('matches Mercury description against source names in JOIN', () => {
       const sql = generateMergeSql(config)
       expect(sql).toContain(
-        "LOWER(stg.description) LIKE CONCAT('%', LOWER(sc.source), '%')",
+        "LOWER(stg.description) LIKE CONCAT(LOWER(sc.source), ';%')",
       )
     })
 

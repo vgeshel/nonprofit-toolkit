@@ -40,7 +40,7 @@ WHERE external_id IN (
   FROM donations.events e
   INNER JOIN donations_raw.source_coverage sc
     ON sc.source != 'mercury'
-    AND LOWER(e.description) LIKE CONCAT('%', LOWER(sc.source), '%')
+    AND LOWER(e.description) LIKE CONCAT(LOWER(sc.source), ';%')
     AND e.event_ts >= sc.covers_from
   WHERE e.source = 'mercury' AND e.status = 'succeeded'
 );
