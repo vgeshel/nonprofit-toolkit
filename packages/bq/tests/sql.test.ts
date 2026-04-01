@@ -196,9 +196,11 @@ describe('SQL generation', () => {
       expect(sql).toContain('transfer from another bank account')
     })
 
-    it('references source_coverage table for disbursement filtering', () => {
+    it('LEFT JOINs source_coverage for disbursement filtering', () => {
       const sql = generateMergeSql(config)
+      expect(sql).toContain('LEFT JOIN')
       expect(sql).toContain('source_coverage')
+      expect(sql).toContain('sc.source IS NOT NULL')
     })
 
     it('filters disbursements based on covers_from date', () => {
@@ -206,7 +208,7 @@ describe('SQL generation', () => {
       expect(sql).toContain('sc.covers_from')
     })
 
-    it('matches Mercury description against source names', () => {
+    it('matches Mercury description against source names in JOIN', () => {
       const sql = generateMergeSql(config)
       expect(sql).toContain(
         "LOWER(stg.description) LIKE CONCAT('%', LOWER(sc.source), '%')",

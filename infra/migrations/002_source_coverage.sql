@@ -32,16 +32,18 @@ WHEN NOT MATCHED THEN INSERT (source, covers_from)
 -- A Mercury transaction is a disbursement if its description contains
 -- the name of a source that has its own connector, AND the transaction
 -- occurred after that source's coverage start date.
+-- Uses JOIN approach because BigQuery does not support EXISTS with
+-- non-equality conditions (LIKE) in LEFT SEMI JOIN.
 DELETE FROM donations.events
-WHERE source = 'mercury'
-  AND status = 'succeeded'
-  AND EXISTS (
-    SELECT 1
-    FROM donations_raw.source_coverage sc
-    WHERE sc.source != 'mercury'
-      AND LOWER(donations.events.description) LIKE CONCAT('%', LOWER(sc.source), '%')
-      AND donations.events.event_ts >= sc.covers_from
-  );
+WHERE external_id IN (
+  SELECT e.external_id
+  FROM donations.events e
+  INNER JOIN donations_raw.source_coverage sc
+    ON sc.source != 'mercury'
+    AND LOWER(e.description) LIKE CONCAT('%', LOWER(sc.source), '%')
+    AND e.event_ts >= sc.covers_from
+  WHERE e.source = 'mercury' AND e.status = 'succeeded'
+);
 
 -- Also remove inter-bank transfers (not donations)
 DELETE FROM donations.events

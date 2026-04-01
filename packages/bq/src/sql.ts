@@ -25,6 +25,11 @@ USING (
     SELECT *,
       ROW_NUMBER() OVER (PARTITION BY source, external_id ORDER BY ingested_at DESC) AS row_num
     FROM \`${datasetRaw}.stg_events\` AS stg
+    LEFT JOIN \`${datasetRaw}.source_coverage\` AS sc
+      ON stg.source = 'mercury'
+      AND sc.source != 'mercury'
+      AND LOWER(stg.description) LIKE CONCAT('%', LOWER(sc.source), '%')
+      AND stg.event_ts >= sc.covers_from
     WHERE stg.run_id = @run_id
       -- Mercury-specific filtering: only external incoming donations
       AND NOT (
@@ -36,16 +41,9 @@ USING (
           -- Exclude inter-bank transfers (not donations)
           OR LOWER(stg.description) LIKE '%transfer from another bank account%'
           -- Exclude platform disbursements when we have that source's own data.
-          -- Uses source_coverage table to know which sources are active and from when.
-          -- This is time-sensitive: only excludes disbursements after the source's
-          -- coverage start date. Disbursements before a source was active are kept.
-          OR EXISTS (
-            SELECT 1
-            FROM \`${datasetRaw}.source_coverage\` sc
-            WHERE sc.source != 'mercury'
-              AND LOWER(stg.description) LIKE CONCAT('%', LOWER(sc.source), '%')
-              AND stg.event_ts >= sc.covers_from
-          )
+          -- sc.source is non-null when description matches a covered source and
+          -- the event is after that source's coverage start date.
+          OR sc.source IS NOT NULL
         )
       )
   )
