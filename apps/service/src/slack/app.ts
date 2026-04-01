@@ -10,6 +10,7 @@ import {
 import { App, Assistant } from '@slack/bolt'
 import type { KnownBlock } from '@slack/web-api'
 import type { Logger } from 'pino'
+import { z } from 'zod'
 import type { Config } from '../config'
 import { handleDonorLetterCommand } from './commands/donor-letter'
 import { prettySql } from './formatters/query-result'
@@ -238,6 +239,22 @@ export function createSlackApp(config: Config, logger: Logger) {
     return blocks
   }
 
+  // Extract mrkdwn text from the first section block in a message
+  const AnswerBlockSchema = z.object({
+    type: z.literal('section'),
+    text: z.object({ type: z.literal('mrkdwn'), text: z.string() }),
+  })
+
+  function extractAnswerText(message: unknown): string {
+    const msg = z.object({ blocks: z.array(z.unknown()) }).safeParse(message)
+    if (!msg.success) return ''
+    for (const block of msg.data.blocks) {
+      const parsed = AnswerBlockSchema.safeParse(block)
+      if (parsed.success) return parsed.data.text.text
+    }
+    return ''
+  }
+
   // Toggle SQL display inline by updating the message
   for (const actionId of ['show_sql', 'hide_sql'] as const) {
     app.action(actionId, async ({ ack, action, body, client }) => {
@@ -248,16 +265,17 @@ export function createSlackApp(config: Config, logger: Logger) {
         'channel' in body && body.channel ? body.channel.id : undefined
       const messageTs =
         'message' in body && body.message ? body.message.ts : undefined
-      const messageText =
-        'message' in body ? String(body.message?.text ?? '') : ''
       if (!channel || !messageTs) return
+
+      const message = 'message' in body ? body.message : undefined
+      const answerText = extractAnswerText(message)
 
       const showSql = actionId === 'show_sql'
       await client.chat.update({
         channel,
         ts: messageTs,
-        blocks: buildResultBlocks(messageText, action.value, showSql),
-        text: messageText,
+        blocks: buildResultBlocks(answerText, action.value, showSql),
+        text: answerText,
       })
     })
   }
