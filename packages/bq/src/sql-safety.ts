@@ -18,6 +18,11 @@ const FORBIDDEN_KEYWORDS = [
   'MERGE',
   'GRANT',
   'REVOKE',
+  'EXPORT',
+  'CALL',
+  'EXECUTE',
+  'DECLARE',
+  'BEGIN',
 ] as const
 
 /**
@@ -38,9 +43,21 @@ export function validateReadOnlySql(sql: string): string | null {
     return `Query must start with SELECT or WITH, got: ${firstWord}`
   }
 
-  // Check for forbidden keywords as standalone words (not inside strings)
-  // Strip string literals first to avoid false positives
-  const withoutStrings = trimmed.replace(/'[^']*'/g, '').replace(/"[^"]*"/g, '')
+  // Reject multi-statement queries (semicolons enable chaining attacks)
+  const withoutStrings = trimmed
+    .replace(/'[^']*'/g, '')
+    .replace(/"[^"]*"/g, '')
+    .replace(/`[^`]*`/g, '')
+  if (withoutStrings.includes(';')) {
+    return 'Multi-statement queries are not allowed (semicolons forbidden)'
+  }
+
+  // Block INFORMATION_SCHEMA access (prevents schema enumeration)
+  if (/\bINFORMATION_SCHEMA\b/i.test(withoutStrings)) {
+    return 'INFORMATION_SCHEMA access is not allowed'
+  }
+
+  // Check for forbidden keywords as standalone words (not inside strings or identifiers)
 
   for (const keyword of FORBIDDEN_KEYWORDS) {
     const pattern = new RegExp(`\\b${keyword}\\b`, 'i')

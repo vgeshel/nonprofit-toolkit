@@ -21,9 +21,9 @@ export function generateMergeSql(config: BigQueryConfig): string {
   return `
 MERGE \`${datasetCanon}.events\` AS target
 USING (
-  SELECT * EXCEPT(row_num) FROM (
-    SELECT *,
-      ROW_NUMBER() OVER (PARTITION BY source, external_id ORDER BY ingested_at DESC) AS row_num
+  SELECT * EXCEPT(row_num, _sc_matched) FROM (
+    SELECT stg.*, sc.source IS NOT NULL AS _sc_matched,
+      ROW_NUMBER() OVER (PARTITION BY stg.source, stg.external_id ORDER BY stg.ingested_at DESC) AS row_num
     FROM \`${datasetRaw}.stg_events\` AS stg
     LEFT JOIN \`${datasetRaw}.source_coverage\` AS sc
       ON stg.source = 'mercury'
@@ -39,7 +39,7 @@ USING (
           OR JSON_VALUE(stg.source_metadata, '$.isCredit') = 'false'  -- Exclude debits
           OR stg.payment_method = 'check'  -- Exclude checks (tracked via check_deposits source)
           -- Exclude platform disbursements when we have that source's own data.
-          -- sc.source is non-null when description matches a covered source and
+          -- _sc_matched is true when description matches a covered source and
           -- the event is after that source's coverage start date.
           OR sc.source IS NOT NULL
         )

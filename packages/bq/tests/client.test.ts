@@ -1043,7 +1043,9 @@ describe('BigQueryClient', () => {
 
       expect(result.isErr()).toBe(true)
       if (result.isErr()) {
-        expect(result.error.message).toContain('Forbidden SQL keyword: DROP')
+        expect(result.error.message).toContain(
+          'Multi-statement queries are not allowed',
+        )
       }
       expect(mockQuery).not.toHaveBeenCalled()
     })

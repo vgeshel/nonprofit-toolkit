@@ -196,6 +196,8 @@ describe('SQL generation', () => {
       expect(sql).toContain('LEFT JOIN')
       expect(sql).toContain('source_coverage')
       expect(sql).toContain('sc.source IS NOT NULL')
+      // Verify explicit stg.* to avoid ambiguous columns from JOIN
+      expect(sql).toContain('stg.*')
     })
 
     it('filters disbursements based on covers_from date', () => {

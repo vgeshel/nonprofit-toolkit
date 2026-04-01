@@ -144,10 +144,8 @@ export function createSlackApp(config: Config, logger: Logger) {
         }
       }
 
-      logger.info(
-        { question, hasHistory: history.length > 0 },
-        'Running donation agent',
-      )
+      logger.info({ hasHistory: history.length > 0 }, 'Running donation agent')
+      logger.debug({ question }, 'Agent question')
 
       const result = await runDonationAgent(
         question,
@@ -171,7 +169,8 @@ export function createSlackApp(config: Config, logger: Logger) {
 
       const { text, sql } = result.value
 
-      logger.info({ question, sql, textLength: text.length }, 'Agent completed')
+      logger.info({ textLength: text.length }, 'Agent completed')
+      logger.debug({ question, sql }, 'Agent details')
 
       // Post the answer with a "Show SQL" button
       if (sql) {
@@ -203,16 +202,20 @@ export function createSlackApp(config: Config, logger: Logger) {
 
   app.assistant(assistant)
 
-  // Build message blocks with optional SQL display
+  // Slack button value max length
+  const MAX_BUTTON_VALUE = 2000
+
+  // Build message blocks with optional SQL display and Show/Hide toggle.
+  // If SQL exceeds Slack's 2000-char button value limit, omit the button.
   function buildResultBlocks(
     text: string,
-    sql: string,
+    sql: string | null,
     showSql: boolean,
   ): KnownBlock[] {
     const blocks: KnownBlock[] = [
       { type: 'section', text: { type: 'mrkdwn', text } },
     ]
-    if (showSql) {
+    if (showSql && sql) {
       blocks.push({
         type: 'section',
         block_id: 'sql_display',
@@ -222,20 +225,22 @@ export function createSlackApp(config: Config, logger: Logger) {
         },
       })
     }
-    blocks.push({
-      type: 'actions',
-      elements: [
-        {
-          type: 'button',
-          text: {
-            type: 'plain_text',
-            text: showSql ? 'Hide SQL' : 'Show SQL',
+    if (sql && sql.length <= MAX_BUTTON_VALUE) {
+      blocks.push({
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            text: {
+              type: 'plain_text',
+              text: showSql ? 'Hide SQL' : 'Show SQL',
+            },
+            action_id: showSql ? 'hide_sql' : 'show_sql',
+            value: sql,
           },
-          action_id: showSql ? 'hide_sql' : 'show_sql',
-          value: sql,
-        },
-      ],
-    })
+        ],
+      })
+    }
     return blocks
   }
 
@@ -268,7 +273,11 @@ export function createSlackApp(config: Config, logger: Logger) {
       if (!channel || !messageTs) return
 
       const message = 'message' in body ? body.message : undefined
-      const answerText = extractAnswerText(message)
+      // Extract mrkdwn from blocks, fall back to message.text (plain text fallback)
+      const answerText =
+        extractAnswerText(message) ||
+        ('message' in body ? String(body.message?.text ?? '') : '')
+      if (!answerText) return
 
       const showSql = actionId === 'show_sql'
       await client.chat.update({
@@ -329,11 +338,22 @@ export function createSlackApp(config: Config, logger: Logger) {
     }
 
     logger.info(
-      { question, hasHistory: history.length > 0 },
+      { hasHistory: history.length > 0 },
       'Running donation agent (channel mention)',
     )
+    logger.debug({ question }, 'Agent question (channel mention)')
 
-    const result = await runDonationAgent(question, bqConfig, queryFn, history)
+    const result = await runDonationAgent(
+      question,
+      bqConfig,
+      queryFn,
+      history,
+      {
+        model: config.AGENT_MODEL,
+        orgName: config.ORG_NAME,
+        apiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
+      },
+    )
     const replyTs = event.thread_ts ?? event.ts
 
     if (result.isErr()) {
@@ -348,7 +368,11 @@ export function createSlackApp(config: Config, logger: Logger) {
 
     const { text, sql } = result.value
 
-    logger.info({ question, sql, textLength: text.length }, 'Agent completed')
+    logger.info(
+      { textLength: text.length },
+      'Agent completed (channel mention)',
+    )
+    logger.debug({ question, sql }, 'Agent details (channel mention)')
 
     await client.chat.postMessage({
       channel: event.channel,

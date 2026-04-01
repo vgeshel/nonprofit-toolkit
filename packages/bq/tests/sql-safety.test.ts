@@ -53,34 +53,23 @@ describe('validateReadOnlySql', () => {
     ).toContain('must start with SELECT')
   })
 
-  it('rejects SELECT with embedded DROP', () => {
+  it('rejects multi-statement queries (semicolons)', () => {
     expect(
       validateReadOnlySql('SELECT 1; DROP TABLE donations.events'),
-    ).toContain('Forbidden SQL keyword: DROP')
-  })
-
-  it('rejects SELECT with embedded DELETE', () => {
+    ).toContain('Multi-statement')
     expect(
       validateReadOnlySql(
         'SELECT * FROM donations.events; DELETE FROM donations.events',
       ),
-    ).toContain('Forbidden SQL keyword: DELETE')
+    ).toContain('Multi-statement')
   })
 
-  it('rejects SELECT with embedded UPDATE', () => {
+  it('allows semicolons inside string literals', () => {
     expect(
       validateReadOnlySql(
-        "SELECT * FROM donations.events; UPDATE donations.events SET status = 'x'",
+        "SELECT * FROM donations.events WHERE description = 'foo; bar'",
       ),
-    ).toContain('Forbidden SQL keyword: UPDATE')
-  })
-
-  it('rejects SELECT with embedded INSERT', () => {
-    expect(
-      validateReadOnlySql(
-        'SELECT * FROM donations.events; INSERT INTO donations.events VALUES (1)',
-      ),
-    ).toContain('Forbidden SQL keyword: INSERT')
+    ).toBeNull()
   })
 
   it('rejects ALTER', () => {
@@ -109,20 +98,60 @@ describe('validateReadOnlySql', () => {
     ).toContain('must start with SELECT')
   })
 
-  it('rejects GRANT', () => {
+  it('rejects EXPORT DATA', () => {
     expect(
       validateReadOnlySql(
-        'SELECT 1; GRANT SELECT ON TABLE donations.events TO "user"',
+        'SELECT 1 EXPORT DATA OPTIONS(uri="gs://bucket/data")',
       ),
-    ).toContain('Forbidden SQL keyword: GRANT')
+    ).toContain('Forbidden SQL keyword: EXPORT')
+  })
+
+  it('rejects EXECUTE IMMEDIATE', () => {
+    expect(
+      validateReadOnlySql('SELECT EXECUTE IMMEDIATE "DROP TABLE x"'),
+    ).toContain('Forbidden SQL keyword: EXECUTE')
+  })
+
+  it('rejects CALL', () => {
+    expect(validateReadOnlySql('SELECT 1 CALL my_procedure()')).toContain(
+      'Forbidden SQL keyword: CALL',
+    )
+  })
+
+  it('rejects DECLARE', () => {
+    expect(validateReadOnlySql('SELECT 1 DECLARE x INT64 DEFAULT 0')).toContain(
+      'Forbidden SQL keyword: DECLARE',
+    )
+  })
+
+  it('rejects INFORMATION_SCHEMA access', () => {
+    expect(
+      validateReadOnlySql(
+        'SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = "events"',
+      ),
+    ).toContain('INFORMATION_SCHEMA')
+  })
+
+  it('allows forbidden keywords inside backtick-quoted identifiers', () => {
+    expect(
+      validateReadOnlySql(
+        'SELECT * FROM donations.events WHERE `drop_date` IS NOT NULL',
+      ),
+    ).toBeNull()
+  })
+
+  it('rejects GRANT', () => {
+    expect(
+      validateReadOnlySql('GRANT SELECT ON TABLE donations.events TO "user"'),
+    ).toContain('must start with SELECT')
   })
 
   it('rejects REVOKE', () => {
     expect(
       validateReadOnlySql(
-        'SELECT 1; REVOKE SELECT ON TABLE donations.events FROM "user"',
+        'REVOKE SELECT ON TABLE donations.events FROM "user"',
       ),
-    ).toContain('Forbidden SQL keyword: REVOKE')
+    ).toContain('must start with SELECT')
   })
 
   it('allows forbidden keywords inside string literals', () => {
