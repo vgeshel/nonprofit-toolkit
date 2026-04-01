@@ -8,6 +8,7 @@ import {
   type ConversationMessage,
 } from '@donations-etl/bq'
 import { App, Assistant } from '@slack/bolt'
+import type { KnownBlock } from '@slack/web-api'
 import type { Logger } from 'pino'
 import type { Config } from '../config'
 import { handleDonorLetterCommand } from './commands/donor-letter'
@@ -201,22 +202,65 @@ export function createSlackApp(config: Config, logger: Logger) {
 
   app.assistant(assistant)
 
-  // Handle "Show SQL" button clicks — post SQL as ephemeral (only visible to clicker)
-  app.action('show_sql', async ({ ack, action, body, client }) => {
-    await ack()
-    if (action.type !== 'button' || !action.value) return
-
-    const channel =
-      'channel' in body && body.channel ? body.channel.id : undefined
-    const user = body.user.id
-    if (!channel) return
-
-    await client.chat.postEphemeral({
-      channel,
-      user,
-      text: `\`\`\`${prettySql(action.value)}\`\`\``,
+  // Build message blocks with optional SQL display
+  function buildResultBlocks(
+    text: string,
+    sql: string,
+    showSql: boolean,
+  ): KnownBlock[] {
+    const blocks: KnownBlock[] = [
+      { type: 'section', text: { type: 'mrkdwn', text } },
+    ]
+    if (showSql) {
+      blocks.push({
+        type: 'section',
+        block_id: 'sql_display',
+        text: {
+          type: 'mrkdwn',
+          text: `\`\`\`${prettySql(sql)}\`\`\``,
+        },
+      })
+    }
+    blocks.push({
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: {
+            type: 'plain_text',
+            text: showSql ? 'Hide SQL' : 'Show SQL',
+          },
+          action_id: showSql ? 'hide_sql' : 'show_sql',
+          value: sql,
+        },
+      ],
     })
-  })
+    return blocks
+  }
+
+  // Toggle SQL display inline by updating the message
+  for (const actionId of ['show_sql', 'hide_sql'] as const) {
+    app.action(actionId, async ({ ack, action, body, client }) => {
+      await ack()
+      if (action.type !== 'button' || !action.value) return
+
+      const channel =
+        'channel' in body && body.channel ? body.channel.id : undefined
+      const messageTs =
+        'message' in body && body.message ? body.message.ts : undefined
+      const messageText =
+        'message' in body ? String(body.message?.text ?? '') : ''
+      if (!channel || !messageTs) return
+
+      const showSql = actionId === 'show_sql'
+      await client.chat.update({
+        channel,
+        ts: messageTs,
+        blocks: buildResultBlocks(messageText, action.value, showSql),
+        text: messageText,
+      })
+    })
+  }
 
   // Also handle @mentions in channels for shared visibility
   app.event('app_mention', async ({ event, client }) => {
