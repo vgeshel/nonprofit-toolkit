@@ -171,20 +171,23 @@ export function createSlackApp(config: Config, logger: Logger) {
 
       logger.info({ question, sql, textLength: text.length }, 'Agent completed')
 
-      // Post the formatted answer with SQL collapsed in attachment
+      // Post the answer with a "Show SQL" button
       if (sql) {
         await say({
           text,
-          attachments: [
+          blocks: [
             {
-              color: '#dddddd',
-              blocks: [
+              type: 'section',
+              text: { type: 'mrkdwn', text },
+            },
+            {
+              type: 'actions',
+              elements: [
                 {
-                  type: 'section',
-                  text: {
-                    type: 'mrkdwn',
-                    text: `*Generated SQL*\n\`\`\`${prettySql(sql)}\`\`\``,
-                  },
+                  type: 'button',
+                  text: { type: 'plain_text', text: 'Show SQL' },
+                  action_id: 'show_sql',
+                  value: sql,
                 },
               ],
             },
@@ -197,6 +200,23 @@ export function createSlackApp(config: Config, logger: Logger) {
   })
 
   app.assistant(assistant)
+
+  // Handle "Show SQL" button clicks — post SQL as ephemeral (only visible to clicker)
+  app.action('show_sql', async ({ ack, action, body, client }) => {
+    await ack()
+    if (action.type !== 'button' || !action.value) return
+
+    const channel =
+      'channel' in body && body.channel ? body.channel.id : undefined
+    const user = body.user.id
+    if (!channel) return
+
+    await client.chat.postEphemeral({
+      channel,
+      user,
+      text: `\`\`\`${prettySql(action.value)}\`\`\``,
+    })
+  })
 
   // Also handle @mentions in channels for shared visibility
   app.event('app_mention', async ({ event, client }) => {
@@ -273,16 +293,19 @@ export function createSlackApp(config: Config, logger: Logger) {
       text,
       thread_ts: replyTs,
       ...(sql && {
-        attachments: [
+        blocks: [
           {
-            color: '#dddddd',
-            blocks: [
+            type: 'section',
+            text: { type: 'mrkdwn', text },
+          },
+          {
+            type: 'actions',
+            elements: [
               {
-                type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `*Generated SQL*\n\`\`\`${prettySql(sql)}\`\`\``,
-                },
+                type: 'button',
+                text: { type: 'plain_text', text: 'Show SQL' },
+                action_id: 'show_sql',
+                value: sql,
               },
             ],
           },
