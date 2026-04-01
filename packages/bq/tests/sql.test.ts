@@ -191,11 +191,6 @@ describe('SQL generation', () => {
   })
 
   describe('generateMergeSql - disbursement deduplication', () => {
-    it('excludes Mercury inter-bank transfers', () => {
-      const sql = generateMergeSql(config)
-      expect(sql).toContain('transfer from another bank account')
-    })
-
     it('LEFT JOINs source_coverage for disbursement filtering', () => {
       const sql = generateMergeSql(config)
       expect(sql).toContain('LEFT JOIN')

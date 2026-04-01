@@ -45,8 +45,5 @@ WHERE external_id IN (
   WHERE e.source = 'mercury' AND e.status = 'succeeded'
 );
 
--- Also remove inter-bank transfers (not donations)
-DELETE FROM donations.events
-WHERE source = 'mercury'
-  AND status = 'succeeded'
-  AND LOWER(description) LIKE '%transfer from another bank account%';
+-- Note: inter-bank transfers ("Transfer from another bank account to Mercury")
+-- are NOT removed — these are direct donations via bank wire.

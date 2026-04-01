@@ -38,8 +38,6 @@ USING (
           stg.payment_method = 'internal'  -- Exclude internal transfers
           OR JSON_VALUE(stg.source_metadata, '$.isCredit') = 'false'  -- Exclude debits
           OR stg.payment_method = 'check'  -- Exclude checks (tracked via check_deposits source)
-          -- Exclude inter-bank transfers (not donations)
-          OR LOWER(stg.description) LIKE '%transfer from another bank account%'
           -- Exclude platform disbursements when we have that source's own data.
           -- sc.source is non-null when description matches a covered source and
           -- the event is after that source's coverage start date.
