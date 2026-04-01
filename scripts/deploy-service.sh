@@ -294,14 +294,21 @@ else
     log "  SERVICE_API_KEY — generated"
   fi
 
-  ensure_secret "SERVICE_API_KEY" "$SERVICE_API_KEY"
+  ensure_secret "LETTER_SERVICE_API_KEY" "$SERVICE_API_KEY"
   ensure_secret "SLACK_BOT_TOKEN" "${SLACK_BOT_TOKEN:-placeholder}"
   ensure_secret "SLACK_SIGNING_SECRET" "${SLACK_SIGNING_SECRET:-placeholder}"
+  ensure_secret "GOOGLE_GENERATIVE_AI_API_KEY" "${GOOGLE_GENERATIVE_AI_API_KEY:-placeholder}"
+  ensure_secret "ORG_NAME" "${ORG_NAME:-}"
+  ensure_secret "ORG_ADDRESS" "${ORG_ADDRESS:-}"
+  ensure_secret "ORG_MISSION" "${ORG_MISSION:-}"
+  ensure_secret "ORG_TAX_STATUS" "${ORG_TAX_STATUS:-}"
+  ensure_secret "DEFAULT_SIGNER_NAME" "${DEFAULT_SIGNER_NAME:-}"
+  ensure_secret "DEFAULT_SIGNER_TITLE" "${DEFAULT_SIGNER_TITLE:-}"
 
   # Grant SA access to secrets
   if [[ "$DRY_RUN" != "true" ]]; then
     log "Granting ${RUNTIME_SA} access to secrets..."
-    for SECRET_NAME in SERVICE_API_KEY SLACK_BOT_TOKEN SLACK_SIGNING_SECRET; do
+    for SECRET_NAME in LETTER_SERVICE_API_KEY SLACK_BOT_TOKEN SLACK_SIGNING_SECRET GOOGLE_GENERATIVE_AI_API_KEY ORG_NAME ORG_ADDRESS ORG_MISSION ORG_TAX_STATUS DEFAULT_SIGNER_NAME DEFAULT_SIGNER_TITLE; do
       gcloud secrets add-iam-policy-binding "${SECRET_NAME}" \
         --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
         --role="roles/secretmanager.secretAccessor" \
@@ -347,7 +354,17 @@ else
     --image "${IMAGE_URI}" \
     --service-account "${RUNTIME_SA_EMAIL}" \
     --set-env-vars "PROJECT_ID=${PROJECT_ID},DATASET_CANON=${DATASET_CANON}" \
-    --set-secrets "SERVICE_API_KEY=SERVICE_API_KEY:latest,SLACK_BOT_TOKEN=SLACK_BOT_TOKEN:latest,SLACK_SIGNING_SECRET=SLACK_SIGNING_SECRET:latest" \
+    --set-secrets "\
+SERVICE_API_KEY=LETTER_SERVICE_API_KEY:latest,\
+SLACK_BOT_TOKEN=SLACK_BOT_TOKEN:latest,\
+SLACK_SIGNING_SECRET=SLACK_SIGNING_SECRET:latest,\
+GOOGLE_GENERATIVE_AI_API_KEY=GOOGLE_GENERATIVE_AI_API_KEY:latest,\
+ORG_NAME=ORG_NAME:latest,\
+ORG_ADDRESS=ORG_ADDRESS:latest,\
+ORG_MISSION=ORG_MISSION:latest,\
+ORG_TAX_STATUS=ORG_TAX_STATUS:latest,\
+DEFAULT_SIGNER_NAME=DEFAULT_SIGNER_NAME:latest,\
+DEFAULT_SIGNER_TITLE=DEFAULT_SIGNER_TITLE:latest" \
     --memory 1Gi \
     --cpu 1 \
     --min-instances 0 \
