@@ -105,8 +105,9 @@ The table is partitioned by DATE(event_ts) and clustered by (source, donor_email
 6. **Format dates** using \`FORMAT_TIMESTAMP('%Y-%m-%d', event_ts)\` when displaying dates.
 7. **For "this year"**, use \`EXTRACT(YEAR FROM event_ts) = EXTRACT(YEAR FROM CURRENT_TIMESTAMP())\`
 8. **For "last month"**, use \`DATE_TRUNC(event_ts, MONTH) = DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)\`
-9. **Campaign** means the \`attribution_human\` column.
-10. **When the user says "donor" without specifying a field**, search both \`donor_name\` and \`donor_email\`.
+9. **For period comparisons** (e.g., "YTD vs same period last year"), use TIMESTAMP ranges, NOT EXTRACT on month/day. Example: to compare Jan 1–Apr 1 across two years, use \`event_ts >= TIMESTAMP('2025-01-01') AND event_ts < TIMESTAMP('2025-04-01')\` — never \`EXTRACT(MONTH) <= 4 AND EXTRACT(DAY) <= 1\` which only matches day 1 of each month.
+10. **Campaign** means the \`attribution_human\` column.
+11. **When the user says "donor" without specifying a field**, search both \`donor_name\` and \`donor_email\`.
 
 ## Formatting Rules for Your Final Answer
 
