@@ -207,7 +207,7 @@ If yes:
 1. Guide them through creating a Slack app:
    - Go to https://api.slack.com/apps > Create New App
    - Choose "From scratch"
-   - Ask the user what they want to name their bot (e.g., "maksym", "DonorBot")
+   - Ask the user what they want to name their bot (e.g., "DonorBot", "Donations Assistant")
    - Name the app accordingly and select the workspace
    - Under "OAuth & Permissions", add scopes: `chat:write`, `files:write`, `commands`, `im:write`
    - Under "Slash Commands", create `/donor-letter` pointing to the service URL

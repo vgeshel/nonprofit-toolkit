@@ -83,8 +83,8 @@ describe('buildAgentPrompt', () => {
   })
 
   it('includes org name when provided', () => {
-    const prompt = buildAgentPrompt(config, { orgName: 'Leleka Foundation' })
-    expect(prompt).toContain('Leleka Foundation')
+    const prompt = buildAgentPrompt(config, { orgName: 'Test Foundation' })
+    expect(prompt).toContain('Test Foundation')
   })
 
   it('uses generic label when org name not provided', () => {
