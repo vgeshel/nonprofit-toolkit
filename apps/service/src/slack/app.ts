@@ -171,13 +171,27 @@ export function createSlackApp(config: Config, logger: Logger) {
 
       logger.info({ question, sql, textLength: text.length }, 'Agent completed')
 
-      // Post the formatted answer
-      await say(text)
-
-      // Post SQL as a follow-up (smaller, for reference)
+      // Post the formatted answer with SQL collapsed in attachment
       if (sql) {
-        const formatted = prettySql(sql)
-        await say(`_Generated SQL:_\n\`\`\`${formatted}\`\`\``)
+        await say({
+          text,
+          attachments: [
+            {
+              color: '#dddddd',
+              blocks: [
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `*Generated SQL*\n\`\`\`${prettySql(sql)}\`\`\``,
+                  },
+                },
+              ],
+            },
+          ],
+        })
+      } else {
+        await say(text)
       }
     },
   })
@@ -258,15 +272,23 @@ export function createSlackApp(config: Config, logger: Logger) {
       channel: event.channel,
       text,
       thread_ts: replyTs,
+      ...(sql && {
+        attachments: [
+          {
+            color: '#dddddd',
+            blocks: [
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `*Generated SQL*\n\`\`\`${prettySql(sql)}\`\`\``,
+                },
+              },
+            ],
+          },
+        ],
+      }),
     })
-
-    if (sql) {
-      await client.chat.postMessage({
-        channel: event.channel,
-        text: `_Generated SQL:_\n\`\`\`${prettySql(sql)}\`\`\``,
-        thread_ts: replyTs,
-      })
-    }
   })
 
   logger.info('Donation assistant registered (DM + channel mentions)')
