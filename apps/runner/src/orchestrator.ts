@@ -18,6 +18,7 @@ import {
   FunraiseConnector,
   GivebutterConnector,
   MercuryConnector,
+  PatreonConnector,
   PayPalConnector,
   VenmoConnector,
   WiseConnector,
@@ -176,6 +177,18 @@ export class Orchestrator {
           config: {
             apiToken: config.WISE_TOKEN,
             profileId: config.WISE_PROFILE_ID,
+          },
+        }),
+      )
+    }
+
+    if (config.PATREON_ACCESS_TOKEN && config.PATREON_CAMPAIGN_ID) {
+      this.connectors.set(
+        'patreon',
+        new PatreonConnector({
+          config: {
+            accessToken: config.PATREON_ACCESS_TOKEN,
+            campaignId: config.PATREON_CAMPAIGN_ID,
           },
         }),
       )

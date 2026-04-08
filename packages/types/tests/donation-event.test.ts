@@ -79,6 +79,7 @@ describe('SourceEnum', () => {
     expect(SourceEnum.parse('paypal')).toBe('paypal')
     expect(SourceEnum.parse('givebutter')).toBe('givebutter')
     expect(SourceEnum.parse('check_deposits')).toBe('check_deposits')
+    expect(SourceEnum.parse('patreon')).toBe('patreon')
   })
 
   it('rejects invalid sources', () => {

@@ -75,6 +75,7 @@ const mockCheckDepositsConnector = { fetchAll: vi.fn<FetchAllFn>() }
 const mockFunraiseConnector = { fetchAll: vi.fn<FetchAllFn>() }
 const mockVenmoConnector = { fetchAll: vi.fn<FetchAllFn>() }
 const mockWiseConnector = { fetchAll: vi.fn<FetchAllFn>() }
+const mockPatreonConnector = { fetchAll: vi.fn<FetchAllFn>() }
 
 // Mock dependencies with class-based implementations
 vi.mock('@donations-etl/connectors', () => ({
@@ -98,6 +99,9 @@ vi.mock('@donations-etl/connectors', () => ({
   },
   WiseConnector: class MockWiseConnector {
     fetchAll = mockWiseConnector.fetchAll
+  },
+  PatreonConnector: class MockPatreonConnector {
+    fetchAll = mockPatreonConnector.fetchAll
   },
 }))
 
@@ -202,6 +206,16 @@ describe('Orchestrator', () => {
         WISE_PROFILE_ID: 12345,
       }
       const orchestrator = new Orchestrator(configWithWise, logger)
+      expect(orchestrator).toBeDefined()
+    })
+
+    it('initializes with patreon connector when access token and campaign ID are present', () => {
+      const configWithPatreon = {
+        ...config,
+        PATREON_ACCESS_TOKEN: 'patreon-token',
+        PATREON_CAMPAIGN_ID: 'cmp_42',
+      }
+      const orchestrator = new Orchestrator(configWithPatreon, logger)
       expect(orchestrator).toBeDefined()
     })
   })

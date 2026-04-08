@@ -123,6 +123,14 @@ export interface WiseConfig {
   baseUrl?: string
 }
 
+export interface PatreonConfig {
+  /** Patreon Creator's Access Token (OAuth 2.0 Bearer) */
+  accessToken: string
+  /** Patreon Campaign ID to fetch members from */
+  campaignId: string
+  baseUrl?: string
+}
+
 export interface ConnectorConfigs {
   mercury?: MercuryConfig
   paypal?: PayPalConfig
@@ -131,6 +139,7 @@ export interface ConnectorConfigs {
   funraise?: FunraiseConfig
   venmo?: VenmoConfig
   wise?: WiseConfig
+  patreon?: PatreonConfig
 }
 
 /**

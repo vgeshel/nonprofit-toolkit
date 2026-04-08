@@ -35,6 +35,10 @@ export const ConfigSchema = z.object({
   WISE_TOKEN: z.string().optional(),
   WISE_PROFILE_ID: z.coerce.number().int().positive().optional(),
 
+  // Patreon
+  PATREON_ACCESS_TOKEN: z.string().optional(),
+  PATREON_CAMPAIGN_ID: z.string().optional(),
+
   // Slack (for reports)
   SLACK_BOT_TOKEN: z.string().optional(),
   REPORT_SLACK_CHANNEL: z.string().optional(),
@@ -65,6 +69,9 @@ export function loadConfig(): Config {
     GIVEBUTTER_API_KEY:
       process.env.GIVEBUTTER_API_KEY ?? process.env.SECRET_GIVEBUTTER_API_KEY,
     WISE_TOKEN: process.env.WISE_TOKEN ?? process.env.SECRET_WISE_TOKEN,
+    PATREON_ACCESS_TOKEN:
+      process.env.PATREON_ACCESS_TOKEN ??
+      process.env.SECRET_PATREON_ACCESS_TOKEN,
   }
   return ConfigSchema.parse(env)
 }
@@ -74,13 +81,21 @@ export function loadConfig(): Config {
  */
 export function getEnabledSources(
   config: Config,
-): ('mercury' | 'paypal' | 'givebutter' | 'check_deposits' | 'wise')[] {
+): (
+  | 'mercury'
+  | 'paypal'
+  | 'givebutter'
+  | 'check_deposits'
+  | 'wise'
+  | 'patreon'
+)[] {
   const sources: (
     | 'mercury'
     | 'paypal'
     | 'givebutter'
     | 'check_deposits'
     | 'wise'
+    | 'patreon'
   )[] = []
 
   if (config.MERCURY_API_KEY) {
@@ -101,6 +116,10 @@ export function getEnabledSources(
 
   if (config.WISE_TOKEN && config.WISE_PROFILE_ID) {
     sources.push('wise')
+  }
+
+  if (config.PATREON_ACCESS_TOKEN && config.PATREON_CAMPAIGN_ID) {
+    sources.push('patreon')
   }
 
   return sources

@@ -173,6 +173,20 @@ describe('ConfigSchema', () => {
 
       expect(() => ConfigSchema.parse(input)).toThrow(ZodError)
     })
+
+    it('accepts PATREON_ACCESS_TOKEN and PATREON_CAMPAIGN_ID', () => {
+      const input = {
+        PROJECT_ID: 'my-project',
+        BUCKET: 'my-bucket',
+        PATREON_ACCESS_TOKEN: 'patreon-token',
+        PATREON_CAMPAIGN_ID: 'cmp_42',
+      }
+
+      const result = ConfigSchema.parse(input)
+
+      expect(result.PATREON_ACCESS_TOKEN).toBe('patreon-token')
+      expect(result.PATREON_CAMPAIGN_ID).toBe('cmp_42')
+    })
   })
 
   describe('LOOKBACK_HOURS coercion', () => {
@@ -319,6 +333,7 @@ describe('loadConfig', () => {
     process.env.SECRET_PAYPAL_SECRET = 'secret-paypal-secret'
     process.env.SECRET_GIVEBUTTER_API_KEY = 'secret-givebutter-key'
     process.env.SECRET_WISE_TOKEN = 'secret-wise-token'
+    process.env.SECRET_PATREON_ACCESS_TOKEN = 'secret-patreon-token'
 
     const config = loadConfig()
 
@@ -327,6 +342,7 @@ describe('loadConfig', () => {
     expect(config.PAYPAL_SECRET).toBe('secret-paypal-secret')
     expect(config.GIVEBUTTER_API_KEY).toBe('secret-givebutter-key')
     expect(config.WISE_TOKEN).toBe('secret-wise-token')
+    expect(config.PATREON_ACCESS_TOKEN).toBe('secret-patreon-token')
   })
 
   it('prefers non-SECRET vars over SECRET_* vars', () => {
@@ -461,6 +477,40 @@ describe('getEnabledSources', () => {
     expect(sources).toEqual([])
   })
 
+  it('returns patreon when PATREON_ACCESS_TOKEN and PATREON_CAMPAIGN_ID are set', () => {
+    const config: Config = {
+      ...baseConfig,
+      PATREON_ACCESS_TOKEN: 'tok',
+      PATREON_CAMPAIGN_ID: 'cmp_1',
+    }
+
+    const sources = getEnabledSources(config)
+
+    expect(sources).toEqual(['patreon'])
+  })
+
+  it('does not return patreon when only PATREON_ACCESS_TOKEN is set', () => {
+    const config: Config = {
+      ...baseConfig,
+      PATREON_ACCESS_TOKEN: 'tok',
+    }
+
+    const sources = getEnabledSources(config)
+
+    expect(sources).toEqual([])
+  })
+
+  it('does not return patreon when only PATREON_CAMPAIGN_ID is set', () => {
+    const config: Config = {
+      ...baseConfig,
+      PATREON_CAMPAIGN_ID: 'cmp_1',
+    }
+
+    const sources = getEnabledSources(config)
+
+    expect(sources).toEqual([])
+  })
+
   it('returns all sources when all are configured', () => {
     const config: Config = {
       ...baseConfig,
@@ -471,6 +521,8 @@ describe('getEnabledSources', () => {
       CHECK_DEPOSITS_SPREADSHEET_ID: 'test-spreadsheet-id-123',
       WISE_TOKEN: 'wise-token',
       WISE_PROFILE_ID: 12345,
+      PATREON_ACCESS_TOKEN: 'patreon-token',
+      PATREON_CAMPAIGN_ID: 'cmp_42',
     }
 
     const sources = getEnabledSources(config)
@@ -481,6 +533,7 @@ describe('getEnabledSources', () => {
       'givebutter',
       'check_deposits',
       'wise',
+      'patreon',
     ])
   })
 })

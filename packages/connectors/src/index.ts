@@ -15,6 +15,7 @@ export type {
   FunraiseConfig,
   GivebutterConfig,
   MercuryConfig,
+  PatreonConfig,
   PayPalConfig,
   VenmoConfig,
   WiseConfig,
@@ -78,3 +79,13 @@ export {
   type IWiseClient,
   type WiseConnectorOptions,
 } from './wise'
+
+// Patreon connector (API)
+export {
+  PATREON_BASE_URL,
+  PATREON_DEFAULT_PAGE_SIZE,
+  PatreonClient,
+  PatreonConnector,
+  type IPatreonClient,
+  type PatreonConnectorOptions,
+} from './patreon'
