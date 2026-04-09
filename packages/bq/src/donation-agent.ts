@@ -72,7 +72,7 @@ The table is \`${config.datasetCanon}.events\` with these columns:
 
 | Column | Type | Description |
 |--------|------|-------------|
-| source | STRING | Payment platform: 'mercury', 'paypal', 'givebutter', 'check_deposits', 'funraise', 'venmo', 'wise' |
+| source | STRING | Payment platform: 'mercury', 'paypal', 'givebutter', 'check_deposits', 'funraise', 'venmo', 'wise', 'patreon' |
 | external_id | STRING | Unique ID from source system |
 | event_ts | TIMESTAMP | When the donation occurred (UTC) |
 | created_at | TIMESTAMP | When created on source platform |

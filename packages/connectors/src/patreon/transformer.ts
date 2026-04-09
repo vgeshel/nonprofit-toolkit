@@ -171,7 +171,7 @@ export function transformPatreonPledgeEvent(
     created_at: attrs.date,
     ingested_at: DateTime.utc().toISO(),
     amount_cents: amountCents,
-    fee_cents: 0,
+    fee_cents: 0, // Patreon charges 5-12% platform fees but V2 API does not expose per-transaction fees
     net_amount_cents: amountCents,
     currency,
     donor_name: memberAttrs.full_name ?? null,

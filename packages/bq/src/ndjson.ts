@@ -76,7 +76,7 @@ export function chunkEvents(
  * Format: runs/{runId}/source={source}/[chunk-{chunkPrefix}-]part-{index}.ndjson
  *
  * @param runId Unique run identifier
- * @param source Source name (mercury, paypal, givebutter)
+ * @param source Source name (mercury, paypal, givebutter, patreon, etc.)
  * @param index Part index within this write operation
  * @param chunkPrefix Optional prefix to differentiate date chunks
  */
