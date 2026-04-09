@@ -40,6 +40,10 @@ describe('mapPatreonPaymentStatus', () => {
     expect(mapPatreonPaymentStatus('Other')).toBe('failed')
   })
 
+  it('maps "Deleted" to "failed" (subscription record cleaned up by Patreon)', () => {
+    expect(mapPatreonPaymentStatus('Deleted')).toBe('failed')
+  })
+
   it('maps "Refunded" to "refunded"', () => {
     expect(mapPatreonPaymentStatus('Refunded')).toBe('refunded')
   })
@@ -52,8 +56,8 @@ describe('mapPatreonPaymentStatus', () => {
     expect(mapPatreonPaymentStatus(undefined)).toBe('succeeded')
   })
 
-  it('defaults unknown values to "succeeded"', () => {
-    expect(mapPatreonPaymentStatus('SomethingNew')).toBe('succeeded')
+  it('defaults unknown values to "failed" (conservative — exclude from totals)', () => {
+    expect(mapPatreonPaymentStatus('SomethingNew')).toBe('failed')
   })
 })
 

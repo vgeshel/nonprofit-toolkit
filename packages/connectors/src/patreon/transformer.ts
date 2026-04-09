@@ -52,9 +52,15 @@ const SUBSCRIPTION_EVENT_TYPE = 'subscription'
 /**
  * Map a Patreon `payment_status` value to the canonical DonationStatus.
  *
- * Patreon documents the following values: Paid, Declined, Pending,
- * Refunded, Fraud, Other. Anything we don't recognize is logged and
- * defaulted to 'succeeded' to avoid silently dropping data.
+ * Patreon documents Paid, Declined, Pending, Refunded, Fraud, Other.
+ * Live API inspection also surfaced `Deleted`, which represents a
+ * recurring charge that was attempted but later marked deleted (e.g.
+ * the patron left or their payment method was removed). No money was
+ * collected, so we map it to `failed`.
+ *
+ * Unknown values default to `failed` (not `succeeded`) so that any
+ * future unrecognized status is excluded from donation totals until
+ * we explicitly classify it.
  */
 export function mapPatreonPaymentStatus(
   status: string | null | undefined,
@@ -70,15 +76,16 @@ export function mapPatreonPaymentStatus(
     case 'Declined':
     case 'Fraud':
     case 'Other':
+    case 'Deleted':
       return 'failed'
     case 'Refunded':
       return 'refunded'
     default:
       logger.warn(
         { status },
-        'Unknown Patreon payment_status, defaulting to succeeded',
+        'Unknown Patreon payment_status, defaulting to failed',
       )
-      return 'succeeded'
+      return 'failed'
   }
 }
 

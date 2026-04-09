@@ -3,7 +3,7 @@
  *
  * Uses Commander for argument parsing and Zod for validation.
  */
-import type { Source } from '@donations-etl/types'
+import { SourceEnum, type Source } from '@donations-etl/types'
 import { Command } from 'commander'
 import { err, ok, type Result } from 'neverthrow'
 import { z } from 'zod'
@@ -24,32 +24,22 @@ function createError(type: CliError['type'], message: string): CliError {
 }
 
 /**
- * Source schema for validation.
- */
-const SourceSchema = z.enum([
-  'mercury',
-  'paypal',
-  'givebutter',
-  'check_deposits',
-  'funraise',
-  'venmo',
-  'wise',
-])
-
-/**
  * Parse a comma-separated source list.
+ *
+ * Uses the canonical SourceEnum from @donations-etl/types so the CLI
+ * automatically picks up new sources without local duplication.
  */
 function parseSourceList(value: string): Result<Source[], CliError> {
   const sources = value.split(',').map((s) => s.trim().toLowerCase())
 
   const validatedSources: Source[] = []
   for (const source of sources) {
-    const result = SourceSchema.safeParse(source)
+    const result = SourceEnum.safeParse(source)
     if (!result.success) {
       return err(
         createError(
           'validation',
-          `Invalid source: ${source}. Valid sources: mercury, paypal, givebutter, check_deposits, funraise, venmo, wise`,
+          `Invalid source: ${source}. Valid sources: ${SourceEnum.options.join(', ')}`,
         ),
       )
     }
@@ -64,19 +54,7 @@ function parseSourceList(value: string): Result<Source[], CliError> {
  */
 export const DailyOptionsSchema = z
   .object({
-    sources: z
-      .array(
-        z.enum([
-          'mercury',
-          'paypal',
-          'givebutter',
-          'check_deposits',
-          'funraise',
-          'venmo',
-          'wise',
-        ]),
-      )
-      .optional(),
+    sources: z.array(SourceEnum).optional(),
     skipMerge: z.boolean().optional(),
     mergeOnly: z.boolean().optional(),
     funraiseCsv: z.string().optional(),
@@ -105,19 +83,7 @@ export const BackfillOptionsSchema = z
       .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD format')
       .optional(),
     chunk: z.enum(['day', 'week', 'month']).default('month'),
-    sources: z
-      .array(
-        z.enum([
-          'mercury',
-          'paypal',
-          'givebutter',
-          'check_deposits',
-          'funraise',
-          'venmo',
-          'wise',
-        ]),
-      )
-      .optional(),
+    sources: z.array(SourceEnum).optional(),
     skipMerge: z.boolean().optional(),
     mergeOnly: z.boolean().optional(),
     funraiseCsv: z.string().optional(),
