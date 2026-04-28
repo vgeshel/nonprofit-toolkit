@@ -10,15 +10,56 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { createJurisdictionRegistry } from '../registry/jurisdiction-registry.ts'
-import type { Jurisdiction } from '../types/index.ts'
+import type { Jurisdiction, Source } from '../types/index.ts'
 
-function makeJurisdiction(id: string): Jurisdiction {
+function makeSource(
+  args: {
+    readonly id?: string
+    readonly accessUrl?: string
+    readonly tosUrl?: string
+  } = {},
+): Source {
+  return {
+    id: args.id ?? 'fake-source',
+    jurisdiction: 'us-federal',
+    kind: 'api',
+    authRequired: false,
+    description: 'fake source',
+    accessUrl: args.accessUrl ?? 'https://example.com/source',
+    accessMethod: 'official_api',
+    automationAllowed: true,
+    tosUrl: args.tosUrl ?? 'https://example.com/tos',
+    run: () => {
+      throw new Error('not used in registry tests')
+    },
+  }
+}
+
+function makeJurisdiction(id: string, sources: Source[] = []): Jurisdiction {
   return {
     id,
     entityIdSchema: z.object({}).strict(),
-    sources: [],
+    sources,
     deadlineRules: [],
     forms: [],
+  }
+}
+
+function makeManualSource(args: { readonly manualOnlyReason: string }): Source {
+  return {
+    id: 'manual-source',
+    jurisdiction: 'us-ca',
+    kind: 'manual',
+    authRequired: false,
+    description: 'manual source',
+    accessUrl: 'https://example.com/manual',
+    accessMethod: 'manual',
+    automationAllowed: false,
+    manualOnlyReason: args.manualOnlyReason,
+    tosUrl: 'https://example.com/tos',
+    run: () => {
+      throw new Error('not used in registry tests')
+    },
   }
 }
 
@@ -138,5 +179,32 @@ describe('createJurisdictionRegistry', () => {
 
     const ids = r.list().map((j) => j.id)
     expect(ids).toEqual(['us-federal', 'us-ca'])
+  })
+
+  it('rejects a jurisdiction whose source metadata has an invalid access URL', () => {
+    const r = createJurisdictionRegistry()
+    const result = r.register(
+      makeJurisdiction('us-federal', [makeSource({ accessUrl: 'not-a-url' })]),
+    )
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.type).toBe('invalid_source')
+      expect(result.error.id).toBe('fake-source')
+      expect(result.error.message).toContain('accessUrl')
+    }
+    expect(r.list()).toEqual([])
+  })
+
+  it('rejects a manual-only source without a reason', () => {
+    const r = createJurisdictionRegistry()
+    const result = r.register(
+      makeJurisdiction('us-ca', [makeManualSource({ manualOnlyReason: '' })]),
+    )
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.type).toBe('invalid_source')
+      expect(result.error.id).toBe('manual-source')
+      expect(result.error.message).toContain('manualOnlyReason')
+    }
   })
 })

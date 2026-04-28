@@ -88,6 +88,9 @@ function fakeMigrationPort(
     createTable: vi.fn<ComplianceMigrationPort['createTable']>(() =>
       okAsync(undefined),
     ),
+    addTableColumn: vi.fn<ComplianceMigrationPort['addTableColumn']>(() =>
+      okAsync(undefined),
+    ),
     ...overrides,
   }
 }

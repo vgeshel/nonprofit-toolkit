@@ -28,6 +28,9 @@ function fakePort(
     createTable: vi.fn<ComplianceMigrationPort['createTable']>(() =>
       okAsync(undefined),
     ),
+    addTableColumn: vi.fn<ComplianceMigrationPort['addTableColumn']>(() =>
+      okAsync(undefined),
+    ),
     ...overrides,
   }
 }
@@ -97,6 +100,7 @@ describe('didCreateAnything', () => {
         createdDataset: true,
         createdTables: [],
         skippedTables: ['entity', 'discovery_runs', 'findings', 'sources'],
+        addedColumns: [],
       }),
     ).toBe(true)
   })
@@ -108,6 +112,7 @@ describe('didCreateAnything', () => {
         createdDataset: false,
         createdTables: ['findings'],
         skippedTables: ['entity', 'discovery_runs', 'sources'],
+        addedColumns: [],
       }),
     ).toBe(true)
   })
@@ -119,7 +124,20 @@ describe('didCreateAnything', () => {
         createdDataset: false,
         createdTables: [],
         skippedTables: ['entity', 'discovery_runs', 'findings', 'sources'],
+        addedColumns: [],
       }),
     ).toBe(false)
+  })
+
+  it('is true when schema upgrade columns were added', async () => {
+    const { didCreateAnything } = await import('../state/ensure-schema.ts')
+    expect(
+      didCreateAnything({
+        createdDataset: false,
+        createdTables: [],
+        skippedTables: ['entity', 'discovery_runs', 'findings', 'sources'],
+        addedColumns: ['sources.access_url'],
+      }),
+    ).toBe(true)
   })
 })

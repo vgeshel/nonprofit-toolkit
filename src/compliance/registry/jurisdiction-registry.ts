@@ -13,7 +13,12 @@
  */
 import type { Result } from 'neverthrow'
 import { err, ok } from 'neverthrow'
-import { JurisdictionIdSchema, type Jurisdiction } from '../types/index.ts'
+import {
+  JurisdictionIdSchema,
+  SourceMetadataSchema,
+  type Jurisdiction,
+  type Source,
+} from '../types/index.ts'
 
 /**
  * Failure modes when interacting with the registry.
@@ -22,6 +27,7 @@ export type RegistryError =
   | { type: 'duplicate'; id: string; message: string }
   | { type: 'not_found'; id: string; message: string }
   | { type: 'invalid_id'; id: string; message: string }
+  | { type: 'invalid_source'; id: string; message: string }
 
 /**
  * Registry interface — exposed so callers can pass it around without depending
@@ -59,6 +65,13 @@ export function createJurisdictionRegistry(): JurisdictionRegistry {
         })
       }
 
+      for (const source of jurisdiction.sources) {
+        const sourceValidation = validateSourceMetadata(source)
+        if (sourceValidation.isErr()) {
+          return err(sourceValidation.error)
+        }
+      }
+
       entries.push(jurisdiction)
       return ok(jurisdiction)
     },
@@ -87,4 +100,24 @@ export function createJurisdictionRegistry(): JurisdictionRegistry {
       return entries.slice()
     },
   }
+}
+
+function validateSourceMetadata(source: Source): Result<Source, RegistryError> {
+  const parsed = SourceMetadataSchema.safeParse(source)
+  if (!parsed.success) {
+    return err({
+      type: 'invalid_source',
+      id: source.id,
+      message: `Invalid source metadata for ${source.id}: ${parsed.error.issues
+        .map(formatIssuePath)
+        .join('; ')}`,
+    })
+  }
+  return ok(source)
+}
+
+function formatIssuePath(issue: {
+  readonly path: readonly PropertyKey[]
+}): string {
+  return issue.path.map(String).join('.')
 }

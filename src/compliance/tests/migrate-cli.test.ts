@@ -54,10 +54,12 @@ function fakeDataset(state: FakeDatasetState): BqDataset {
 function fakeBq(state: {
   dataset: FakeDatasetState
   createDataset: ReturnType<typeof vi.fn<BqClient['createDataset']>>
+  query?: ReturnType<typeof vi.fn<BqClient['query']>>
 }): BqClient {
   return {
     dataset: () => fakeDataset(state.dataset),
     createDataset: state.createDataset,
+    query: state.query ?? vi.fn<BqClient['query']>(() => Promise.resolve([])),
   }
 }
 
@@ -300,6 +302,66 @@ describe('makeBqPort', () => {
       description: '',
     })
     expect(r.isErr()).toBe(true)
+  })
+
+  it('routes addTableColumn through BigQuery DDL', async () => {
+    const query = vi.fn<BqClient['query']>(() => Promise.resolve([]))
+    const bq = fakeBq({
+      dataset: {
+        exists: vi.fn<BqDataset['exists']>(() => Promise.resolve([true])),
+        createTable: vi.fn<BqDataset['createTable']>(() =>
+          Promise.resolve([{}]),
+        ),
+        tableExists: vi.fn<() => Promise<unknown>>(() =>
+          Promise.resolve([true]),
+        ),
+      },
+      createDataset: vi.fn<BqClient['createDataset']>(() =>
+        Promise.resolve([{}]),
+      ),
+      query,
+    })
+    const port = makeBqPort(bq)
+    const result = await port.addTableColumn({
+      dataset: 'compliance',
+      tableId: 'sources',
+      field: { name: 'access_url', type: 'STRING', mode: 'NULLABLE' },
+    })
+    expect(result.isOk()).toBe(true)
+    expect(query).toHaveBeenCalledWith({
+      query:
+        'ALTER TABLE `compliance.sources` ADD COLUMN IF NOT EXISTS access_url STRING',
+    })
+  })
+
+  it('returns a typed error when addTableColumn rejects', async () => {
+    const bq = fakeBq({
+      dataset: {
+        exists: vi.fn<BqDataset['exists']>(() => Promise.resolve([true])),
+        createTable: vi.fn<BqDataset['createTable']>(() =>
+          Promise.resolve([{}]),
+        ),
+        tableExists: vi.fn<() => Promise<unknown>>(() =>
+          Promise.resolve([true]),
+        ),
+      },
+      createDataset: vi.fn<BqClient['createDataset']>(() =>
+        Promise.resolve([{}]),
+      ),
+      query: vi.fn<BqClient['query']>(() =>
+        Promise.reject(new Error('ddl failed')),
+      ),
+    })
+    const port = makeBqPort(bq)
+    const result = await port.addTableColumn({
+      dataset: 'compliance',
+      tableId: 'sources',
+      field: { name: 'access_url', type: 'STRING', mode: 'NULLABLE' },
+    })
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.message).toBe('ddl failed')
+    }
   })
 })
 

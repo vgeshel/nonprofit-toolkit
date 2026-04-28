@@ -62,6 +62,7 @@ export function adaptBigQueryToBqClient(bq: BigQuery): BqClient {
       }
     },
     createDataset: (name: string) => bq.createDataset(name),
+    query: (options) => bq.query(options),
   }
 }
 

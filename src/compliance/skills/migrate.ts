@@ -42,6 +42,15 @@ export interface CreateTableRequest {
 }
 
 /**
+ * One additive schema change for an existing table.
+ */
+export interface AddTableColumnRequest {
+  readonly dataset: string
+  readonly tableId: string
+  readonly field: TableSchemaField
+}
+
+/**
  * Port abstracting just the BigQuery operations we need. The production
  * adapter lives in `scripts/compliance-migrate.ts` and wraps the real
  * `BigQuery` client; tests inject a `vi.fn()`-based fake.
@@ -54,6 +63,9 @@ export interface ComplianceMigrationPort {
     tableId: string
   }): ResultAsync<boolean, MigrationPortError>
   createTable(req: CreateTableRequest): ResultAsync<void, MigrationPortError>
+  addTableColumn(
+    req: AddTableColumnRequest,
+  ): ResultAsync<void, MigrationPortError>
 }
 
 /**
@@ -63,6 +75,7 @@ export interface MigrationReport {
   readonly createdDataset: boolean
   readonly createdTables: readonly string[]
   readonly skippedTables: readonly string[]
+  readonly addedColumns: readonly string[]
 }
 
 /**
@@ -94,6 +107,7 @@ export function runMigration(
           createdDataset,
           createdTables: tableReport.created,
           skippedTables: tableReport.skipped,
+          addedColumns: tableReport.addedColumns,
         })),
       )
     })
@@ -102,11 +116,25 @@ export function runMigration(
 interface TableEnsureReport {
   readonly created: readonly string[]
   readonly skipped: readonly string[]
+  readonly addedColumns: readonly string[]
 }
 
 type TableOutcome =
-  | { kind: 'ok'; name: string; outcome: 'created' | 'skipped' }
+  | {
+      kind: 'ok'
+      name: string
+      outcome: 'created' | 'skipped'
+      addedColumns: readonly string[]
+    }
   | { kind: 'err'; error: MigrationPortError }
+
+const SOURCE_POLICY_UPGRADE_FIELDS: readonly TableSchemaField[] = [
+  { name: 'access_url', type: 'STRING', mode: 'NULLABLE' },
+  { name: 'access_method', type: 'STRING', mode: 'NULLABLE' },
+  { name: 'automation_allowed', type: 'BOOL', mode: 'NULLABLE' },
+  { name: 'manual_only_reason', type: 'STRING', mode: 'NULLABLE' },
+  { name: 'source_freshness', type: 'JSON', mode: 'NULLABLE' },
+]
 
 function ensureAllTables(
   args: RunMigrationArgs,
@@ -115,12 +143,24 @@ function ensureAllTables(
   for (const def of COMPLIANCE_TABLES) {
     const ensure: Promise<TableOutcome> = args.port
       .tableExists({ dataset: COMPLIANCE_DATASET, tableId: def.name })
-      .andThen<'created' | 'skipped', MigrationPortError>((exists) => {
+      .andThen<TableOutcome, MigrationPortError>((exists) => {
         if (exists) {
-          return okAsync('skipped')
+          return ensureSchemaUpgradeColumns(args, def.name).map(
+            (addedColumns): TableOutcome => ({
+              kind: 'ok',
+              name: def.name,
+              outcome: 'skipped',
+              addedColumns,
+            }),
+          )
         }
         if (args.dryRun) {
-          return okAsync('created')
+          return okAsync({
+            kind: 'ok',
+            name: def.name,
+            outcome: 'created',
+            addedColumns: [],
+          })
         }
         return args.port
           .createTable({
@@ -129,10 +169,17 @@ function ensureAllTables(
             schema: { fields: def.fields },
             description: def.description,
           })
-          .map(() => 'created')
+          .map(
+            (): TableOutcome => ({
+              kind: 'ok',
+              name: def.name,
+              outcome: 'created',
+              addedColumns: [],
+            }),
+          )
       })
       .match(
-        (outcome): TableOutcome => ({ kind: 'ok', name: def.name, outcome }),
+        (outcome): TableOutcome => outcome,
         (error): TableOutcome => ({ kind: 'err', error }),
       )
     promises.push(ensure)
@@ -144,6 +191,7 @@ function ensureAllTables(
   >((results) => {
     const created: string[] = []
     const skipped: string[] = []
+    const addedColumns: string[] = []
     for (const r of results) {
       if (r.kind === 'err') {
         return errAsync(r.error)
@@ -153,9 +201,41 @@ function ensureAllTables(
       } else {
         skipped.push(r.name)
       }
+      addedColumns.push(...r.addedColumns)
     }
-    return okAsync({ created, skipped })
+    return okAsync({ created, skipped, addedColumns })
   })
+}
+
+function ensureSchemaUpgradeColumns(
+  args: RunMigrationArgs,
+  tableId: string,
+): ResultAsync<readonly string[], MigrationPortError> {
+  const fields = schemaUpgradeFieldsForTable(tableId)
+  if (fields.length === 0) {
+    return okAsync([])
+  }
+  if (args.dryRun) {
+    return okAsync(fields.map((field) => `${tableId}.${field.name}`))
+  }
+
+  return ResultAsync.combine(
+    fields.map((field) =>
+      args.port
+        .addTableColumn({
+          dataset: COMPLIANCE_DATASET,
+          tableId,
+          field,
+        })
+        .map(() => `${tableId}.${field.name}`),
+    ),
+  )
+}
+
+function schemaUpgradeFieldsForTable(
+  tableId: string,
+): readonly TableSchemaField[] {
+  return tableId === 'sources' ? SOURCE_POLICY_UPGRADE_FIELDS : []
 }
 
 /**

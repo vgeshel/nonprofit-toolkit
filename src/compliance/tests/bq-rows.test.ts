@@ -204,6 +204,15 @@ describe('ComplianceSourceRowSchema', () => {
     kind: 'api',
     auth_required: false,
     description: 'IRS Pub 78 + Auto Revocation lookup by EIN.',
+    access_url:
+      'https://www.irs.gov/charities-non-profits/tax-exempt-organization-search-bulk-data-downloads',
+    access_method: 'official_bulk_download',
+    automation_allowed: true,
+    manual_only_reason: null,
+    source_freshness: {
+      observedAt: '2026-04-28T00:00:00.000Z',
+      upstreamPublishedAt: '2026-04-15',
+    },
     tos_url:
       'https://www.irs.gov/charities-non-profits/tax-exempt-organization-search-bulk-data-downloads',
     updated_at: '2024-01-01T00:00:00Z',
@@ -223,6 +232,50 @@ describe('ComplianceSourceRowSchema', () => {
     expect(() =>
       ComplianceSourceRowSchema.parse({ ...valid, tos_url: 'not-a-url' }),
     ).toThrow()
+  })
+
+  it('rejects an access_url that is not a URL', () => {
+    expect(() =>
+      ComplianceSourceRowSchema.parse({ ...valid, access_url: 'not-a-url' }),
+    ).toThrow()
+  })
+
+  it('rejects an unknown access method', () => {
+    expect(() =>
+      ComplianceSourceRowSchema.parse({
+        ...valid,
+        access_method: 'private_endpoint',
+      }),
+    ).toThrow()
+  })
+
+  it('requires manual_only_reason when automation is blocked', () => {
+    expect(() =>
+      ComplianceSourceRowSchema.parse({
+        ...valid,
+        automation_allowed: false,
+        manual_only_reason: null,
+      }),
+    ).toThrow()
+  })
+
+  it('rejects manual_only_reason on automated sources', () => {
+    expect(() =>
+      ComplianceSourceRowSchema.parse({
+        ...valid,
+        manual_only_reason: 'not needed',
+      }),
+    ).toThrow()
+  })
+
+  it('parses a manual-only source row with a reason', () => {
+    const parsed = ComplianceSourceRowSchema.parse({
+      ...valid,
+      access_method: 'manual',
+      automation_allowed: false,
+      manual_only_reason: 'Current source terms prohibit automated scraping.',
+    })
+    expect(parsed.manual_only_reason).toContain('scraping')
   })
 
   it('extracts BigQueryTimestamp value for updated_at', () => {

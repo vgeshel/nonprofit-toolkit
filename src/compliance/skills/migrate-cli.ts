@@ -12,6 +12,7 @@ import type { TableSchemaField } from '../state/bq-rows.ts'
 import {
   parseMigrationArgs,
   runMigration,
+  type AddTableColumnRequest,
   type ComplianceMigrationPort,
   type CreateTableRequest,
   type MigrationPortError,
@@ -38,6 +39,7 @@ export interface BqDataset {
 export interface BqClient {
   dataset(name: string): BqDataset
   createDataset(name: string): Promise<unknown>
+  query(options: { query: string }): Promise<unknown>
 }
 
 /**
@@ -113,6 +115,14 @@ export function makeBqPort(bq: BqClient): ComplianceMigrationPort {
         toPortError,
       ).map(() => undefined)
     },
+    addTableColumn(req: AddTableColumnRequest) {
+      return ResultAsync.fromPromise(
+        bq.query({
+          query: `ALTER TABLE \`${req.dataset}.${req.tableId}\` ADD COLUMN IF NOT EXISTS ${req.field.name} ${req.field.type}`,
+        }),
+        toPortError,
+      ).map(() => undefined)
+    },
   }
 }
 
@@ -152,7 +162,8 @@ export async function runCli(args: RunCliArgs): Promise<void> {
   args.io.stdout(
     `compliance-migrate: dataset=${r.createdDataset ? 'created' : 'present'} ` +
       `created_tables=${r.createdTables.length} ` +
-      `skipped_tables=${r.skippedTables.length}` +
+      `skipped_tables=${r.skippedTables.length} ` +
+      `added_columns=${r.addedColumns.length}` +
       (opts.dryRun ? ' (dry-run)' : '') +
       '\n',
   )

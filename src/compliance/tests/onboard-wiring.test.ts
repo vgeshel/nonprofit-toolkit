@@ -126,8 +126,19 @@ describe('runOnboardingProduction', () => {
     })
 
     // BigQuery was hit with the upsert SQL plus named params.
-    const queryCall = mockBqQuery.mock.calls[0]
-    expect(queryCall?.[0]).toMatchObject({
+    const entityUpsert = mockBqQuery.mock.calls
+      .map((call) => call[0])
+      .find((opts) => {
+        if (
+          typeof opts !== 'object' ||
+          opts === null ||
+          !('parameterMode' in opts)
+        ) {
+          return false
+        }
+        return opts.parameterMode === 'named'
+      })
+    expect(entityUpsert).toMatchObject({
       parameterMode: 'named',
     })
   })
@@ -146,7 +157,17 @@ describe('runOnboardingProduction', () => {
 
     expect(result.isOk()).toBe(true)
     // The `updated_at` timestamp on the BQ params should fall in [before, after].
-    const queryCall = mockBqQuery.mock.calls[0]
+    const queryCall = mockBqQuery.mock.calls.find((call) => {
+      const opts = call[0]
+      return (
+        typeof opts === 'object' &&
+        opts !== null &&
+        'params' in opts &&
+        typeof opts.params === 'object' &&
+        opts.params !== null &&
+        'updated_at' in opts.params
+      )
+    })
     const params = (() => {
       const opts = queryCall?.[0]
       if (typeof opts !== 'object' || opts === null || !('params' in opts)) {

@@ -35,6 +35,9 @@ function fakePort(
     createTable: vi.fn<ComplianceMigrationPort['createTable']>(() =>
       okAsync(undefined),
     ),
+    addTableColumn: vi.fn<ComplianceMigrationPort['addTableColumn']>(() =>
+      okAsync(undefined),
+    ),
     ...overrides,
   }
 }
@@ -120,6 +123,7 @@ describe('runMigration', () => {
     expect(port.createDataset).toHaveBeenCalledTimes(1)
     expect(port.createDataset).toHaveBeenCalledWith('compliance')
     expect(port.createTable).toHaveBeenCalledTimes(4)
+    expect(port.addTableColumn).not.toHaveBeenCalled()
 
     expect(result.value.createdDataset).toBe(true)
     expect([...result.value.createdTables].sort()).toEqual([
@@ -163,6 +167,13 @@ describe('runMigration', () => {
     if (!result.isOk()) return
     expect(port.createTable).not.toHaveBeenCalled()
     expect(result.value.createdTables).toEqual([])
+    expect(result.value.addedColumns).toEqual([
+      'sources.access_url',
+      'sources.access_method',
+      'sources.automation_allowed',
+      'sources.manual_only_reason',
+      'sources.source_freshness',
+    ])
   })
 
   it('skips actual creation calls when dryRun is true', async () => {
@@ -175,9 +186,37 @@ describe('runMigration', () => {
     if (!result.isOk()) return
     expect(port.createDataset).not.toHaveBeenCalled()
     expect(port.createTable).not.toHaveBeenCalled()
+    expect(port.addTableColumn).not.toHaveBeenCalled()
     // Plan still records what would have happened.
     expect(result.value.createdDataset).toBe(true)
     expect(result.value.createdTables.length).toBe(4)
+    expect(result.value.addedColumns).toEqual([])
+  })
+
+  it('plans Phase 2 column upgrades on dry-run when sources table already exists', async () => {
+    const port = fakePort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        okAsync(true),
+      ),
+      tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+        okAsync(true),
+      ),
+    })
+    const result = await runMigration({
+      port,
+      dryRun: true,
+    })
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(port.addTableColumn).not.toHaveBeenCalled()
+    expect(result.value.addedColumns).toEqual([
+      'sources.access_url',
+      'sources.access_method',
+      'sources.automation_allowed',
+      'sources.manual_only_reason',
+      'sources.source_freshness',
+    ])
   })
 
   it('returns the underlying error if datasetExists fails', async () => {
@@ -255,5 +294,55 @@ describe('runMigration', () => {
       'legal_name',
     )
     expect(entityCall?.[0]?.dataset).toBe('compliance')
+  })
+
+  it('adds nullable Phase 2 columns to an existing sources table', async () => {
+    const port = fakePort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        okAsync(true),
+      ),
+      tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+        okAsync(true),
+      ),
+    })
+
+    const result = await runMigration({
+      port,
+      dryRun: false,
+    })
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(port.addTableColumn).toHaveBeenCalledTimes(5)
+    expect(port.addTableColumn).toHaveBeenCalledWith({
+      dataset: 'compliance',
+      tableId: 'sources',
+      field: { name: 'access_url', type: 'STRING', mode: 'NULLABLE' },
+    })
+    expect(result.value.addedColumns).toContain('sources.access_url')
+  })
+
+  it('returns the underlying error if adding a Phase 2 column fails', async () => {
+    const port = fakePort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        okAsync(true),
+      ),
+      tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+        okAsync(true),
+      ),
+      addTableColumn: vi.fn<ComplianceMigrationPort['addTableColumn']>(() =>
+        errAsync({ type: 'sdk', message: 'alter failed' }),
+      ),
+    })
+
+    const result = await runMigration({
+      port,
+      dryRun: false,
+    })
+
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.message).toBe('alter failed')
+    }
   })
 })

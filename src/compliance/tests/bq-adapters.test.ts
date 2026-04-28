@@ -143,6 +143,21 @@ describe('adaptBigQueryToBqClient', () => {
     expect(mockCreateDataset).toHaveBeenCalledWith('compliance')
     expect(got).toEqual([{ name: 'compliance' }])
   })
+
+  it('routes query() through the BigQuery instance', async () => {
+    const bq = freshBq()
+    mockQuery.mockResolvedValue([[], {}])
+
+    const client = adaptBigQueryToBqClient(bq)
+    const got = await client.query({
+      query: 'ALTER TABLE t ADD COLUMN c STRING',
+    })
+
+    expect(mockQuery).toHaveBeenCalledWith({
+      query: 'ALTER TABLE t ADD COLUMN c STRING',
+    })
+    expect(got).toEqual([[], {}])
+  })
 })
 
 describe('adaptBigQueryToQueryRunner', () => {

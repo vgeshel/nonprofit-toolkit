@@ -26,12 +26,21 @@ export {
 } from './jurisdiction.ts'
 
 export {
+  SourceAccessMethodSchema,
+  SourceFreshnessSchema,
   SourceKindSchema,
+  SourceMetadataSchema,
   SourceRecordSchema,
+  SourceRunOutcomeSchema,
+  SourceRunOutputSchema,
   type FetchImpl,
   type Source,
+  type SourceAccessMethod,
   type SourceContext,
+  type SourceFreshness,
   type SourceKind,
+  type SourceMetadata,
   type SourceRecord,
+  type SourceRunOutcome,
   type SourceRunOutput,
 } from './source.ts'

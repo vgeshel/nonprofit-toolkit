@@ -10,7 +10,7 @@
  */
 import { ResultAsync, errAsync, okAsync } from 'neverthrow'
 import type { Source } from '../types/index.ts'
-import type { BqQueryRunner, QueryParam } from './bq-entity.ts'
+import type { BqParameterType, BqQueryRunner, QueryParam } from './bq-entity.ts'
 import { COMPLIANCE_DATASET, ComplianceSourceRowSchema } from './bq-rows.ts'
 
 /**
@@ -63,6 +63,11 @@ export function createSourcesAccessor(
           kind: s.kind,
           auth_required: s.authRequired,
           description: s.description,
+          access_url: s.accessUrl,
+          access_method: s.accessMethod,
+          automation_allowed: s.automationAllowed,
+          manual_only_reason: s.automationAllowed ? null : s.manualOnlyReason,
+          source_freshness: s.sourceFreshness ?? null,
           tos_url: s.tosUrl,
           updated_at: updatedAt,
         }
@@ -73,7 +78,23 @@ export function createSourcesAccessor(
             message: validation.error.message,
           })
         }
-        rows.push({ ...row })
+        rows.push({
+          source_id: row.source_id,
+          jurisdiction_id: row.jurisdiction_id,
+          kind: row.kind,
+          auth_required: row.auth_required,
+          description: row.description,
+          access_url: row.access_url,
+          access_method: row.access_method,
+          automation_allowed: row.automation_allowed,
+          manual_only_reason: row.manual_only_reason,
+          source_freshness:
+            row.source_freshness === null
+              ? null
+              : JSON.stringify(row.source_freshness),
+          tos_url: row.tos_url,
+          updated_at: row.updated_at,
+        })
       }
 
       const sql = `
@@ -85,6 +106,11 @@ export function createSourcesAccessor(
             @kind AS kind,
             @auth_required AS auth_required,
             @description AS description,
+            @access_url AS access_url,
+            @access_method AS access_method,
+            @automation_allowed AS automation_allowed,
+            @manual_only_reason AS manual_only_reason,
+            PARSE_JSON(@source_freshness) AS source_freshness,
             @tos_url AS tos_url,
             @updated_at AS updated_at
         ) S
@@ -94,6 +120,11 @@ export function createSourcesAccessor(
           kind = S.kind,
           auth_required = S.auth_required,
           description = S.description,
+          access_url = S.access_url,
+          access_method = S.access_method,
+          automation_allowed = S.automation_allowed,
+          manual_only_reason = S.manual_only_reason,
+          source_freshness = S.source_freshness,
           tos_url = S.tos_url,
           updated_at = S.updated_at
         WHEN NOT MATCHED THEN INSERT (
@@ -102,6 +133,11 @@ export function createSourcesAccessor(
           kind,
           auth_required,
           description,
+          access_url,
+          access_method,
+          automation_allowed,
+          manual_only_reason,
+          source_freshness,
           tos_url,
           updated_at
         ) VALUES (
@@ -110,15 +146,25 @@ export function createSourcesAccessor(
           S.kind,
           S.auth_required,
           S.description,
+          S.access_url,
+          S.access_method,
+          S.automation_allowed,
+          S.manual_only_reason,
+          S.source_freshness,
           S.tos_url,
           S.updated_at
         )
       `
 
+      const types: Record<string, BqParameterType> = {
+        manual_only_reason: 'STRING',
+        source_freshness: 'STRING',
+      }
+
       const merges: ResultAsync<void, SourcesAccessorError>[] = rows.map(
         (params) =>
           deps.runner
-            .query(sql, params)
+            .query(sql, params, types)
             .mapErr<SourcesAccessorError>((err) => ({
               type: 'query',
               message: err.message,

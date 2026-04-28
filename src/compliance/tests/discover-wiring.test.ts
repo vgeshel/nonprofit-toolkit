@@ -104,6 +104,9 @@ function makeSource(args: {
     kind: 'api',
     authRequired: false,
     description: 'fake',
+    accessUrl: 'https://example.com/source',
+    accessMethod: 'official_api',
+    automationAllowed: true,
     tosUrl: 'https://example.com/tos',
     run: vi.fn<Source['run']>(() => {
       const output: SourceRunOutput = {
@@ -297,6 +300,9 @@ describe('runDiscoveryProduction', () => {
       kind: 'api',
       authRequired: false,
       description: 'fake',
+      accessUrl: 'https://example.com/source',
+      accessMethod: 'official_api',
+      automationAllowed: true,
       tosUrl: 'https://example.com/tos',
       run: vi.fn<Source['run']>((_entity, ctx) =>
         ResultAsync.fromPromise(

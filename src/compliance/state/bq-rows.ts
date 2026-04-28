@@ -19,6 +19,8 @@ import { z } from 'zod'
 import {
   EntitySchema,
   FindingSchema,
+  SourceAccessMethodSchema,
+  SourceFreshnessSchema,
   SourceKindSchema,
 } from '../types/index.ts'
 
@@ -168,6 +170,11 @@ export const COMPLIANCE_TABLES: readonly ComplianceTableDefinition[] = [
       { name: 'kind', type: 'STRING', mode: 'REQUIRED' },
       { name: 'auth_required', type: 'BOOL', mode: 'REQUIRED' },
       { name: 'description', type: 'STRING', mode: 'REQUIRED' },
+      { name: 'access_url', type: 'STRING', mode: 'NULLABLE' },
+      { name: 'access_method', type: 'STRING', mode: 'NULLABLE' },
+      { name: 'automation_allowed', type: 'BOOL', mode: 'NULLABLE' },
+      { name: 'manual_only_reason', type: 'STRING', mode: 'NULLABLE' },
+      { name: 'source_freshness', type: 'JSON', mode: 'NULLABLE' },
       { name: 'tos_url', type: 'STRING', mode: 'REQUIRED' },
       { name: 'updated_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
     ],
@@ -218,14 +225,28 @@ export type ComplianceFindingRow = z.infer<typeof ComplianceFindingRowSchema>
 /**
  * Row schema for the `sources` registry-snapshot table.
  */
-export const ComplianceSourceRowSchema = z.object({
-  source_id: z.string().min(1),
-  jurisdiction_id: z.string().min(1),
-  kind: SourceKindSchema,
-  auth_required: z.boolean(),
-  description: z.string().min(1),
-  tos_url: z.string().url(),
-  updated_at: z.preprocess(extractTimestampValue, z.string().min(1)),
-})
+export const ComplianceSourceRowSchema = z
+  .object({
+    source_id: z.string().min(1),
+    jurisdiction_id: z.string().min(1),
+    kind: SourceKindSchema,
+    auth_required: z.boolean(),
+    description: z.string().min(1),
+    access_url: z.string().url(),
+    access_method: SourceAccessMethodSchema,
+    automation_allowed: z.boolean(),
+    manual_only_reason: z.string().min(1).nullable(),
+    source_freshness: SourceFreshnessSchema.nullable(),
+    tos_url: z.string().url(),
+    updated_at: z.preprocess(extractTimestampValue, z.string().min(1)),
+  })
+  .refine((row) => row.automation_allowed || row.manual_only_reason !== null, {
+    path: ['manual_only_reason'],
+    message: 'manual_only_reason is required when automation is blocked',
+  })
+  .refine((row) => !row.automation_allowed || row.manual_only_reason === null, {
+    path: ['manual_only_reason'],
+    message: 'manual_only_reason must be null when automation is allowed',
+  })
 
 export type ComplianceSourceRow = z.infer<typeof ComplianceSourceRowSchema>

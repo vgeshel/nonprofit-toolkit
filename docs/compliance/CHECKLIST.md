@@ -103,12 +103,12 @@ the design.
 
 ### Pre-flight
 
-- [ ] Read `CLAUDE.md`, every file in `.claude/rules/`, `docs/compliance/PLAN.md`, and
+- [x] Read `CLAUDE.md`, every file in `.claude/rules/`, `docs/compliance/PLAN.md`, and
       this file.
-- [ ] Confirm working directory is a fresh worktree on branch
+- [x] Confirm working directory is a fresh worktree on branch
       `compliance/phase-2-public-sources`.
-- [ ] Run `bun typecheck`, `bun lint`, and `bun test:run` once on a clean tree.
-- [ ] Inspect existing Phase 1 compliance code and tests before designing new types.
+- [x] Run `bun typecheck`, `bun lint`, and `bun test:run` once on a clean tree.
+- [x] Inspect existing Phase 1 compliance code and tests before designing new types.
 - [ ] Refresh current official URLs and source terms for:
   - [ ] CA SOS business records / bizfile
   - [ ] CA AG Registry of Charities and Fundraisers
@@ -121,14 +121,14 @@ the design.
 
 ### Source metadata and policy (TDD)
 
-- [ ] Tests for source metadata schemas: URL fields, source freshness fields, access
+- [x] Tests for source metadata schemas: URL fields, source freshness fields, access
       method, automation policy, and manual-only reason.
-- [ ] Implement metadata schemas with Zod validation for every source definition.
-- [ ] Tests that a source cannot be registered without `accessUrl`, `tosUrl`, and an
+- [x] Implement metadata schemas with Zod validation for every source definition.
+- [x] Tests that a source cannot be registered without `accessUrl`, `tosUrl`, and an
       explicit access policy.
 - [ ] Tests that policy-blocked sources return a typed manual-required result rather
       than attempting network automation.
-- [ ] Implement typed source outcomes for success, source failure, manual required,
+- [x] Implement typed source outcomes for success, source failure, manual required,
       policy blocked, and auth/MFA unexpectedly required.
 
 ### Download cache and evidence policy (TDD)
@@ -270,8 +270,8 @@ the design.
       `discovery_runs`.
 - [ ] Tests for writing typed findings with opened/resolved timestamps and stable
       de-duplication.
-- [ ] Tests for source registry snapshots that include source policy metadata.
-- [ ] Implement any idempotent migrations required by new fields. Do not weaken Phase
+- [x] Tests for source registry snapshots that include source policy metadata.
+- [x] Implement any idempotent migrations required by new fields. Do not weaken Phase
       1 schema tests.
 
 ### Skill changes (TDD)

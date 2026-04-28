@@ -10,7 +10,7 @@ import type { ResultAsync } from 'neverthrow'
 import { z } from 'zod'
 import type { SourceError } from '../sources/errors.ts'
 import type { Entity, EntityIdentifiers } from './entity.ts'
-import type { Finding } from './finding.ts'
+import { FindingSchema, type Finding } from './finding.ts'
 import type { JurisdictionId } from './jurisdiction.ts'
 
 /**
@@ -18,6 +18,60 @@ import type { JurisdictionId } from './jurisdiction.ts'
  */
 export const SourceKindSchema = z.enum(['api', 'playwright', 'manual'])
 export type SourceKind = z.infer<typeof SourceKindSchema>
+
+/**
+ * How the source is accessed. This is policy metadata, not runner dispatch:
+ * an `api` source can use an official bulk download, and a `manual` source can
+ * point to a public search page that cannot be automated under current terms.
+ */
+export const SourceAccessMethodSchema = z.enum([
+  'official_api',
+  'official_bulk_download',
+  'playwright_readonly',
+  'manual',
+])
+export type SourceAccessMethod = z.infer<typeof SourceAccessMethodSchema>
+
+/**
+ * Source freshness metadata. `observedAt` is when we checked or fetched the
+ * source. `upstreamPublishedAt` is whatever posting date the authority gives
+ * us, if any; many official pages publish a date rather than a timestamp.
+ */
+export const SourceFreshnessSchema = z.object({
+  observedAt: z.iso.datetime(),
+  upstreamPublishedAt: z.string().min(1).optional(),
+})
+
+export type SourceFreshness = z.infer<typeof SourceFreshnessSchema>
+
+const SourceMetadataBaseSchema = z.object({
+  accessUrl: z.string().url(),
+  tosUrl: z.string().url(),
+  accessMethod: SourceAccessMethodSchema,
+  sourceFreshness: SourceFreshnessSchema.optional(),
+})
+
+const AutomatedSourceMetadataSchema = SourceMetadataBaseSchema.extend({
+  automationAllowed: z.literal(true),
+  manualOnlyReason: z.never().optional(),
+})
+
+const ManualOnlySourceMetadataSchema = SourceMetadataBaseSchema.extend({
+  automationAllowed: z.literal(false),
+  manualOnlyReason: z.string().min(1),
+})
+
+/**
+ * Declarative source metadata required before a source can be registered.
+ * Runtime schemas enforce the policy fields even though TypeScript already
+ * catches most missing-field mistakes for in-repo source definitions.
+ */
+export const SourceMetadataSchema = z.discriminatedUnion('automationAllowed', [
+  AutomatedSourceMetadataSchema,
+  ManualOnlySourceMetadataSchema,
+])
+
+export type SourceMetadata = z.infer<typeof SourceMetadataSchema>
 
 /**
  * Raw payload captured from a source. Persisted verbatim for audit.
@@ -49,6 +103,59 @@ export interface SourceRunOutput {
   readonly record: SourceRecord
   readonly findings: readonly Finding[]
 }
+
+/**
+ * Runtime schema for source outputs. Source bodies validate upstream payloads
+ * before producing a record; this schema validates the runner-facing envelope.
+ */
+export const SourceRunOutputSchema = z.object({
+  record: SourceRecordSchema,
+  findings: z.array(FindingSchema),
+})
+
+const SourceManualEvidenceFieldSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  required: z.boolean(),
+})
+
+/**
+ * Typed source outcomes used by Phase 2 orchestration and reporting.
+ *
+ * `runSource` still returns `ResultAsync<SourceRunOutput, SourceError>` for
+ * backwards-compatible Phase 1 behavior; this union is the shared vocabulary
+ * for manual-required, policy-blocked, and auth-required cases added in Phase 2.
+ */
+export const SourceRunOutcomeSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('success'),
+    output: SourceRunOutputSchema,
+  }),
+  z.object({
+    status: z.literal('source_failure'),
+    source_id: z.string().min(1),
+    error_type: z.string().min(1),
+    message: z.string().min(1),
+  }),
+  z.object({
+    status: z.literal('manual_required'),
+    source_id: z.string().min(1),
+    instructions: z.array(z.string().min(1)).min(1),
+    evidenceFields: z.array(SourceManualEvidenceFieldSchema).min(1),
+  }),
+  z.object({
+    status: z.literal('policy_blocked'),
+    source_id: z.string().min(1),
+    reason: z.string().min(1),
+  }),
+  z.object({
+    status: z.literal('auth_required'),
+    source_id: z.string().min(1),
+    message: z.string().min(1),
+  }),
+])
+
+export type SourceRunOutcome = z.infer<typeof SourceRunOutcomeSchema>
 
 /**
  * Minimal HTTP client surface a source uses. We deliberately do NOT use
@@ -88,15 +195,28 @@ export interface SourceContext {
  * the choice. `authRequired` is the policy bit; the runner refuses to run a
  * source that says it needs auth without authentication context (Phase 3+).
  */
-export interface Source {
+interface SourceBase {
   readonly id: string
   readonly jurisdiction: JurisdictionId
   readonly kind: SourceKind
   readonly authRequired: boolean
   readonly description: string
   readonly tosUrl: string
+  readonly accessUrl: string
+  readonly accessMethod: SourceAccessMethod
+  readonly sourceFreshness?: SourceFreshness
   readonly run: (
     entity: Entity,
     ctx: SourceContext,
   ) => ResultAsync<SourceRunOutput, SourceError>
 }
+
+export type Source =
+  | (SourceBase & {
+      readonly automationAllowed: true
+      readonly manualOnlyReason?: never
+    })
+  | (SourceBase & {
+      readonly automationAllowed: false
+      readonly manualOnlyReason: string
+    })

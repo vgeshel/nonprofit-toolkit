@@ -54,5 +54,9 @@ export function ensureComplianceSchema(
  * the only signal that should drive that chatter.
  */
 export function didCreateAnything(report: MigrationReport): boolean {
-  return report.createdDataset || report.createdTables.length > 0
+  return (
+    report.createdDataset ||
+    report.createdTables.length > 0 ||
+    report.addedColumns.length > 0
+  )
 }

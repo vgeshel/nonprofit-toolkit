@@ -54,17 +54,19 @@ function fakeRecorder(): FakeRecorderState & RunRecorder {
 
 function makeSuccessSource(
   output: SourceRunOutput,
-  overrides: Partial<Source> = {},
+  overrides: { readonly authRequired?: boolean } = {},
 ): Source {
   return {
     id: 'fake',
     jurisdiction: 'us-federal',
     kind: 'api',
-    authRequired: false,
+    authRequired: overrides.authRequired ?? false,
     description: 'fake',
+    accessUrl: 'https://example.com/source',
+    accessMethod: 'official_api',
+    automationAllowed: true,
     tosUrl: 'https://example.com/tos',
     run: () => okAsync(output),
-    ...overrides,
   }
 }
 
@@ -78,6 +80,9 @@ function makeFailingSource(
     kind,
     authRequired: false,
     description: 'fake',
+    accessUrl: 'https://example.com/source',
+    accessMethod: 'official_api',
+    automationAllowed: true,
     tosUrl: 'https://example.com/tos',
     run: () => errAsync(error),
   }

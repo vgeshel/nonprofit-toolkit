@@ -88,6 +88,9 @@ function fakeMigrationPort(
     createTable: vi.fn<ComplianceMigrationPort['createTable']>(() =>
       okAsync(undefined),
     ),
+    addTableColumn: vi.fn<ComplianceMigrationPort['addTableColumn']>(() =>
+      okAsync(undefined),
+    ),
     ...overrides,
   }
 }
@@ -126,6 +129,9 @@ function makeSource(args: MakeSourceArgs): Source {
     kind: 'api',
     authRequired: false,
     description: 'fake',
+    accessUrl: 'https://example.com/source',
+    accessMethod: 'official_api',
+    automationAllowed: true,
     tosUrl: 'https://example.com/tos',
     run: vi.fn<Source['run']>(() => {
       if (args.fail === true) {

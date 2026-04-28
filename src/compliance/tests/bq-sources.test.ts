@@ -13,6 +13,14 @@ const SOURCE_A: Source = {
   kind: 'api',
   authRequired: false,
   description: 'IRS Pub. 78 + Auto Revocation lookup by EIN.',
+  accessUrl:
+    'https://www.irs.gov/charities-non-profits/tax-exempt-organization-search-bulk-data-downloads',
+  accessMethod: 'official_bulk_download',
+  automationAllowed: true,
+  sourceFreshness: {
+    observedAt: '2026-04-28T00:00:00.000Z',
+    upstreamPublishedAt: '2026-04-15',
+  },
   tosUrl:
     'https://www.irs.gov/charities-non-profits/tax-exempt-organization-search-bulk-data-downloads',
   run: () => {
@@ -48,8 +56,52 @@ describe('createSourcesAccessor.upsertSources', () => {
       jurisdiction_id: 'us-federal',
       kind: 'api',
       auth_required: false,
+      access_url: SOURCE_A.accessUrl,
+      access_method: 'official_bulk_download',
+      automation_allowed: true,
+      manual_only_reason: null,
+      source_freshness: JSON.stringify(SOURCE_A.sourceFreshness),
       tos_url: SOURCE_A.tosUrl,
       updated_at: fixedNow.toISOString(),
+    })
+  })
+
+  it('upserts manual-only sources with the required reason', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
+    const fixedNow = new Date('2024-05-01T00:00:00.000Z')
+    const accessor = createSourcesAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+      now: () => fixedNow,
+    })
+    const manualSource: Source = {
+      id: 'ca-sos-bizfile',
+      jurisdiction: 'us-ca',
+      kind: 'manual',
+      authRequired: false,
+      description: 'Manual CA SOS bizfile business status check.',
+      accessUrl: 'https://bizfileonline.sos.ca.gov/search/business',
+      accessMethod: 'manual',
+      automationAllowed: false,
+      manualOnlyReason:
+        'Published bizfile terms prohibit scraping or similar automated collection.',
+      tosUrl:
+        'https://www.sos.ca.gov/business-programs/bizfile/privacy-warning-terms-and-conditions-use',
+      run: () => {
+        throw new Error('not used in accessor tests')
+      },
+    }
+
+    const result = await accessor.upsertSources([manualSource])
+    expect(result.isOk()).toBe(true)
+    const params = query.mock.calls[0]?.[1]
+    expect(params).toMatchObject({
+      source_id: 'ca-sos-bizfile',
+      access_method: 'manual',
+      automation_allowed: false,
+      manual_only_reason:
+        'Published bizfile terms prohibit scraping or similar automated collection.',
+      source_freshness: null,
     })
   })
 

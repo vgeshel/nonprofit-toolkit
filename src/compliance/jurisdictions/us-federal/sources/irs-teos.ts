@@ -427,6 +427,9 @@ export const irsTeosSource: Source = {
   kind: 'api',
   authRequired: false,
   description: DESCRIPTION,
+  accessUrl: TOS_URL,
+  accessMethod: 'official_bulk_download',
+  automationAllowed: true,
   tosUrl: TOS_URL,
 
   run(entity, ctx): ResultAsync<SourceRunOutput, SourceError> {
