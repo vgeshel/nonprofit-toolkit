@@ -17,6 +17,7 @@
  */
 import { Command } from 'commander'
 import { z } from 'zod'
+import { formatDiscoveryReport } from '../src/compliance/skills/discover-report.ts'
 import { runDiscoveryProduction } from '../src/compliance/skills/discover-wiring.ts'
 
 const OptionsSchema = z.object({
@@ -60,23 +61,5 @@ if (opts.json) {
   process.exit(0)
 }
 
-const ok = report.runs.filter((r) => r.outcome === 'ok').length
-const errs = report.runs.filter((r) => r.outcome === 'err').length
-process.stdout.write(
-  `compliance-discover: ok=${ok} err=${errs} findings=${report.findings.length}\n`,
-)
-for (const run of report.runs) {
-  if (run.outcome === 'ok') {
-    process.stdout.write(`  + ${run.sourceId} (${run.jurisdictionId})\n`)
-  } else {
-    process.stdout.write(
-      `  ! ${run.sourceId} (${run.jurisdictionId}): ${run.error.type}: ${run.error.message}\n`,
-    )
-  }
-}
-for (const f of report.findings) {
-  process.stdout.write(
-    `  [${f.severity}] ${f.source_id}: ${f.title} — ${f.detail}\n`,
-  )
-}
+process.stdout.write(formatDiscoveryReport(report))
 process.exit(0)

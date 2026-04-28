@@ -7,6 +7,7 @@
  */
 import { z } from 'zod'
 import type { Jurisdiction } from '../../types/index.ts'
+import { irsEoBmfSource } from './sources/irs-bmf.ts'
 import { irsTeosSource } from './sources/irs-teos.ts'
 
 const UsFederalEntityIdSchema = z.object({
@@ -23,7 +24,7 @@ export type UsFederalEntityId = z.infer<typeof UsFederalEntityIdSchema>
 export const usFederalJurisdiction: Jurisdiction = {
   id: 'us-federal',
   entityIdSchema: UsFederalEntityIdSchema,
-  sources: [irsTeosSource],
+  sources: [irsTeosSource, irsEoBmfSource],
   deadlineRules: [],
   forms: [],
 }

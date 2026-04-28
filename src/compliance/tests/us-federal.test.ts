@@ -1,9 +1,9 @@
 /**
  * Tests for the us-federal jurisdiction module.
  *
- * The module exports a `Jurisdiction` value with the IRS TEOS source listed.
- * Registering it must succeed; later phases extend it with deadline rules and
- * forms — Phase 1 leaves those empty.
+ * The module exports a `Jurisdiction` value with the federal public sources
+ * listed. Registering it must succeed; later phases extend it with deadline
+ * rules and forms.
  */
 import { describe, expect, it } from 'vitest'
 import { usFederalJurisdiction } from '../jurisdictions/us-federal/index.ts'
@@ -14,15 +14,18 @@ describe('usFederalJurisdiction', () => {
     expect(usFederalJurisdiction.id).toBe('us-federal')
   })
 
-  it('exposes the IRS TEOS source', () => {
-    expect(usFederalJurisdiction.sources.map((s) => s.id)).toEqual(['irs-teos'])
+  it('exposes the federal public sources', () => {
+    expect(usFederalJurisdiction.sources.map((s) => s.id)).toEqual([
+      'irs-teos',
+      'irs-eo-bmf',
+    ])
   })
 
-  it('starts with no deadline rules in Phase 1', () => {
+  it('starts with no deadline rules in Phase 2', () => {
     expect(usFederalJurisdiction.deadlineRules).toEqual([])
   })
 
-  it('starts with no form definitions in Phase 1', () => {
+  it('starts with no form definitions in Phase 2', () => {
     expect(usFederalJurisdiction.forms).toEqual([])
   })
 

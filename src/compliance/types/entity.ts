@@ -37,26 +37,35 @@ const EinSchema = z
   )
 
 /**
- * California Secretary of State entity number.
- *
- * Format varies (corporations begin with `C`, LLCs with a numeric only string,
- * etc.) so we accept any non-empty alphanumeric string and let the user enter
- * it as printed on the SOS portal.
+ * California Secretary of State entity number. Preserve the printed string:
+ * legacy corporations commonly use `C` + seven digits, older LLC/LP records
+ * use numeric identifiers, and newly registered entities can use a 12-character
+ * `B...` identifier.
  */
 const CaSosEntityNumberSchema = z
   .string()
-  .min(1)
-  .regex(/^[A-Za-z0-9-]+$/, 'CA SOS entity number must be alphanumeric')
+  .regex(
+    /^(?:C\d{7}|\d{7,12}|B[A-Za-z0-9]{11})$/,
+    'CA SOS entity number must be C + 7 digits, 7-12 digits, or a 12-character B-prefixed id',
+  )
 
 /**
  * California Attorney General Registry of Charitable Trusts charity number.
  *
- * Conventionally `CTNNNNNNN`. Optional during Phase 1 onboarding.
+ * Conventionally `CTNNNNNNN`; older records may be six-digit numbers with
+ * leading zeroes. Optional during Phase 1 onboarding.
  */
 const CaAgCharityNumberSchema = z
   .string()
+  .regex(
+    /^(?:CT\d{6,7}|\d{6})$/,
+    'CA AG charity number must be CT + digits or an older six-digit number',
+  )
+
+const CaFtbEntityIdSchema = z
+  .string()
   .min(1)
-  .regex(/^[A-Za-z0-9-]+$/, 'CA AG charity number must be alphanumeric')
+  .regex(/^[A-Za-z0-9-]+$/, 'CA FTB entity id must be alphanumeric')
 
 /**
  * Per-jurisdiction identifiers. Jurisdictions added in later phases plug new
@@ -69,6 +78,8 @@ export const EntityIdentifiersSchema = z
       .object({
         sosEntityNumber: CaSosEntityNumberSchema,
         agCharityNumber: CaAgCharityNumberSchema.optional(),
+        ftbEntityId: CaFtbEntityIdSchema.optional(),
+        ftbEntityName: z.string().min(1).optional(),
       })
       .optional(),
   })

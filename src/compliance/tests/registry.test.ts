@@ -56,6 +56,8 @@ function makeManualSource(args: { readonly manualOnlyReason: string }): Source {
     accessMethod: 'manual',
     automationAllowed: false,
     manualOnlyReason: args.manualOnlyReason,
+    manualInstructions: ['Open the public source.'],
+    manualEvidenceFields: [{ key: 'status', label: 'Status', required: true }],
     tosUrl: 'https://example.com/tos',
     run: () => {
       throw new Error('not used in registry tests')

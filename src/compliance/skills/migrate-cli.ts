@@ -16,6 +16,7 @@ import {
   type ComplianceMigrationPort,
   type CreateTableRequest,
   type MigrationPortError,
+  type TableColumnExistsRequest,
 } from './migrate.ts'
 
 /**
@@ -65,6 +66,7 @@ export interface RunCliArgs {
  * we know we're getting a typed boolean.
  */
 const ExistsTupleSchema = z.tuple([z.boolean()])
+const QueryRowsTupleSchema = z.tuple([z.array(z.unknown())]).rest(z.unknown())
 
 export function parseExists(value: unknown): boolean {
   const parsed = ExistsTupleSchema.safeParse(value)
@@ -72,6 +74,14 @@ export function parseExists(value: unknown): boolean {
     return false
   }
   return parsed.data[0]
+}
+
+function parseQueryHasRows(value: unknown): boolean {
+  const parsed = QueryRowsTupleSchema.safeParse(value)
+  if (!parsed.success) {
+    return false
+  }
+  return parsed.data[0].length > 0
 }
 
 /**
@@ -122,6 +132,18 @@ export function makeBqPort(bq: BqClient): ComplianceMigrationPort {
         }),
         toPortError,
       ).map(() => undefined)
+    },
+    tableColumnExists(req: TableColumnExistsRequest) {
+      return ResultAsync.fromPromise(
+        bq.query({
+          query:
+            `SELECT 1 FROM \`${req.dataset}.INFORMATION_SCHEMA.COLUMNS\` ` +
+            `WHERE table_name = '${req.tableId}' ` +
+            `AND column_name = '${req.columnName}' ` +
+            'LIMIT 1',
+        }),
+        toPortError,
+      ).map(parseQueryHasRows)
     },
   }
 }

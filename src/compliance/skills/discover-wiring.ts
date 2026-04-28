@@ -8,19 +8,25 @@
  *      `buildCommonDeps`.
  *   2. Adds the discovery-specific bits: a `RunRecorder` composed from the
  *      `discovery_runs` and `findings` accessors, plus a jurisdiction
- *      registry pre-populated with `usFederalJurisdiction`.
+ *      registry pre-populated with the Phase 2 public-source jurisdictions.
  *   3. Calls `runDiscovery`.
  *
  * Tests inject factories / fetch / clock to avoid hitting GCP or the network.
  */
 import type { ResultAsync } from 'neverthrow'
 import { errAsync } from 'neverthrow'
+import { join } from 'node:path'
+import { usCaJurisdiction } from '../jurisdictions/us-ca/index.ts'
 import { usFederalJurisdiction } from '../jurisdictions/us-federal/index.ts'
 import {
   createJurisdictionRegistry,
   type JurisdictionRegistry,
   type RegistryError,
 } from '../registry/jurisdiction-registry.ts'
+import {
+  LocalDownloadCacheStore,
+  type DownloadCacheStore,
+} from '../sources/download-cache.ts'
 import type { RunRecorder } from '../sources/runner.ts'
 import { createFindingsAccessor } from '../state/bq-findings.ts'
 import { createDiscoveryRunsAccessor } from '../state/bq-runs.ts'
@@ -46,8 +52,7 @@ export type DiscoveryProductionError =
 /**
  * Wiring args for the production discovery entry point.
  *
- * `jurisdictions` defaults to `[usFederalJurisdiction]` — the only Phase 1
- * jurisdiction. Phase 2 callers (or tests) can pass a different list.
+ * `jurisdictions` defaults to federal and California public-source modules.
  *
  * `fetch` defaults to the global `fetch` (Bun's native implementation).
  */
@@ -58,6 +63,8 @@ export interface RunDiscoveryProductionArgs {
   readonly now?: () => Date
   readonly fetch?: FetchImpl
   readonly jurisdictions?: readonly Jurisdiction[]
+  readonly downloadCache?: DownloadCacheStore
+  readonly downloadCacheDir?: string
 }
 
 /**
@@ -69,7 +76,15 @@ export function runDiscoveryProduction(
   const now = args.now ?? (() => new Date())
   const fetchImpl: FetchImpl =
     args.fetch ?? ((input, init) => fetch(input, init))
-  const jurisdictions = args.jurisdictions ?? [usFederalJurisdiction]
+  const jurisdictions = args.jurisdictions ?? [
+    usFederalJurisdiction,
+    usCaJurisdiction,
+  ]
+  const downloadCache =
+    args.downloadCache ??
+    new LocalDownloadCacheStore(
+      args.downloadCacheDir ?? join(process.cwd(), '.cache', 'compliance'),
+    )
 
   const registryResult = buildRegistry(jurisdictions)
   if (registryResult.kind === 'err') {
@@ -107,6 +122,7 @@ export function runDiscoveryProduction(
     migrationPort: deps.migrationPort,
     now,
     fetch: fetchImpl,
+    downloadCache,
   })
 }
 

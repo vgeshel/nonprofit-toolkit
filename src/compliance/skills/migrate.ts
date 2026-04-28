@@ -51,6 +51,15 @@ export interface AddTableColumnRequest {
 }
 
 /**
+ * Read-only column-existence check for idempotent additive migrations.
+ */
+export interface TableColumnExistsRequest {
+  readonly dataset: string
+  readonly tableId: string
+  readonly columnName: string
+}
+
+/**
  * Port abstracting just the BigQuery operations we need. The production
  * adapter lives in `scripts/compliance-migrate.ts` and wraps the real
  * `BigQuery` client; tests inject a `vi.fn()`-based fake.
@@ -66,6 +75,9 @@ export interface ComplianceMigrationPort {
   addTableColumn(
     req: AddTableColumnRequest,
   ): ResultAsync<void, MigrationPortError>
+  tableColumnExists(
+    req: TableColumnExistsRequest,
+  ): ResultAsync<boolean, MigrationPortError>
 }
 
 /**
@@ -220,15 +232,9 @@ function ensureSchemaUpgradeColumns(
   }
 
   return ResultAsync.combine(
-    fields.map((field) =>
-      args.port
-        .addTableColumn({
-          dataset: COMPLIANCE_DATASET,
-          tableId,
-          field,
-        })
-        .map(() => `${tableId}.${field.name}`),
-    ),
+    fields.map((field) => ensureSchemaUpgradeColumn(args, tableId, field)),
+  ).map((addedColumns) =>
+    addedColumns.filter((column): column is string => column !== null),
   )
 }
 
@@ -236,6 +242,32 @@ function schemaUpgradeFieldsForTable(
   tableId: string,
 ): readonly TableSchemaField[] {
   return tableId === 'sources' ? SOURCE_POLICY_UPGRADE_FIELDS : []
+}
+
+function ensureSchemaUpgradeColumn(
+  args: RunMigrationArgs,
+  tableId: string,
+  field: TableSchemaField,
+): ResultAsync<string | null, MigrationPortError> {
+  const columnName = `${tableId}.${field.name}`
+  const existsResult = args.port.tableColumnExists({
+    dataset: COMPLIANCE_DATASET,
+    tableId,
+    columnName: field.name,
+  })
+
+  return existsResult.andThen((exists) => {
+    if (exists) {
+      return okAsync(null)
+    }
+    return args.port
+      .addTableColumn({
+        dataset: COMPLIANCE_DATASET,
+        tableId,
+        field,
+      })
+      .map(() => columnName)
+  })
 }
 
 /**

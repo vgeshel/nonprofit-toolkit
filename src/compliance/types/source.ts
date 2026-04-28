@@ -114,11 +114,15 @@ export const SourceRunOutputSchema = z.object({
   findings: z.array(FindingSchema),
 })
 
-const SourceManualEvidenceFieldSchema = z.object({
+export const SourceManualEvidenceFieldSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
   required: z.boolean(),
 })
+
+export type SourceManualEvidenceField = z.infer<
+  typeof SourceManualEvidenceFieldSchema
+>
 
 /**
  * Typed source outcomes used by Phase 2 orchestration and reporting.
@@ -222,4 +226,6 @@ export type Source =
   | (SourceBase & {
       readonly automationAllowed: false
       readonly manualOnlyReason: string
+      readonly manualInstructions: readonly string[]
+      readonly manualEvidenceFields: readonly SourceManualEvidenceField[]
     })

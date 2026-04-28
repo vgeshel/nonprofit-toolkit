@@ -107,3 +107,56 @@ describe('createDiscoveryRunsAccessor.recordRun', () => {
     }
   })
 })
+
+describe('createDiscoveryRunsAccessor.listLatestRuns', () => {
+  it('reads and validates the latest run rows ordered by jurisdiction and source', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() => okAsync([ROW]))
+    const accessor = createDiscoveryRunsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listLatestRuns()
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value).toEqual([ROW])
+    const [sql] = query.mock.calls[0] ?? []
+    expect(sql).toMatch(/ROW_NUMBER\(\) OVER/i)
+    expect(sql).toMatch(/ORDER BY jurisdiction_id, source_id/i)
+  })
+
+  it('returns a parse error for malformed rows', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() =>
+      okAsync([{ ...ROW, run_id: 'not-a-uuid' }]),
+    )
+    const accessor = createDiscoveryRunsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listLatestRuns()
+
+    expect(result.isErr()).toBe(true)
+    if (!result.isErr()) return
+    expect(result.error.type).toBe('parse')
+    expect(result.error.message).toContain('Invalid discovery_runs row')
+  })
+
+  it('propagates query errors when listing latest runs', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() =>
+      errAsync({ type: 'query', message: 'BQ down' }),
+    )
+    const accessor = createDiscoveryRunsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listLatestRuns()
+
+    expect(result.isErr()).toBe(true)
+    if (!result.isErr()) return
+    expect(result.error.type).toBe('query')
+    expect(result.error.message).toContain('BQ down')
+  })
+})

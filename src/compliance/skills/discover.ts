@@ -11,9 +11,11 @@
  */
 import { ResultAsync, errAsync } from 'neverthrow'
 import type { JurisdictionRegistry } from '../registry/jurisdiction-registry.ts'
+import { deriveComplianceFindings } from '../rules/findings.ts'
 import type { DownloadCacheStore } from '../sources/download-cache.ts'
 import type { SourceError } from '../sources/errors.ts'
-import { runSource, type RunRecorder } from '../sources/runner.ts'
+import { formatSourceError } from '../sources/errors.ts'
+import { runSourceOutcome, type RunRecorder } from '../sources/runner.ts'
 import type { EntityAccessor } from '../state/bq-entity.ts'
 import { ensureComplianceSchema } from '../state/ensure-schema.ts'
 import type { EntityIdsAccessor } from '../state/secret-manager.ts'
@@ -22,8 +24,10 @@ import type {
   EntityIdentifiers,
   FetchImpl,
   Finding,
+  SourceAccessMethod,
   SourceContext,
-  SourceRunOutput,
+  SourceFreshness,
+  SourceRunOutcome,
 } from '../types/index.ts'
 import type { ComplianceMigrationPort, MigrationReport } from './migrate.ts'
 
@@ -34,23 +38,27 @@ import type { ComplianceMigrationPort, MigrationReport } from './migrate.ts'
 export type DiscoveryError =
   | { type: 'not_onboarded'; message: string }
   | { type: 'load'; message: string }
+  | { type: 'persist'; message: string }
+
+/**
+ * Source metadata copied into each per-run report entry so report rendering
+ * does not need to reach back into the registry.
+ */
+export interface DiscoveryRunSourceSummary {
+  readonly sourceId: string
+  readonly jurisdictionId: string
+  readonly description: string
+  readonly accessMethod: SourceAccessMethod
+  readonly automationAllowed: boolean
+  readonly sourceFreshness?: SourceFreshness
+}
 
 /**
  * One element of the per-run report.
  */
-export type DiscoveryRun =
-  | {
-      readonly outcome: 'ok'
-      readonly sourceId: string
-      readonly jurisdictionId: string
-      readonly output: SourceRunOutput
-    }
-  | {
-      readonly outcome: 'err'
-      readonly sourceId: string
-      readonly jurisdictionId: string
-      readonly error: SourceError
-    }
+export interface DiscoveryRun extends DiscoveryRunSourceSummary {
+  readonly outcome: SourceRunOutcome
+}
 
 /**
  * Discovery result aggregate.
@@ -162,24 +170,30 @@ function executeAllSources(
   for (const j of args.registry.list()) {
     for (const source of j.sources) {
       promises.push(
-        runSource({
+        runSourceOutcome({
           source,
           entity: args.entity,
           ctx,
           recorder: args.recorder,
         })
           .match<DiscoveryRun>(
-            (output): DiscoveryRun => ({
-              outcome: 'ok',
+            (outcome): DiscoveryRun => ({
               sourceId: source.id,
               jurisdictionId: j.id,
-              output,
+              description: source.description,
+              accessMethod: source.accessMethod,
+              automationAllowed: source.automationAllowed,
+              sourceFreshness: source.sourceFreshness,
+              outcome,
             }),
             (error): DiscoveryRun => ({
-              outcome: 'err',
               sourceId: source.id,
               jurisdictionId: j.id,
-              error,
+              description: source.description,
+              accessMethod: source.accessMethod,
+              automationAllowed: source.automationAllowed,
+              sourceFreshness: source.sourceFreshness,
+              outcome: sourceErrorToOutcome(source.id, error),
             }),
           )
           .then((r) => r),
@@ -187,21 +201,53 @@ function executeAllSources(
     }
   }
 
-  return ResultAsync.fromSafePromise(Promise.all(promises)).map(
-    (runs): DiscoveryReport => {
-      const findings: Finding[] = []
-      for (const r of runs) {
-        if (r.outcome === 'ok') {
-          findings.push(...r.output.findings)
-        }
-      }
-      return {
+  return ResultAsync.fromSafePromise(Promise.all(promises)).andThen(
+    (runs): ResultAsync<DiscoveryReport, DiscoveryError> => {
+      const sourceFindings = collectSourceFindings(runs)
+      const derivedFindings = deriveComplianceFindings({
         entity: args.entity,
         identifiers: args.identifiers,
         runs,
-        findings,
-        migration: args.migration,
-      }
+        now: args.now,
+      })
+      return args.recorder
+        .recordFindings(derivedFindings)
+        .mapErr<DiscoveryError>((err) => ({
+          type: 'persist',
+          message: `Failed to persist derived findings: ${err.message}`,
+        }))
+        .map((): DiscoveryReport => {
+          const findings: Finding[] = [...sourceFindings, ...derivedFindings]
+          return {
+            entity: args.entity,
+            identifiers: args.identifiers,
+            runs,
+            findings,
+            migration: args.migration,
+          }
+        })
     },
   )
+}
+
+function sourceErrorToOutcome(
+  sourceId: string,
+  error: SourceError,
+): SourceRunOutcome {
+  return {
+    status: 'source_failure',
+    source_id: sourceId,
+    error_type: error.type,
+    message: formatSourceError(error),
+  }
+}
+
+function collectSourceFindings(runs: readonly DiscoveryRun[]): Finding[] {
+  const findings: Finding[] = []
+  for (const r of runs) {
+    if (r.outcome.status === 'success') {
+      findings.push(...r.outcome.output.findings)
+    }
+  }
+  return findings
 }

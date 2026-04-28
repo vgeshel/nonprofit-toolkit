@@ -23,6 +23,17 @@ const extractTimestampValue = (val: unknown): unknown => {
   return val
 }
 
+const parseJsonRecordString = (val: unknown): unknown => {
+  if (typeof val !== 'string') {
+    return val
+  }
+  try {
+    return JSON.parse(val)
+  } catch {
+    return val
+  }
+}
+
 /**
  * Severity ladder. `info` = informational, `warn` = action recommended,
  * `error` = action required.
@@ -51,7 +62,10 @@ export const FindingSchema = z.object({
   status: FindingStatusSchema,
   title: z.string().min(1),
   detail: z.string(),
-  evidence: z.record(z.string(), z.unknown()),
+  evidence: z.preprocess(
+    parseJsonRecordString,
+    z.record(z.string(), z.unknown()),
+  ),
   opened_at: z.preprocess(extractTimestampValue, z.string().min(1)),
   resolved_at: z.preprocess(
     extractTimestampValue,

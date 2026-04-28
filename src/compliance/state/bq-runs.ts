@@ -9,19 +9,26 @@
  * schema in `bq-rows.ts` is unit-tested as the runtime source of truth.
  */
 import type { ResultAsync } from 'neverthrow'
+import { errAsync, okAsync } from 'neverthrow'
 import type { BqParameterType, BqQueryRunner, QueryParam } from './bq-entity.ts'
 import {
   COMPLIANCE_DATASET,
+  ComplianceDiscoveryRunRowSchema,
   type ComplianceDiscoveryRunRow,
 } from './bq-rows.ts'
 
 /**
  * Errors emitted by the discovery_runs accessor.
  */
-export interface RunsAccessorError {
-  readonly type: 'query'
-  readonly message: string
-}
+export type RunsAccessorError =
+  | {
+      readonly type: 'query'
+      readonly message: string
+    }
+  | {
+      readonly type: 'parse'
+      readonly message: string
+    }
 
 /**
  * Wiring.
@@ -38,6 +45,10 @@ export interface DiscoveryRunsAccessor {
   recordRun(
     row: ComplianceDiscoveryRunRow,
   ): ResultAsync<void, RunsAccessorError>
+  listLatestRuns(): ResultAsync<
+    readonly ComplianceDiscoveryRunRow[],
+    RunsAccessorError
+  >
 }
 
 /**
@@ -107,5 +118,47 @@ export function createDiscoveryRunsAccessor(
         }))
         .map(() => undefined)
     },
+
+    listLatestRuns() {
+      const sql = `
+        SELECT * EXCEPT(row_num)
+        FROM (
+          SELECT
+            *,
+            ROW_NUMBER() OVER (
+              PARTITION BY source_id
+              ORDER BY started_at DESC
+            ) AS row_num
+          FROM ${tableName}
+        )
+        WHERE row_num = 1
+        ORDER BY jurisdiction_id, source_id
+      `
+
+      return deps.runner
+        .query(sql)
+        .mapErr<RunsAccessorError>((err) => ({
+          type: 'query',
+          message: err.message,
+        }))
+        .andThen((rows) => parseRunRows(rows))
+    },
   }
+}
+
+function parseRunRows(
+  rows: readonly unknown[],
+): ResultAsync<readonly ComplianceDiscoveryRunRow[], RunsAccessorError> {
+  const parsedRows: ComplianceDiscoveryRunRow[] = []
+  for (const row of rows) {
+    const parsed = ComplianceDiscoveryRunRowSchema.safeParse(row)
+    if (!parsed.success) {
+      return errAsync({
+        type: 'parse',
+        message: `Invalid discovery_runs row from BigQuery: ${parsed.error.message}`,
+      })
+    }
+    parsedRows.push(parsed.data)
+  }
+  return okAsync(parsedRows)
 }

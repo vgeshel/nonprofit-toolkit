@@ -14,7 +14,7 @@ import { errAsync, okAsync } from 'neverthrow'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SourceError } from '../sources/errors.ts'
 import type { RunRecorder } from '../sources/runner.ts'
-import { runSource } from '../sources/runner.ts'
+import { runSource, runSourceOutcome } from '../sources/runner.ts'
 import type {
   Entity,
   FetchImpl,
@@ -85,6 +85,24 @@ function makeFailingSource(
     automationAllowed: true,
     tosUrl: 'https://example.com/tos',
     run: () => errAsync(error),
+  }
+}
+
+function makeManualSource(): Source {
+  return {
+    id: 'manual-check',
+    jurisdiction: 'us-ca',
+    kind: 'manual',
+    authRequired: false,
+    description: 'manual source',
+    accessUrl: 'https://example.com/manual',
+    accessMethod: 'manual',
+    automationAllowed: false,
+    manualOnlyReason: 'Current source terms prohibit automated collection.',
+    manualInstructions: ['Open the public search page.', 'Record the status.'],
+    manualEvidenceFields: [{ key: 'status', label: 'Status', required: true }],
+    tosUrl: 'https://example.com/tos',
+    run: () => errAsync({ type: 'internal', message: 'must not run' }),
   }
 }
 
@@ -300,6 +318,134 @@ describe('runSource', () => {
     }
   })
 
+  it('returns a typed manual-required outcome for manual sources without network access', async () => {
+    const source = makeManualSource()
+    const fetch = vi.fn<FetchImpl>(() =>
+      Promise.resolve(new Response('', { status: 200 })),
+    )
+    const ctx = makeContext({ fetch })
+
+    const result = await runSourceOutcome({
+      source,
+      entity: ENTITY,
+      ctx,
+      recorder,
+    })
+
+    expect(result.isOk()).toBe(true)
+    expect(fetch).not.toHaveBeenCalled()
+    expect(recorder.recordRun).toHaveBeenCalledTimes(1)
+    const row = recorder.recordRun.mock.calls[0]?.[0]
+    expect(row?.status).toBe('failed')
+    expect(row?.error_type).toBe('manual_required')
+    if (result.isOk()) {
+      expect(result.value).toEqual({
+        status: 'manual_required',
+        source_id: 'manual-check',
+        instructions: ['Open the public search page.', 'Record the status.'],
+        evidenceFields: [{ key: 'status', label: 'Status', required: true }],
+      })
+    }
+  })
+
+  it('returns a typed policy-blocked outcome for automated sources blocked by policy', async () => {
+    const source: Source = {
+      id: 'blocked',
+      jurisdiction: 'us-ca',
+      kind: 'api',
+      authRequired: false,
+      description: 'blocked',
+      accessUrl: 'https://example.com/blocked',
+      accessMethod: 'manual',
+      automationAllowed: false,
+      manualOnlyReason: 'No permitted automated access path was found.',
+      manualInstructions: [],
+      manualEvidenceFields: [],
+      tosUrl: 'https://example.com/tos',
+      run: () => errAsync({ type: 'internal', message: 'must not run' }),
+    }
+    const fetch = vi.fn<FetchImpl>(() =>
+      Promise.resolve(new Response('', { status: 200 })),
+    )
+    const ctx = makeContext({ fetch })
+
+    const result = await runSourceOutcome({
+      source,
+      entity: ENTITY,
+      ctx,
+      recorder,
+    })
+
+    expect(result.isOk()).toBe(true)
+    expect(fetch).not.toHaveBeenCalled()
+    expect(recorder.recordRun).toHaveBeenCalledTimes(1)
+    if (result.isOk()) {
+      expect(result.value).toEqual({
+        status: 'policy_blocked',
+        source_id: 'blocked',
+        reason: 'No permitted automated access path was found.',
+      })
+    }
+  })
+
+  it('returns an internal error when policy-blocked run persistence fails', async () => {
+    const source: Source = {
+      id: 'blocked',
+      jurisdiction: 'us-ca',
+      kind: 'api',
+      authRequired: false,
+      description: 'blocked',
+      accessUrl: 'https://example.com/blocked',
+      accessMethod: 'manual',
+      automationAllowed: false,
+      manualOnlyReason: 'No permitted automated access path was found.',
+      manualInstructions: [],
+      manualEvidenceFields: [],
+      tosUrl: 'https://example.com/tos',
+      run: () => errAsync({ type: 'internal', message: 'must not run' }),
+    }
+    const ctx = makeContext()
+    recorder.recordRun.mockReturnValueOnce(
+      errAsync({ type: 'recorder', message: 'BQ unavailable' }),
+    )
+
+    const result = await runSourceOutcome({
+      source,
+      entity: ENTITY,
+      ctx,
+      recorder,
+    })
+
+    expect(result.isErr()).toBe(true)
+    if (!result.isErr()) return
+    expect(result.error.type).toBe('internal')
+    expect(result.error.message).toContain('discovery_runs')
+  })
+
+  it('records a source-failure outcome for unsupported automated source kinds', async () => {
+    const source = makeFailingSource(
+      { type: 'internal', message: 'unused' },
+      'playwright',
+    )
+    const ctx = makeContext()
+
+    const result = await runSourceOutcome({
+      source,
+      entity: ENTITY,
+      ctx,
+      recorder,
+    })
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value).toMatchObject({
+      status: 'source_failure',
+      source_id: 'fake',
+      error_type: 'tos',
+    })
+    expect(recorder.recordRun).toHaveBeenCalledTimes(1)
+  })
+
   it('refuses to run a source that requires auth (Phase 1 has no auth context)', async () => {
     const source = makeSuccessSource(
       {
@@ -330,6 +476,75 @@ describe('runSource', () => {
     expect(recorder.recordRun).not.toHaveBeenCalled()
   })
 
+  it('returns a typed auth-required outcome and records the failed run', async () => {
+    const source = makeSuccessSource(
+      {
+        record: {
+          record_id: '550e8400-e29b-41d4-a716-446655440000',
+          source_id: 'fake',
+          fetched_at: '2024-01-01T00:00:01.000Z',
+          payload: {},
+        },
+        findings: [],
+      },
+      { authRequired: true },
+    )
+    const ctx = makeContext()
+
+    const result = await runSourceOutcome({
+      source,
+      entity: ENTITY,
+      ctx,
+      recorder,
+    })
+
+    expect(result.isOk()).toBe(true)
+    expect(recorder.recordRun).toHaveBeenCalledTimes(1)
+    const row = recorder.recordRun.mock.calls[0]?.[0]
+    expect(row).toMatchObject({
+      status: 'failed',
+      error_type: 'auth_required',
+      payload: null,
+    })
+    if (!result.isOk()) return
+    expect(result.value).toEqual({
+      status: 'auth_required',
+      source_id: 'fake',
+      message: 'Source "fake" requires auth, but no auth context is available.',
+    })
+  })
+
+  it('returns an internal error when auth-required run persistence fails', async () => {
+    const source = makeSuccessSource(
+      {
+        record: {
+          record_id: '550e8400-e29b-41d4-a716-446655440000',
+          source_id: 'fake',
+          fetched_at: '2024-01-01T00:00:01.000Z',
+          payload: {},
+        },
+        findings: [],
+      },
+      { authRequired: true },
+    )
+    const ctx = makeContext()
+    recorder.recordRun.mockReturnValueOnce(
+      errAsync({ type: 'recorder', message: 'BQ unavailable' }),
+    )
+
+    const result = await runSourceOutcome({
+      source,
+      entity: ENTITY,
+      ctx,
+      recorder,
+    })
+
+    expect(result.isErr()).toBe(true)
+    if (!result.isErr()) return
+    expect(result.error.type).toBe('internal')
+    expect(result.error.message).toContain('discovery_runs')
+  })
+
   it('still returns the source error even when recordRun itself errors', async () => {
     const source = makeFailingSource({ type: 'network', message: 'down' })
     const ctx = makeContext()
@@ -350,6 +565,30 @@ describe('runSource', () => {
       // context to the run row metadata. We don't lose the upstream cause.
       expect(result.error.type).toBe('network')
     }
+  })
+
+  it('returns a source-failure outcome even when failed-run persistence fails', async () => {
+    const source = makeFailingSource({ type: 'network', message: 'down' })
+    const ctx = makeContext()
+    recorder.recordRun.mockReturnValueOnce(
+      errAsync({ type: 'recorder', message: 'BQ down' }),
+    )
+
+    const result = await runSourceOutcome({
+      source,
+      entity: ENTITY,
+      ctx,
+      recorder,
+    })
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value).toEqual({
+      status: 'source_failure',
+      source_id: 'fake',
+      error_type: 'network',
+      message: '[network] down',
+    })
   })
 
   it('returns the source error even when recordFindings fails', async () => {

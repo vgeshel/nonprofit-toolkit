@@ -118,3 +118,78 @@ describe('createFindingsAccessor.recordFindings', () => {
     expect(params?.finding_id).toBe(FINDING_A.finding_id)
   })
 })
+
+describe('createFindingsAccessor.listOpenFindings', () => {
+  it('reads and validates open findings ordered by severity and source', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() =>
+      okAsync([FINDING_A, FINDING_B]),
+    )
+    const accessor = createFindingsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listOpenFindings()
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value).toEqual([FINDING_A, FINDING_B])
+    const [sql] = query.mock.calls[0] ?? []
+    expect(sql).toMatch(/WHERE status = 'open'/i)
+    expect(sql).toMatch(/ORDER BY/i)
+  })
+
+  it('accepts BigQuery JSON evidence returned as a string', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() =>
+      okAsync([
+        { ...FINDING_A, evidence: '{"code":"source.manual_required"}' },
+      ]),
+    )
+    const accessor = createFindingsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listOpenFindings()
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value[0]?.evidence).toEqual({
+      code: 'source.manual_required',
+    })
+  })
+
+  it('returns a parse error for malformed finding rows', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() =>
+      okAsync([{ ...FINDING_A, severity: 'urgent' }]),
+    )
+    const accessor = createFindingsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listOpenFindings()
+
+    expect(result.isErr()).toBe(true)
+    if (!result.isErr()) return
+    expect(result.error.type).toBe('parse')
+    expect(result.error.message).toContain('Invalid findings row')
+  })
+
+  it('propagates query errors when listing open findings', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() =>
+      errAsync({ type: 'query', message: 'BQ down' }),
+    )
+    const accessor = createFindingsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listOpenFindings()
+
+    expect(result.isErr()).toBe(true)
+    if (!result.isErr()) return
+    expect(result.error.type).toBe('query')
+    expect(result.error.message).toContain('BQ down')
+  })
+})

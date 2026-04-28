@@ -6,18 +6,23 @@
  * truth.
  */
 import type { ResultAsync } from 'neverthrow'
-import { okAsync } from 'neverthrow'
+import { errAsync, okAsync } from 'neverthrow'
 import type { Finding } from '../types/index.ts'
 import type { BqParameterType, BqQueryRunner, QueryParam } from './bq-entity.ts'
-import { COMPLIANCE_DATASET } from './bq-rows.ts'
+import { COMPLIANCE_DATASET, ComplianceFindingRowSchema } from './bq-rows.ts'
 
 /**
  * Errors emitted by the findings accessor.
  */
-export interface FindingsAccessorError {
-  readonly type: 'query'
-  readonly message: string
-}
+export type FindingsAccessorError =
+  | {
+      readonly type: 'query'
+      readonly message: string
+    }
+  | {
+      readonly type: 'parse'
+      readonly message: string
+    }
 
 /**
  * Wiring.
@@ -34,6 +39,7 @@ export interface FindingsAccessor {
   recordFindings(
     findings: readonly Finding[],
   ): ResultAsync<void, FindingsAccessorError>
+  listOpenFindings(): ResultAsync<readonly Finding[], FindingsAccessorError>
 }
 
 /**
@@ -116,5 +122,47 @@ export function createFindingsAccessor(
         okAsync(undefined),
       )
     },
+
+    listOpenFindings() {
+      const sql = `
+        SELECT *
+        FROM ${tableName}
+        WHERE status = 'open'
+        ORDER BY
+          CASE severity
+            WHEN 'error' THEN 0
+            WHEN 'warn' THEN 1
+            ELSE 2
+          END,
+          jurisdiction_id,
+          source_id,
+          title
+      `
+
+      return deps.runner
+        .query(sql)
+        .mapErr<FindingsAccessorError>((err) => ({
+          type: 'query',
+          message: err.message,
+        }))
+        .andThen((rows) => parseFindingRows(rows))
+    },
   }
+}
+
+function parseFindingRows(
+  rows: readonly unknown[],
+): ResultAsync<readonly Finding[], FindingsAccessorError> {
+  const parsedRows: Finding[] = []
+  for (const row of rows) {
+    const parsed = ComplianceFindingRowSchema.safeParse(row)
+    if (!parsed.success) {
+      return errAsync({
+        type: 'parse',
+        message: `Invalid findings row from BigQuery: ${parsed.error.message}`,
+      })
+    }
+    parsedRows.push(parsed.data)
+  }
+  return okAsync(parsedRows)
 }

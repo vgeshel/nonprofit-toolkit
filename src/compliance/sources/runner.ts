@@ -20,9 +20,12 @@ import type {
   Finding,
   Source,
   SourceContext,
+  SourceRunOutcome,
   SourceRunOutput,
 } from '../types/index.ts'
 import { formatSourceError, type SourceError } from './errors.ts'
+
+type ManualOnlySource = Extract<Source, { readonly automationAllowed: false }>
 
 /**
  * Recorder error — the runner returns these wrapped as an `internal`
@@ -92,6 +95,58 @@ export function runSource(
     )
     .orElse((sourceError) =>
       finishFailure({ sourceError, startedAt, source, ctx, recorder }),
+    )
+}
+
+/**
+ * Run a single source and return the Phase 2 typed outcome vocabulary.
+ *
+ * This is the public runner shape for Phase 2 orchestration. `runSource`
+ * remains as the Phase 1 compatibility wrapper for callers that still expect
+ * a `ResultAsync<SourceRunOutput, SourceError>`.
+ */
+export function runSourceOutcome(
+  args: RunSourceArgs,
+): ResultAsync<SourceRunOutcome, SourceError> {
+  const { source, entity, ctx, recorder } = args
+
+  if (!source.automationAllowed) {
+    return finishBlockedByPolicy({ source, ctx, recorder })
+  }
+
+  if (source.kind !== 'api') {
+    return finishFailureOutcome({
+      sourceError: {
+        type: 'tos',
+        message: `Source kind "${source.kind}" not yet supported. Source: ${source.id}`,
+      },
+      startedAt: ctx.now(),
+      source,
+      ctx,
+      recorder,
+    })
+  }
+
+  if (source.authRequired) {
+    return finishAuthRequired({ source, ctx, recorder })
+  }
+
+  const startedAt = ctx.now()
+
+  return source
+    .run(entity, ctx)
+    .andThen((output) =>
+      finishSuccess({ output, startedAt, source, ctx, recorder }),
+    )
+    .map<SourceRunOutcome>((output) => ({
+      status: 'success',
+      output: {
+        record: output.record,
+        findings: output.findings.slice(),
+      },
+    }))
+    .orElse((sourceError) =>
+      finishFailureOutcome({ sourceError, startedAt, source, ctx, recorder }),
     )
 }
 
@@ -168,6 +223,130 @@ function finishFailure(
     .recordRun(row)
     .orElse(() => okAsync(undefined))
     .andThen(() => errAsync<SourceRunOutput, SourceError>(sourceError))
+}
+
+interface FinishPolicyArgs {
+  readonly source: ManualOnlySource
+  readonly ctx: SourceContext
+  readonly recorder: RunRecorder
+}
+
+function finishBlockedByPolicy(
+  args: FinishPolicyArgs,
+): ResultAsync<SourceRunOutcome, SourceError> {
+  const { source, ctx, recorder } = args
+  const startedAt = ctx.now()
+  const completedAt = ctx.now()
+  const hasManualInstructions =
+    source.manualInstructions.length > 0 &&
+    source.manualEvidenceFields.length > 0 &&
+    source.kind === 'manual'
+  const row: ComplianceDiscoveryRunRow = {
+    run_id: uuidv4(),
+    source_id: source.id,
+    jurisdiction_id: source.jurisdiction,
+    status: 'failed',
+    started_at: startedAt.toISOString(),
+    completed_at: completedAt.toISOString(),
+    duration_ms: completedAt.getTime() - startedAt.getTime(),
+    error_type: hasManualInstructions ? 'manual_required' : 'policy_blocked',
+    error_message: source.manualOnlyReason,
+    payload: hasManualInstructions
+      ? {
+          instructions: source.manualInstructions,
+          evidenceFields: source.manualEvidenceFields,
+        }
+      : null,
+  }
+
+  const outcome: SourceRunOutcome = hasManualInstructions
+    ? {
+        status: 'manual_required',
+        source_id: source.id,
+        instructions: source.manualInstructions.slice(),
+        evidenceFields: source.manualEvidenceFields.slice(),
+      }
+    : {
+        status: 'policy_blocked',
+        source_id: source.id,
+        reason: source.manualOnlyReason,
+      }
+
+  return recorder
+    .recordRun(row)
+    .mapErr<SourceError>((err) => ({
+      type: 'internal',
+      message: `Failed to persist discovery_runs row: ${err.message}`,
+    }))
+    .map(() => outcome)
+}
+
+interface FinishAuthRequiredArgs {
+  readonly source: Source
+  readonly ctx: SourceContext
+  readonly recorder: RunRecorder
+}
+
+function finishAuthRequired(
+  args: FinishAuthRequiredArgs,
+): ResultAsync<SourceRunOutcome, SourceError> {
+  const { source, ctx, recorder } = args
+  const startedAt = ctx.now()
+  const completedAt = ctx.now()
+  const message = `Source "${source.id}" requires auth, but no auth context is available.`
+  const row: ComplianceDiscoveryRunRow = {
+    run_id: uuidv4(),
+    source_id: source.id,
+    jurisdiction_id: source.jurisdiction,
+    status: 'failed',
+    started_at: startedAt.toISOString(),
+    completed_at: completedAt.toISOString(),
+    duration_ms: completedAt.getTime() - startedAt.getTime(),
+    error_type: 'auth_required',
+    error_message: message,
+    payload: null,
+  }
+
+  return recorder
+    .recordRun(row)
+    .mapErr<SourceError>((err) => ({
+      type: 'internal',
+      message: `Failed to persist discovery_runs row: ${err.message}`,
+    }))
+    .map<SourceRunOutcome>(() => ({
+      status: 'auth_required',
+      source_id: source.id,
+      message,
+    }))
+}
+
+function finishFailureOutcome(
+  args: FinishFailureArgs,
+): ResultAsync<SourceRunOutcome, SourceError> {
+  const { sourceError, startedAt, source, ctx, recorder } = args
+  const completedAt = ctx.now()
+  const row: ComplianceDiscoveryRunRow = {
+    run_id: uuidv4(),
+    source_id: source.id,
+    jurisdiction_id: source.jurisdiction,
+    status: 'failed',
+    started_at: startedAt.toISOString(),
+    completed_at: completedAt.toISOString(),
+    duration_ms: completedAt.getTime() - startedAt.getTime(),
+    error_type: sourceError.type,
+    error_message: formatSourceError(sourceError),
+    payload: null,
+  }
+
+  return recorder
+    .recordRun(row)
+    .orElse(() => okAsync(undefined))
+    .map(() => ({
+      status: 'source_failure',
+      source_id: source.id,
+      error_type: sourceError.type,
+      message: formatSourceError(sourceError),
+    }))
 }
 
 function persistFindings(

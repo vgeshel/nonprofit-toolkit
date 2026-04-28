@@ -138,9 +138,72 @@ describe('EntityIdentifiersSchema', () => {
     expect(parsed['us-ca']?.sosEntityNumber).toBe('C0123456')
   })
 
+  it('accepts CA SOS numeric and new B-prefixed entity numbers', () => {
+    expect(
+      EntityIdentifiersSchema.parse({
+        'us-ca': { sosEntityNumber: '201202310025' },
+      })['us-ca']?.sosEntityNumber,
+    ).toBe('201202310025')
+
+    expect(
+      EntityIdentifiersSchema.parse({
+        'us-ca': { sosEntityNumber: 'B20250000001' },
+      })['us-ca']?.sosEntityNumber,
+    ).toBe('B20250000001')
+  })
+
+  it('accepts CA AG CT numbers and older six-digit numbers with leading zeroes', () => {
+    expect(
+      EntityIdentifiersSchema.parse({
+        'us-ca': {
+          sosEntityNumber: 'C0123456',
+          agCharityNumber: 'CT0123456',
+        },
+      })['us-ca']?.agCharityNumber,
+    ).toBe('CT0123456')
+
+    expect(
+      EntityIdentifiersSchema.parse({
+        'us-ca': {
+          sosEntityNumber: 'C0123456',
+          agCharityNumber: '000123',
+        },
+      })['us-ca']?.agCharityNumber,
+    ).toBe('000123')
+  })
+
+  it('accepts optional CA FTB lookup identifiers', () => {
+    const parsed = EntityIdentifiersSchema.parse({
+      'us-ca': {
+        sosEntityNumber: 'C0123456',
+        ftbEntityId: '1234567',
+        ftbEntityName: 'Foo Foundation',
+      },
+    })
+
+    expect(parsed['us-ca']?.ftbEntityId).toBe('1234567')
+    expect(parsed['us-ca']?.ftbEntityName).toBe('Foo Foundation')
+  })
+
   it('rejects empty CA SOS entity number', () => {
     expect(() =>
       EntityIdentifiersSchema.parse({ 'us-ca': { sosEntityNumber: '' } }),
+    ).toThrow()
+  })
+
+  it('rejects malformed California identifiers', () => {
+    expect(() =>
+      EntityIdentifiersSchema.parse({
+        'us-ca': { sosEntityNumber: 'bad entity number!' },
+      }),
+    ).toThrow()
+    expect(() =>
+      EntityIdentifiersSchema.parse({
+        'us-ca': {
+          sosEntityNumber: 'C0123456',
+          agCharityNumber: 'charity 123',
+        },
+      }),
     ).toThrow()
   })
 })
@@ -267,6 +330,23 @@ describe('FindingSchema', () => {
       opened_at: { value: '2024-03-02T00:00:00.000Z' },
     })
     expect(result.opened_at).toBe('2024-03-02T00:00:00.000Z')
+  })
+
+  it('parses BigQuery JSON evidence returned as a string', () => {
+    const result = FindingSchema.parse({
+      ...valid,
+      evidence: '{"source_record_pointer":"gs://bucket/x"}',
+    })
+
+    expect(result.evidence).toEqual({
+      source_record_pointer: 'gs://bucket/x',
+    })
+  })
+
+  it('rejects invalid JSON evidence strings', () => {
+    expect(() =>
+      FindingSchema.parse({ ...valid, evidence: '{"broken"' }),
+    ).toThrow()
   })
 
   it('rejects unknown severity', () => {

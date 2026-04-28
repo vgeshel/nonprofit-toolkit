@@ -334,6 +334,41 @@ describe('makeBqPort', () => {
     })
   })
 
+  it('routes tableColumnExists through INFORMATION_SCHEMA.COLUMNS', async () => {
+    const query = vi.fn<BqClient['query']>(() =>
+      Promise.resolve([[{ column_name: 'access_url' }], {}]),
+    )
+    const bq = fakeBq({
+      dataset: {
+        exists: vi.fn<BqDataset['exists']>(() => Promise.resolve([true])),
+        createTable: vi.fn<BqDataset['createTable']>(() =>
+          Promise.resolve([{}]),
+        ),
+        tableExists: vi.fn<() => Promise<unknown>>(() =>
+          Promise.resolve([true]),
+        ),
+      },
+      createDataset: vi.fn<BqClient['createDataset']>(() =>
+        Promise.resolve([{}]),
+      ),
+      query,
+    })
+    const port = makeBqPort(bq)
+    const result = await port.tableColumnExists({
+      dataset: 'compliance',
+      tableId: 'sources',
+      columnName: 'access_url',
+    })
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value).toBe(true)
+    const [arg] = query.mock.calls[0] ?? []
+    expect(arg?.query).toContain('INFORMATION_SCHEMA.COLUMNS')
+    expect(arg?.query).toContain("table_name = 'sources'")
+    expect(arg?.query).toContain("column_name = 'access_url'")
+  })
+
   it('returns a typed error when addTableColumn rejects', async () => {
     const bq = fakeBq({
       dataset: {

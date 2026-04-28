@@ -91,6 +91,9 @@ function fakeMigrationPort(
     addTableColumn: vi.fn<ComplianceMigrationPort['addTableColumn']>(() =>
       okAsync(undefined),
     ),
+    tableColumnExists: vi.fn<ComplianceMigrationPort['tableColumnExists']>(() =>
+      okAsync(false),
+    ),
     ...overrides,
   }
 }

@@ -38,6 +38,9 @@ function fakePort(
     addTableColumn: vi.fn<ComplianceMigrationPort['addTableColumn']>(() =>
       okAsync(undefined),
     ),
+    tableColumnExists: vi.fn<ComplianceMigrationPort['tableColumnExists']>(() =>
+      okAsync(false),
+    ),
     ...overrides,
   }
 }
@@ -320,6 +323,30 @@ describe('runMigration', () => {
       field: { name: 'access_url', type: 'STRING', mode: 'NULLABLE' },
     })
     expect(result.value.addedColumns).toContain('sources.access_url')
+  })
+
+  it('does not report Phase 2 columns as added when they already exist', async () => {
+    const port = fakePort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        okAsync(true),
+      ),
+      tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+        okAsync(true),
+      ),
+      tableColumnExists: vi.fn<ComplianceMigrationPort['tableColumnExists']>(
+        () => okAsync(true),
+      ),
+    })
+
+    const result = await runMigration({
+      port,
+      dryRun: false,
+    })
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(port.addTableColumn).not.toHaveBeenCalled()
+    expect(result.value.addedColumns).toEqual([])
   })
 
   it('returns the underlying error if adding a Phase 2 column fails', async () => {

@@ -85,6 +85,10 @@ describe('createSourcesAccessor.upsertSources', () => {
       automationAllowed: false,
       manualOnlyReason:
         'Published bizfile terms prohibit scraping or similar automated collection.',
+      manualInstructions: ['Open the bizfile business search page.'],
+      manualEvidenceFields: [
+        { key: 'entity_status', label: 'Entity status', required: true },
+      ],
       tosUrl:
         'https://www.sos.ca.gov/business-programs/bizfile/privacy-warning-terms-and-conditions-use',
       run: () => {
