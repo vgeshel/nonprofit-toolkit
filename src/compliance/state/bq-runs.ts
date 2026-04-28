@@ -86,7 +86,7 @@ export function createDiscoveryRunsAccessor(
         duration_ms: v.duration_ms,
         error_type: v.error_type,
         error_message: v.error_message,
-        payload: JSON.stringify(v.payload),
+        payload: v.payload === null ? null : JSON.stringify(v.payload),
       }
 
       // BigQuery's nodejs SDK refuses null parameter values without an
