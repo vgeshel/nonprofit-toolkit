@@ -89,10 +89,12 @@ EINs and SOS entity numbers are technically public and don't need to be secret. 
 - BigQuery `compliance` dataset with the four core tables (`entity`, `discovery_runs`, `findings`, `sources`)
 - GCS bucket created (not yet populated)
 - `src/compliance/` skeleton with types, jurisdiction registry, source runner (`api` kind only)
-- `us-federal` jurisdiction with **one** source: IRS Tax Exempt Organization Search lookup by EIN
+- `us-federal` jurisdiction with **one** source: IRS Tax Exempt Organization
+  Search bulk-data lookup by EIN (Pub. 78 + Auto-Revocation)
 - Entity identification storage: secret-manager accessor for IDs + BigQuery accessor for entity row
 - `compliance-onboard` skill: interactive interview, writes IDs and entity row
-- `compliance-discover` skill (minimal): runs IRS TEOS only, writes to BQ, prints raw findings
+- `compliance-discover` skill (minimal): runs IRS TEOS bulk-data lookup only,
+  writes to BQ, prints raw findings
 - 100% test coverage on all new code; all gates green
 
 **Out of scope:**
@@ -102,20 +104,128 @@ EINs and SOS entity numbers are technically public and don't need to be secret. 
 - Real findings/gap engine (deferred to Phase 2 — Phase 1 just dumps raw source data)
 - Calendar, walkthroughs, governance
 
-**Why this carve-out.** IRS TEOS has a clean public JSON API, so `kind: 'api'` is sufficient. Implementing one source end-to-end shapes the abstraction realistically without the second-system trap of designing for sources we haven't written yet.
+**Why this carve-out.** IRS TEOS publishes canonical public bulk downloads for
+Pub. 78 and auto-revocation data, so `kind: 'api'` is sufficient for the first
+source even without browser automation. Implementing one source end-to-end
+shapes the abstraction realistically without the second-system trap of designing
+for sources we haven't written yet.
 
 ### Phase 2 — Public-source discovery (CA + IRS BMF)
 
-High-level scope:
+**Goal.** Turn the Phase 1 single-source slice into a real public-source
+compliance picture for the user's federal and California standing, without
+credentials, filings, payments, or any other external side effects.
 
-- Add `kind: 'playwright'` source runner with read-only constraints, MFA hand-off, ToS-check metadata, and explicit failure modes (no silent stale data)
-- `us-ca` jurisdiction module
-- Sources: CA SOS bizfile, CA AG Registry of Charities & Fundraisers search, CA FTB Entity Status Letter, IRS BMF bulk lookup
-- Findings/gap engine: detect suspended status, missing/late RRF-1, missing latest 990, address mismatch across registries
-- Promote `compliance-discover` from minimal to real (multi-source, multi-jurisdiction, prioritized markdown report)
-- New `compliance-status` skill (read-only summary of stored state)
+**Important source-governance decision.** Phase 2 is not "scrape every portal."
+Every source must start with current official-source review, then select the
+least invasive allowed access method:
 
-Detailed checklist for Phase 2 will be drafted at the start of the phase, after Phase 1 is merged.
+- Prefer official bulk downloads or public CSVs over browser automation.
+- Use Playwright only when the official source permits automated read-only
+  access or the implementation documents a specific approved basis for it.
+- If a source's terms prohibit automated collection, model the source as
+  `kind: 'manual'` with exact user instructions and typed evidence capture
+  rather than bypassing the restriction.
+- Search/query forms are allowed only when the source policy classifies them as
+  read-only and documents the request shape. Mutating submits, filings, account
+  changes, payments, document uploads, and "certify/order" actions are forbidden.
+- A source that cannot be read confidently must produce an explicit source error
+  or manual-verification requirement. It must not return stale, empty, or guessed
+  compliance status.
+
+**Source research snapshot, checked 2026-04-28.** The implementation phase must
+refresh this before coding and capture the final URLs in source definitions.
+
+| Source         | Official URLs to start from                                                                                                                                                                                                        | Planning implication                                                                                                                                                                                      |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CA SOS         | `https://www.sos.ca.gov/business-programs/business-entities/information-requests`, `https://www.sos.ca.gov/business-programs/bizfile`, `https://www.sos.ca.gov/business-programs/bizfile/privacy-warning-terms-and-conditions-use` | bizfile exposes entity status and related fields, but its terms include anti-scraping restrictions. Start as manual or authorized bulk/public-data access, not blind scrape.                              |
+| CA AG Registry | `https://www.oag.ca.gov/charities`, `https://www.oag.ca.gov/charities/reports`, `https://oag.ca.gov/charities/content/info`, `https://rct.doj.ca.gov`                                                                              | Prefer the downloadable Registry Reports CSVs for status. The search tool remains useful for latest filings and documents, but its replacement by a 2026 online filing system must be handled explicitly. |
+| CA FTB         | `https://www.ftb.ca.gov/help/business/entity-status-letter.asp`, `https://webapp.ftb.ca.gov/eletter/`                                                                                                                              | Entity Status Letter is public and free for supported entity types, including exempt organizations. Treat it as FTB-only status; it does not reflect other agencies.                                      |
+| IRS EO BMF     | `https://www.irs.gov/charities-non-profits/exempt-organizations-business-master-file-extract-eo-bmf`, `https://www.irs.gov/charities-non-profits/tax-exempt-organization-search-bulk-data-downloads`                               | Official CSV bulk data. Add caching before another large federal download source is introduced.                                                                                                           |
+
+**In scope:**
+
+- Source-governance metadata on every source:
+  - `accessUrl` and `tosUrl`
+  - `accessMethod` documented as official API/download, Playwright read-only, or manual
+  - `automationAllowed` / `manualOnlyReason`
+  - source freshness fields (`observedAt`, upstream posting date when available)
+  - bounded evidence policy (small typed excerpts, download metadata, or manual
+    evidence references; no unbounded HTML dumps in BigQuery rows)
+- Shared HTTP/bulk cache for public downloads:
+  - ETag / Last-Modified support where the upstream provides it
+  - source URL + content hash recorded with each run
+  - deterministic local cache for tests and local runs
+  - fail-loud behavior for corrupt, stale, or schema-invalid cached artifacts
+- `kind: 'playwright'` runner:
+  - browser/page injected through the source context for testability
+  - denylist and allowlist policy for navigation, downloads, clicks, and form submits
+  - no credentials in Phase 2
+  - no MFA flow required yet, except a clear "blocked by auth/MFA" result if a
+    public page unexpectedly demands it
+  - explicit DOM/schema mismatch errors when a page changes
+- `us-ca` jurisdiction module:
+  - entity ID schema for `sosEntityNumber`, `agCharityNumber`, and optional FTB
+    entity ID/name search fields
+  - preserve leading zeroes and letters in IDs
+  - accept current CA SOS entity-number formats, including the new 12-character
+    `B...` IDs for newly registered corporations, LLCs, and LPs
+  - register each California source independently
+- Public sources:
+  - CA SOS business status as a manual or authorized bulk/public-data source unless
+    current source review documents a permitted automated path
+  - CA AG Registry status and renewal/reporting data, primarily from Registry
+    Reports CSVs and secondarily from the search tool only if permitted and needed
+  - CA FTB Entity Status Letter lookup for FTB good-standing / exempt-status signal
+  - IRS EO BMF CSV lookup by EIN, supplementing Phase 1 Pub. 78 and
+    auto-revocation data
+- Findings/gap engine:
+  - source-specific findings for suspended/forfeited/delinquent/revoked status
+  - CA AG renewal findings for missing, incomplete, rejected, late, or not-submitted
+    RRF-1 / required annual reporting
+  - latest Form 990 presence/freshness finding using IRS TEOS/BMF and CA AG filings
+    where available
+  - cross-source findings for legal-name/address mismatch, stale source data, and
+    missing configured identifiers
+  - severity model with stable finding codes, typed evidence, opened/resolved
+    timestamps, and deterministic de-duplication
+- Skill layer:
+  - promote `compliance-discover` from raw Phase 1 output to a multi-source,
+    multi-jurisdiction markdown report ordered by severity
+  - add `compliance-status`, a read-only skill that summarizes stored state without
+    network calls
+- Manual verification:
+  - run against the user's onboarded nonprofit after implementation
+  - record which sources were live, manual, skipped by policy, or unreachable
+
+**Out of scope:**
+
+- Authenticated portal sessions, MyFTB login, AG login, IRS Tax Pro account, and
+  MFA-assisted data collection
+- Filing submissions, payments, certified-copy orders, document uploads, and portal
+  account changes
+- Calendar/deadline planning, filing walkthroughs, governance records, or GCS
+  document-retention workflows beyond bounded evidence metadata
+- Building around a private or undocumented endpoint that the official source does
+  not document or permit
+
+**Work packages:**
+
+1. **Source contracts and policy audit.** Refresh official URLs, document ToS/access
+   decisions, add source metadata schemas, and create fixture-driven tests for each
+   source record shape.
+2. **Cache and evidence plumbing.** Add the shared HTTP/download cache and evidence
+   size policy before implementing IRS BMF or CA AG CSV downloads.
+3. **Runner support.** Extend the source runner for Playwright/manual outcomes with
+   read-only policy enforcement and explicit failure types.
+4. **Jurisdiction and sources.** Add `us-ca`, then implement one source at a time
+   with RED -> GREEN -> REFACTOR tests.
+5. **Findings engine.** Move derivable compliance status into typed finding rules,
+   including Phase 1 IRS TEOS findings where that simplifies cross-source logic.
+6. **Skills and reports.** Upgrade `compliance-discover`, add `compliance-status`,
+   and update skill docs with exact behavior and limitations.
+7. **Verification and PR.** Run all gates, perform live/manual verification against
+   the onboarded nonprofit, update the checklist, push the branch, and open the PR.
 
 ### Phase 3 — Authenticated discovery (TBD)
 
