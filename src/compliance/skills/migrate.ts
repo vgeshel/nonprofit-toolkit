@@ -222,13 +222,14 @@ export function parseMigrationArgs(
     return err({ type: 'parse', message: describeParseFailure(caught) })
   }
 
-  // After a successful commander parse, `--project` is guaranteed (it is
-  // `requiredOption`) and `--dry-run` defaults to false. Zod gives us the
-  // narrow types without an unreachable defensive branch.
-  const rawOpts = program.opts()
+  const rawValidation = RawSchema.safeParse(program.opts())
+  if (!rawValidation.success) {
+    return err({ type: 'validation', message: rawValidation.error.message })
+  }
+
   const validation = MigrationOptionsSchema.safeParse({
-    projectId: RawSchema.parse(rawOpts).project,
-    dryRun: RawSchema.parse(rawOpts).dryRun,
+    projectId: rawValidation.data.project,
+    dryRun: rawValidation.data.dryRun,
   })
   if (!validation.success) {
     return err({ type: 'validation', message: validation.error.message })

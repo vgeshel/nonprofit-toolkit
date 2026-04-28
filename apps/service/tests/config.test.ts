@@ -15,6 +15,12 @@ describe('ConfigSchema', () => {
     SLACK_SIGNING_SECRET: 'test-signing-secret',
   }
 
+  function withoutEnvKey(key: keyof typeof validEnv): Partial<typeof validEnv> {
+    const env: Partial<typeof validEnv> = { ...validEnv }
+    delete env[key]
+    return env
+  }
+
   it('parses valid configuration', () => {
     const config = ConfigSchema.parse(validEnv)
 
@@ -67,25 +73,25 @@ describe('ConfigSchema', () => {
   })
 
   it('rejects missing PROJECT_ID', () => {
-    const { PROJECT_ID: _, ...rest } = validEnv
+    const rest = withoutEnvKey('PROJECT_ID')
 
     expect(() => ConfigSchema.parse(rest)).toThrow()
   })
 
   it('rejects missing SERVICE_API_KEY', () => {
-    const { SERVICE_API_KEY: _, ...rest } = validEnv
+    const rest = withoutEnvKey('SERVICE_API_KEY')
 
     expect(() => ConfigSchema.parse(rest)).toThrow()
   })
 
   it('rejects missing SLACK_BOT_TOKEN', () => {
-    const { SLACK_BOT_TOKEN: _, ...rest } = validEnv
+    const rest = withoutEnvKey('SLACK_BOT_TOKEN')
 
     expect(() => ConfigSchema.parse(rest)).toThrow()
   })
 
   it('rejects missing SLACK_SIGNING_SECRET', () => {
-    const { SLACK_SIGNING_SECRET: _, ...rest } = validEnv
+    const rest = withoutEnvKey('SLACK_SIGNING_SECRET')
 
     expect(() => ConfigSchema.parse(rest)).toThrow()
   })

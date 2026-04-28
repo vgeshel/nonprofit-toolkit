@@ -10,7 +10,7 @@
  * Tests inject fake accessor instances so no real GCP calls happen.
  */
 import { errAsync, okAsync } from 'neverthrow'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ComplianceMigrationPort } from '../skills/migrate.ts'
 import {
   ONBOARD_INTERVIEW_QUESTIONS,
@@ -19,6 +19,11 @@ import {
 } from '../skills/onboard.ts'
 import type { EntityAccessor } from '../state/bq-entity.ts'
 import type { EntityIdsAccessor } from '../state/secret-manager.ts'
+import { EntityIdentifiersSchema } from '../types/index.ts'
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 const ANSWERS: OnboardingAnswers = {
   legalName: 'Foo Foundation',
@@ -211,6 +216,37 @@ describe('runOnboarding', () => {
     if (result.isErr()) {
       expect(result.error.type).toBe('validation')
     }
+  })
+
+  it('returns a validation error if identifier construction fails', async () => {
+    const invalidIdentifiers = EntityIdentifiersSchema.safeParse({
+      'us-federal': { ein: '123' },
+    })
+    expect(invalidIdentifiers.success).toBe(false)
+
+    vi.spyOn(EntityIdentifiersSchema, 'parse').mockImplementationOnce(() => {
+      throw new Error('identifier validation escaped')
+    })
+    vi.spyOn(EntityIdentifiersSchema, 'safeParse').mockReturnValueOnce(
+      invalidIdentifiers,
+    )
+
+    const ids = fakeIds()
+    const bq = fakeBq()
+    const result = await runOnboarding({
+      answers: ANSWERS,
+      identifiersAccessor: ids,
+      entityAccessor: bq,
+      migrationPort: fakeMigrationPort(),
+    })
+
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.type).toBe('validation')
+      expect(result.error.message).toContain('EIN must be 9 digits')
+    }
+    expect(ids.writeMock).not.toHaveBeenCalled()
+    expect(bq.upsertMock).not.toHaveBeenCalled()
   })
 
   it('propagates a Secret Manager write failure', async () => {

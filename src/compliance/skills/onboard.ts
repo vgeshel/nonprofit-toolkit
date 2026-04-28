@@ -5,8 +5,8 @@
  * pure logic the skill calls once it has collected user answers. Splitting
  * "ask the user" from "do the work" keeps the work testable.
  */
-import type { ResultAsync } from 'neverthrow'
-import { errAsync } from 'neverthrow'
+import type { Result, ResultAsync } from 'neverthrow'
+import { err, errAsync, ok } from 'neverthrow'
 import { z } from 'zod'
 import type { EntityAccessor, EntityInput } from '../state/bq-entity.ts'
 import { ensureComplianceSchema } from '../state/ensure-schema.ts'
@@ -202,17 +202,21 @@ const OnboardingAnswersSchema = z.object({
 
 function buildIdentifiers(
   answers: z.infer<typeof OnboardingAnswersSchema>,
-): EntityIdentifiers {
+): Result<EntityIdentifiers, OnboardingError> {
   const caInner: { sosEntityNumber: string; agCharityNumber?: string } = {
     sosEntityNumber: answers.caSosEntityNumber,
   }
   if (answers.caAgCharityNumber !== null) {
     caInner.agCharityNumber = answers.caAgCharityNumber
   }
-  return EntityIdentifiersSchema.parse({
+  const parsed = EntityIdentifiersSchema.safeParse({
     'us-federal': { ein: answers.ein },
     'us-ca': caInner,
   })
+  if (!parsed.success) {
+    return err({ type: 'validation', message: parsed.error.message })
+  }
+  return ok(parsed.data)
 }
 
 function buildEntityRow(
@@ -258,7 +262,11 @@ export function runOnboarding(
     })
   }
   const valid = validation.data
-  const identifiers = buildIdentifiers(valid)
+  const identifiersResult = buildIdentifiers(valid)
+  if (identifiersResult.isErr()) {
+    return errAsync(identifiersResult.error)
+  }
+  const identifiers = identifiersResult.value
   const entityRow = buildEntityRow(valid)
 
   return ensureComplianceSchema(args.migrationPort)

@@ -5,14 +5,19 @@
  * Tests cover: dataset creation when missing, idempotent skip when present,
  * per-table creation, idempotent re-runs, and error propagation.
  */
+import { Command } from 'commander'
 import { errAsync, okAsync } from 'neverthrow'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   describeParseFailure,
   parseMigrationArgs,
   runMigration,
   type ComplianceMigrationPort,
 } from '../skills/migrate.ts'
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 function fakePort(
   overrides: Partial<ComplianceMigrationPort> = {},
@@ -84,6 +89,20 @@ describe('parseMigrationArgs', () => {
     expect(result.isErr()).toBe(true)
     if (result.isErr()) {
       expect(result.error.type).toBe('parse')
+    }
+  })
+
+  it('returns validation errors when commander emits malformed option values', () => {
+    const opts = vi
+      .spyOn(Command.prototype, 'opts')
+      .mockReturnValueOnce({ project: 42, dryRun: 'yes' })
+
+    const result = parseMigrationArgs(['--project', 'p'])
+
+    expect(opts).toHaveBeenCalledTimes(1)
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.type).toBe('validation')
     }
   })
 })

@@ -70,7 +70,7 @@ describe('createDiscoveryRunsAccessor.recordRun', () => {
     })
   })
 
-  it('serialises a null payload as the literal "null" JSON string', async () => {
+  it('passes SQL NULL for a null payload', async () => {
     const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
     const accessor = createDiscoveryRunsAccessor({
       runner: fakeRunner(query),
@@ -86,7 +86,7 @@ describe('createDiscoveryRunsAccessor.recordRun', () => {
     }
     await accessor.recordRun(failed)
     const [, params] = query.mock.calls[0] ?? []
-    expect(params?.payload).toBe('null')
+    expect(params?.payload).toBeNull()
     expect(params?.error_type).toBe('http')
   })
 

@@ -409,7 +409,7 @@ describe('runDonationAgent', () => {
 
     mockModel = new MockLanguageModelV3({
       doGenerate: async () => {
-        throw 'string failure' // eslint-disable-line @typescript-eslint/only-throw-error
+        throw 'string failure'
       },
     })
 
