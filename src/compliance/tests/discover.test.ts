@@ -11,6 +11,7 @@ import { z } from 'zod'
 import type { JurisdictionRegistry } from '../registry/jurisdiction-registry.ts'
 import { runDiscovery } from '../skills/discover.ts'
 import type { ComplianceMigrationPort } from '../skills/migrate.ts'
+import type { DownloadCacheStore } from '../sources/download-cache.ts'
 import type { RunRecorder } from '../sources/runner.ts'
 import type { EntityAccessor } from '../state/bq-entity.ts'
 import type { EntityIdsAccessor } from '../state/secret-manager.ts'
@@ -192,6 +193,35 @@ describe('runDiscovery', () => {
     expect(result.value.runs).toHaveLength(2)
     expect(sourceA.run).toHaveBeenCalledTimes(1)
     expect(sourceB.run).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes an injected download cache into source context', async () => {
+    const source = makeSource({ id: 'a' })
+    const downloadCache: DownloadCacheStore = {
+      read: vi.fn<DownloadCacheStore['read']>(),
+      write: vi.fn<DownloadCacheStore['write']>(),
+    }
+
+    const result = await runDiscovery({
+      registry: fakeRegistry([makeJurisdiction([source])]),
+      entityAccessor: fakeEntityAccessor(ENTITY),
+      identifiersAccessor: fakeIdsAccessor({
+        'us-federal': { ein: '12-3456789' },
+      }),
+      recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
+      now: () => new Date('2024-05-01T00:00:00Z'),
+      fetch: vi.fn<FetchImpl>(() =>
+        Promise.resolve(new Response('', { status: 200 })),
+      ),
+      downloadCache,
+    })
+
+    expect(result.isOk()).toBe(true)
+    expect(source.run).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(source.run).mock.calls[0]?.[1].downloadCache).toBe(
+      downloadCache,
+    )
   })
 
   it('returns a configuration error when the entity has not been onboarded', async () => {

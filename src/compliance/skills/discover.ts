@@ -11,6 +11,7 @@
  */
 import { ResultAsync, errAsync } from 'neverthrow'
 import type { JurisdictionRegistry } from '../registry/jurisdiction-registry.ts'
+import type { DownloadCacheStore } from '../sources/download-cache.ts'
 import type { SourceError } from '../sources/errors.ts'
 import { runSource, type RunRecorder } from '../sources/runner.ts'
 import type { EntityAccessor } from '../state/bq-entity.ts'
@@ -77,6 +78,7 @@ export interface RunDiscoveryArgs {
   readonly migrationPort: ComplianceMigrationPort
   readonly now: () => Date
   readonly fetch: FetchImpl
+  readonly downloadCache?: DownloadCacheStore
 }
 
 /**
@@ -152,6 +154,7 @@ function executeAllSources(
   const ctx: SourceContext = {
     now: args.now,
     fetch: args.fetch,
+    downloadCache: args.downloadCache,
     identifiers: args.identifiers,
   }
 

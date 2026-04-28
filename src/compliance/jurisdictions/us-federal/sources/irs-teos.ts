@@ -24,6 +24,7 @@ import { strFromU8, unzipSync } from 'fflate'
 import { ResultAsync, errAsync, okAsync } from 'neverthrow'
 import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
+import { fetchDownloadWithCache } from '../../../sources/download-cache.ts'
 import { type SourceError } from '../../../sources/errors.ts'
 import type {
   Entity,
@@ -271,6 +272,16 @@ function fetchZip(
   ctx: SourceContext,
   url: string,
 ): ResultAsync<Uint8Array, SourceError> {
+  if (ctx.downloadCache !== undefined) {
+    return fetchDownloadWithCache({
+      sourceId: 'irs-teos',
+      url,
+      fetch: ctx.fetch,
+      cache: ctx.downloadCache,
+      now: ctx.now,
+    }).map((download) => download.bytes)
+  }
+
   return ResultAsync.fromPromise(ctx.fetch(url), toFetchError).andThen<
     Uint8Array,
     SourceError

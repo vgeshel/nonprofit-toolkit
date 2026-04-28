@@ -8,6 +8,7 @@
  */
 import type { ResultAsync } from 'neverthrow'
 import { z } from 'zod'
+import type { DownloadCacheStore } from '../sources/download-cache.ts'
 import type { SourceError } from '../sources/errors.ts'
 import type { Entity, EntityIdentifiers } from './entity.ts'
 import { FindingSchema, type Finding } from './finding.ts'
@@ -174,6 +175,7 @@ export type FetchImpl = (
  * The runner provides:
  *   - `now`         clock — tests inject a fixed time
  *   - `fetch`       HTTP client — tests inject a fake
+ *   - `downloadCache` optional shared cache for official bulk downloads
  *   - `identifiers` per-jurisdiction IDs (EIN, SOS number, etc.) — the
  *                   orchestrator reads these from Secret Manager once before
  *                   dispatching, so each source receives them by reference
@@ -182,6 +184,7 @@ export type FetchImpl = (
 export interface SourceContext {
   readonly now: () => Date
   readonly fetch: FetchImpl
+  readonly downloadCache?: DownloadCacheStore
   readonly identifiers: EntityIdentifiers
 }
 

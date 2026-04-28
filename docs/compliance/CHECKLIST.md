@@ -95,7 +95,7 @@ the design.
       migration script against a real GCP project.
 - [ ] Confirm the user's existing onboarded entity IDs and attributes can be read from
       Secret Manager and BigQuery before running any live discovery.
-- [ ] Add shared download/cache support before adding IRS BMF or CA AG CSV downloads.
+- [x] Add shared download/cache support before adding IRS BMF or CA AG CSV downloads.
       Phase 1 downloads the full IRS Pub. 78 and Auto-Revocation files on every run;
       Phase 2 should stop repeating identical bulk downloads.
 - [ ] Consume the existing `us-ca` keys in `EntityIdentifiers` rather than inventing a
@@ -133,15 +133,15 @@ the design.
 
 ### Download cache and evidence policy (TDD)
 
-- [ ] Tests for cache key generation from source URL, request parameters, and entity
+- [x] Tests for cache key generation from source URL, request parameters, and entity
       identifier without leaking secrets.
-- [ ] Tests for ETag / Last-Modified revalidation where upstream headers exist.
-- [ ] Tests for hash verification, corrupt cache entries, and stale-cache failure.
-- [ ] Tests for deterministic filesystem cache behavior in local/dev/test runs.
-- [ ] Implement shared cache abstractions and a local adapter.
-- [ ] Tests for bounded evidence payloads: max bytes, structured excerpts, source
+- [x] Tests for ETag / Last-Modified revalidation where upstream headers exist.
+- [x] Tests for hash verification, corrupt cache entries, and stale-cache failure.
+- [x] Tests for deterministic filesystem cache behavior in local/dev/test runs.
+- [x] Implement shared cache abstractions and a local adapter.
+- [x] Tests for bounded evidence payloads: max bytes, structured excerpts, source
       timestamps, content hashes, and no unbounded HTML/PDF/CSV payloads in BigQuery.
-- [ ] Implement evidence helpers used by API, bulk-download, manual, and Playwright
+- [x] Implement evidence helpers used by API, bulk-download, manual, and Playwright
       sources.
 
 ### Source runner extensions (TDD)

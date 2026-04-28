@@ -11,6 +11,7 @@
  * exercise the full happy and unhappy paths without hitting irs.gov.
  */
 import { strToU8, zipSync } from 'fflate'
+import { okAsync } from 'neverthrow'
 import { describe, expect, it, vi } from 'vitest'
 import {
   IRS_TEOS_PUB78_URL,
@@ -18,6 +19,10 @@ import {
   _internal,
   irsTeosSource,
 } from '../jurisdictions/us-federal/sources/irs-teos.ts'
+import type {
+  CachedDownload,
+  DownloadCacheStore,
+} from '../sources/download-cache.ts'
 import type { Entity, FetchImpl, SourceContext } from '../types/index.ts'
 
 const ENTITY: Entity = {
@@ -156,6 +161,19 @@ function makeContext(overrides: Partial<SourceContext> = {}): SourceContext {
   }
 }
 
+class MemoryDownloadCacheStore implements DownloadCacheStore {
+  private readonly artifacts = new Map<string, CachedDownload>()
+
+  read(cacheKey: string) {
+    return okAsync(this.artifacts.get(cacheKey) ?? null)
+  }
+
+  write(artifact: CachedDownload) {
+    this.artifacts.set(artifact.metadata.cacheKey, artifact)
+    return okAsync(undefined)
+  }
+}
+
 describe('_internal.describeError', () => {
   it('returns the message of an Error instance', () => {
     expect(_internal.describeError(new Error('boom'))).toBe('boom')
@@ -232,6 +250,48 @@ describe('irsTeosSource.run', () => {
     )
     expect(pubFinding?.severity).toBe('info')
     expect(pubFinding?.evidence).toMatchObject({ deductibilityCode: 'PC' })
+  })
+
+  it('uses the shared download cache for IRS bulk ZIPs when provided', async () => {
+    const cache = new MemoryDownloadCacheStore()
+    const pub78Text = pub78Row({ tin: '123456789', code: 'PC' })
+    const fetchFn = vi.fn<FetchImpl>((input, init) => {
+      const url = toUrlString(input)
+      const firstCachedRun = fetchFn.mock.calls.length > 2
+      if (firstCachedRun) {
+        expect(init?.headers).toEqual({
+          'if-none-match': url.endsWith('pub78.zip') ? '"pub78"' : '"revoked"',
+          'if-modified-since': 'Tue, 28 Apr 2026 00:00:00 GMT',
+        })
+        return Promise.resolve(new Response('', { status: 304 }))
+      }
+      const body = url.endsWith('pub78.zip')
+        ? zipString('pub78.txt', pub78Text)
+        : zipString('revocation.txt', '')
+      return Promise.resolve(
+        new Response(new Blob([body]), {
+          status: 200,
+          headers: {
+            etag: url.endsWith('pub78.zip') ? '"pub78"' : '"revoked"',
+            'last-modified': 'Tue, 28 Apr 2026 00:00:00 GMT',
+          },
+        }),
+      )
+    })
+    const ctx = makeContext({ fetch: fetchFn, downloadCache: cache })
+
+    const first = await irsTeosSource.run(ENTITY, ctx)
+    const second = await irsTeosSource.run(ENTITY, ctx)
+
+    expect(first.isOk()).toBe(true)
+    expect(second.isOk()).toBe(true)
+    expect(fetchFn).toHaveBeenCalledTimes(4)
+    if (second.isOk()) {
+      expect(second.value.record.payload.pub78).toMatchObject({
+        tin: '123456789',
+        deductibilityCode: 'PC',
+      })
+    }
   })
 
   it('emits a warn finding when EIN is NOT in Pub. 78', async () => {
