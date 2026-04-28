@@ -99,4 +99,22 @@ describe('createFindingsAccessor.recordFindings', () => {
       expect(result.error.type).toBe('query')
     }
   })
+
+  it('stops inserting after the first runner error', async () => {
+    const query = vi
+      .fn<BqQueryRunner['query']>()
+      .mockReturnValueOnce(errAsync({ type: 'query', message: 'BQ down' }))
+      .mockReturnValue(okAsync([]))
+    const accessor = createFindingsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.recordFindings([FINDING_A, FINDING_B])
+
+    expect(result.isErr()).toBe(true)
+    expect(query).toHaveBeenCalledTimes(1)
+    const [, params] = query.mock.calls[0] ?? []
+    expect(params?.finding_id).toBe(FINDING_A.finding_id)
+  })
 })

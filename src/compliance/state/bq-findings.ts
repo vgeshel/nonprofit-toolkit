@@ -5,7 +5,8 @@
  * Finding schema in `bq-rows.ts` is unit-tested as the runtime source of
  * truth.
  */
-import { ResultAsync, okAsync } from 'neverthrow'
+import type { ResultAsync } from 'neverthrow'
+import { okAsync } from 'neverthrow'
 import type { Finding } from '../types/index.ts'
 import type { BqParameterType, BqQueryRunner, QueryParam } from './bq-entity.ts'
 import { COMPLIANCE_DATASET } from './bq-rows.ts'
@@ -88,31 +89,32 @@ export function createFindingsAccessor(
       const types: Record<string, BqParameterType> = {
         resolved_at: 'TIMESTAMP',
       }
-      const inserts: ResultAsync<void, FindingsAccessorError>[] = findings.map(
-        (f) => {
-          const params: Record<string, QueryParam> = {
-            finding_id: f.finding_id,
-            jurisdiction_id: f.jurisdiction_id,
-            source_id: f.source_id,
-            severity: f.severity,
-            status: f.status,
-            title: f.title,
-            detail: f.detail,
-            evidence: JSON.stringify(f.evidence),
-            opened_at: f.opened_at,
-            resolved_at: f.resolved_at,
-          }
-          return deps.runner
-            .query(sql, params, types)
-            .mapErr<FindingsAccessorError>((err) => ({
-              type: 'query',
-              message: err.message,
-            }))
-            .map(() => undefined)
-        },
-      )
 
-      return ResultAsync.combine(inserts).map(() => undefined)
+      return findings.reduce<ResultAsync<void, FindingsAccessorError>>(
+        (chain, f) =>
+          chain.andThen(() => {
+            const params: Record<string, QueryParam> = {
+              finding_id: f.finding_id,
+              jurisdiction_id: f.jurisdiction_id,
+              source_id: f.source_id,
+              severity: f.severity,
+              status: f.status,
+              title: f.title,
+              detail: f.detail,
+              evidence: JSON.stringify(f.evidence),
+              opened_at: f.opened_at,
+              resolved_at: f.resolved_at,
+            }
+            return deps.runner
+              .query(sql, params, types)
+              .mapErr<FindingsAccessorError>((err) => ({
+                type: 'query',
+                message: err.message,
+              }))
+              .map(() => undefined)
+          }),
+        okAsync(undefined),
+      )
     },
   }
 }
