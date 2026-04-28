@@ -143,6 +143,23 @@ describe('createEntityAccessor.upsertEntity', () => {
     })
   })
 
+  it('passes a types map covering every nullable column', async () => {
+    // BigQuery rejects null parameter values without an explicit type.
+    // `mailing_address_line2` is the only nullable column on `entity`, so
+    // it's the only one that needs a hint. The type is attached
+    // unconditionally so a null line2 is accepted without any branching.
+    const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
+    const accessor = createEntityAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+      now: () => new Date('2024-05-01T00:00:00.000Z'),
+    })
+
+    await accessor.upsertEntity(VALID_INPUT)
+    const [, , types] = query.mock.calls[0] ?? []
+    expect(types).toEqual({ mailing_address_line2: 'STRING' })
+  })
+
   it('returns a validation error on malformed input', async () => {
     const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
     const accessor = createEntityAccessor({

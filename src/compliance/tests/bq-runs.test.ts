@@ -51,6 +51,25 @@ describe('createDiscoveryRunsAccessor.recordRun', () => {
     expect(JSON.parse(String(params?.payload))).toEqual({ ok: true })
   })
 
+  it('passes a types map covering every nullable column', async () => {
+    // BigQuery rejects null parameter values without an explicit type. The
+    // accessor must always send a `types` map for nullable columns so that a
+    // failed run (with null payload, error_type, error_message) inserts.
+    const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
+    const accessor = createDiscoveryRunsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    await accessor.recordRun(ROW)
+    const [, , types] = query.mock.calls[0] ?? []
+    expect(types).toEqual({
+      error_type: 'STRING',
+      error_message: 'STRING',
+      payload: 'STRING',
+    })
+  })
+
   it('serialises a null payload as the literal "null" JSON string', async () => {
     const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
     const accessor = createDiscoveryRunsAccessor({

@@ -55,6 +55,23 @@ describe('createFindingsAccessor.recordFindings', () => {
     expect(secondParams).toMatchObject({ finding_id: FINDING_B.finding_id })
   })
 
+  it('passes a types map covering every nullable column', async () => {
+    // `resolved_at` is the only nullable column on `findings`. The schema
+    // marks `detail` and `evidence` as REQUIRED, so they don't strictly need
+    // a type hint, but the SDK requires the hint whenever the value can be
+    // null at runtime. We only declare the genuinely nullable columns here
+    // so the map stays minimal and accurate.
+    const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
+    const accessor = createFindingsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    await accessor.recordFindings([FINDING_A])
+    const [, , types] = query.mock.calls[0] ?? []
+    expect(types).toEqual({ resolved_at: 'TIMESTAMP' })
+  })
+
   it('is a no-op for an empty list', async () => {
     const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
     const accessor = createFindingsAccessor({

@@ -13,7 +13,11 @@ import type { ResultAsync } from 'neverthrow'
 import { errAsync, okAsync } from 'neverthrow'
 import type { z } from 'zod'
 import type { Entity } from '../types/index.ts'
-import { COMPLIANCE_DATASET, ComplianceEntityRowSchema } from './bq-rows.ts'
+import {
+  COMPLIANCE_DATASET,
+  ComplianceEntityRowSchema,
+  type BqFieldType,
+} from './bq-rows.ts'
 
 /**
  * Errors emitted by an entity-row operation.
@@ -34,17 +38,35 @@ export type EntityAccessorError =
 export type QueryParam = string | number | boolean | null
 
 /**
+ * Per-parameter BigQuery type hint, used as the companion `types` map for
+ * named parameters. The set is reused from `BqFieldType` because every
+ * column type the compliance schema declares is also a value-binding type
+ * BigQuery accepts here.
+ *
+ * The map is required for any parameter whose value can be `null`: the
+ * BigQuery nodejs SDK refuses to send a `null` parameter without an explicit
+ * type, since it cannot infer the column type from the value.
+ */
+export type BqParameterType = BqFieldType
+
+/**
  * Minimal port — the production wiring adapts a real `BigQuery` instance to
  * this shape; tests provide a `vi.fn()`.
  *
  * `query` MUST return a parameterised query result as an array of rows. The
  * runner is responsible for parameter binding; the accessor passes `params`
  * verbatim.
+ *
+ * `types` is optional. When supplied, it is a per-parameter map of BigQuery
+ * type names (`'STRING'`, `'INT64'`, etc.). Accessors that bind nullable
+ * columns MUST supply a type for those columns so a `null` value is accepted
+ * by the SDK.
  */
 export interface BqQueryRunner {
   query(
     sql: string,
     params?: Record<string, QueryParam>,
+    types?: Record<string, BqParameterType>,
   ): ResultAsync<unknown[], { type: string; message: string }>
 }
 
@@ -183,8 +205,15 @@ export function createEntityAccessor(deps: EntityAccessorDeps): EntityAccessor {
         updated_at: deps.now().toISOString(),
       }
 
+      // BigQuery's nodejs SDK refuses null parameter values without an
+      // explicit type. `mailing_address_line2` is the only nullable column
+      // on `entity`, so it's the only one that needs a hint.
+      const types: Record<string, BqParameterType> = {
+        mailing_address_line2: 'STRING',
+      }
+
       return deps.runner
-        .query(sql, params)
+        .query(sql, params, types)
         .mapErr<EntityAccessorError>((err) => ({
           type: 'query',
           message: err.message,

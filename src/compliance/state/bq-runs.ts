@@ -9,7 +9,7 @@
  * schema in `bq-rows.ts` is unit-tested as the runtime source of truth.
  */
 import type { ResultAsync } from 'neverthrow'
-import type { BqQueryRunner, QueryParam } from './bq-entity.ts'
+import type { BqParameterType, BqQueryRunner, QueryParam } from './bq-entity.ts'
 import {
   COMPLIANCE_DATASET,
   type ComplianceDiscoveryRunRow,
@@ -89,8 +89,18 @@ export function createDiscoveryRunsAccessor(
         payload: JSON.stringify(v.payload),
       }
 
+      // BigQuery's nodejs SDK refuses null parameter values without an
+      // explicit type. Every nullable column gets a hint here. `payload`
+      // travels as a JSON string into PARSE_JSON, so its parameter type is
+      // STRING rather than JSON.
+      const types: Record<string, BqParameterType> = {
+        error_type: 'STRING',
+        error_message: 'STRING',
+        payload: 'STRING',
+      }
+
       return deps.runner
-        .query(sql, params)
+        .query(sql, params, types)
         .mapErr<RunsAccessorError>((err) => ({
           type: 'query',
           message: err.message,

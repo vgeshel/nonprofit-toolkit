@@ -179,6 +179,47 @@ describe('adaptBigQueryToQueryRunner', () => {
     })
   })
 
+  it('forwards the types map to BigQuery when supplied', async () => {
+    // BigQuery's nodejs SDK rejects null parameter values without an explicit
+    // type hint via the `types` companion map. The adapter must forward
+    // whatever the accessor passes so nullable columns work end-to-end.
+    const bq = freshBq()
+    mockQuery.mockResolvedValue([[], {}])
+
+    const runner = adaptBigQueryToQueryRunner(bq)
+    const got = await runner.query(
+      'SELECT @maybe_null',
+      { maybe_null: null },
+      { maybe_null: 'STRING' },
+    )
+
+    expect(got.isOk()).toBe(true)
+    expect(mockQuery).toHaveBeenCalledWith({
+      query: 'SELECT @maybe_null',
+      params: { maybe_null: null },
+      parameterMode: 'named',
+      types: { maybe_null: 'STRING' },
+    })
+  })
+
+  it('omits the types field when no map is supplied', async () => {
+    // Backwards compat: when an accessor binds only non-nullable values, no
+    // types map is needed and the adapter should not invent an empty one.
+    const bq = freshBq()
+    mockQuery.mockResolvedValue([[], {}])
+
+    const runner = adaptBigQueryToQueryRunner(bq)
+    await runner.query('SELECT 1', { foo: 'bar' })
+
+    expect(mockQuery).toHaveBeenCalledWith({
+      query: 'SELECT 1',
+      params: { foo: 'bar' },
+      parameterMode: 'named',
+    })
+    const call = mockQuery.mock.calls[0]?.[0]
+    expect(call).not.toHaveProperty('types')
+  })
+
   it('returns a typed query error when BigQuery rejects with an Error', async () => {
     const bq = freshBq()
     mockQuery.mockRejectedValue(new Error('forbidden'))

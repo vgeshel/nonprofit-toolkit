@@ -23,7 +23,7 @@ import { BigQuery } from '@google-cloud/bigquery'
 import { ResultAsync } from 'neverthrow'
 import { z } from 'zod'
 import type { BqClient, BqDataset } from '../skills/migrate-cli.ts'
-import type { BqQueryRunner, QueryParam } from './bq-entity.ts'
+import type { BqParameterType, BqQueryRunner, QueryParam } from './bq-entity.ts'
 
 /**
  * Re-export the SDK class so wiring code has a single import surface for
@@ -97,18 +97,33 @@ function describeQueryError(err: unknown): string {
  */
 export function adaptBigQueryToQueryRunner(bq: BigQuery): BqQueryRunner {
   return {
-    query(sql: string, params?: Record<string, QueryParam>) {
-      return ResultAsync.fromPromise(
-        bq.query({
-          query: sql,
-          params: params ?? {},
-          parameterMode: 'named',
-        }),
-        (err) => ({
-          type: 'query',
-          message: describeQueryError(err),
-        }),
-      ).map((response) => {
+    query(
+      sql: string,
+      params?: Record<string, QueryParam>,
+      types?: Record<string, BqParameterType>,
+    ) {
+      // Build the SDK options object incrementally so an absent `types` map
+      // is not serialised as an empty object — the SDK treats present-but-
+      // empty differently from absent in some edge cases, and accessors that
+      // bind only non-nullable values shouldn't pay that risk.
+      const options: {
+        query: string
+        params: Record<string, QueryParam>
+        parameterMode: 'named'
+        types?: Record<string, BqParameterType>
+      } = {
+        query: sql,
+        params: params ?? {},
+        parameterMode: 'named',
+      }
+      if (types !== undefined) {
+        options.types = types
+      }
+
+      return ResultAsync.fromPromise(bq.query(options), (err) => ({
+        type: 'query',
+        message: describeQueryError(err),
+      })).map((response) => {
         const parsed = QueryResultSchema.safeParse(response)
         if (!parsed.success) {
           return []

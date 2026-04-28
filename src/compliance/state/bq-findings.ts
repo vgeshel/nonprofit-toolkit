@@ -7,7 +7,7 @@
  */
 import { ResultAsync, okAsync } from 'neverthrow'
 import type { Finding } from '../types/index.ts'
-import type { BqQueryRunner, QueryParam } from './bq-entity.ts'
+import type { BqParameterType, BqQueryRunner, QueryParam } from './bq-entity.ts'
 import { COMPLIANCE_DATASET } from './bq-rows.ts'
 
 /**
@@ -79,6 +79,15 @@ export function createFindingsAccessor(
       // Run inserts in sequence so a later failure stops the rest.
       // Phase 1 emits at most a few findings per run, so a multi-row INSERT is
       // not yet needed.
+      //
+      // BigQuery's nodejs SDK refuses null parameter values without an
+      // explicit type. `resolved_at` is the only nullable column on
+      // `findings`, so it's the only one that needs a hint. The hint is
+      // attached unconditionally — equally correct whether the value is
+      // null or a timestamp string.
+      const types: Record<string, BqParameterType> = {
+        resolved_at: 'TIMESTAMP',
+      }
       const inserts: ResultAsync<void, FindingsAccessorError>[] = findings.map(
         (f) => {
           const params: Record<string, QueryParam> = {
@@ -94,7 +103,7 @@ export function createFindingsAccessor(
             resolved_at: f.resolved_at,
           }
           return deps.runner
-            .query(sql, params)
+            .query(sql, params, types)
             .mapErr<FindingsAccessorError>((err) => ({
               type: 'query',
               message: err.message,
