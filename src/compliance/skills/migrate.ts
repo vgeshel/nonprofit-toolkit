@@ -70,7 +70,6 @@ export interface MigrationReport {
  */
 export interface RunMigrationArgs {
   readonly port: ComplianceMigrationPort
-  readonly projectId: string
   readonly dryRun: boolean
 }
 

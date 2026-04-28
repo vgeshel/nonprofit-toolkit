@@ -138,7 +138,6 @@ export async function runCli(args: RunCliArgs): Promise<void> {
 
   const result = await runMigration({
     port,
-    projectId: opts.projectId,
     dryRun: opts.dryRun,
   })
   if (result.isErr()) {

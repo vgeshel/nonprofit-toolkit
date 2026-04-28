@@ -42,10 +42,6 @@ export function ensureComplianceSchema(
 ): ResultAsync<MigrationReport, MigrationPortError> {
   return runMigration({
     port,
-    // `runMigration` does not actually consume `projectId` — the field is
-    // there for the CLI's logging context. Pass an empty string and let the
-    // caller worry about identifying the project elsewhere.
-    projectId: '',
     dryRun: false,
   })
 }

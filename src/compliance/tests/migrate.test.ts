@@ -93,7 +93,6 @@ describe('runMigration', () => {
     const port = fakePort()
     const result = await runMigration({
       port,
-      projectId: 'proj',
       dryRun: false,
     })
     expect(result.isOk()).toBe(true)
@@ -120,7 +119,6 @@ describe('runMigration', () => {
     })
     const result = await runMigration({
       port,
-      projectId: 'proj',
       dryRun: false,
     })
     expect(result.isOk()).toBe(true)
@@ -140,7 +138,6 @@ describe('runMigration', () => {
     })
     const result = await runMigration({
       port,
-      projectId: 'proj',
       dryRun: false,
     })
     expect(result.isOk()).toBe(true)
@@ -153,7 +150,6 @@ describe('runMigration', () => {
     const port = fakePort()
     const result = await runMigration({
       port,
-      projectId: 'proj',
       dryRun: true,
     })
     expect(result.isOk()).toBe(true)
@@ -173,7 +169,6 @@ describe('runMigration', () => {
     })
     const result = await runMigration({
       port,
-      projectId: 'proj',
       dryRun: false,
     })
     expect(result.isErr()).toBe(true)
@@ -190,7 +185,6 @@ describe('runMigration', () => {
     })
     const result = await runMigration({
       port,
-      projectId: 'proj',
       dryRun: false,
     })
     expect(result.isErr()).toBe(true)
@@ -207,7 +201,6 @@ describe('runMigration', () => {
     })
     const result = await runMigration({
       port,
-      projectId: 'proj',
       dryRun: false,
     })
     expect(result.isErr()).toBe(true)
@@ -224,7 +217,6 @@ describe('runMigration', () => {
     })
     const result = await runMigration({
       port,
-      projectId: 'proj',
       dryRun: false,
     })
     expect(result.isErr()).toBe(true)
@@ -234,7 +226,6 @@ describe('runMigration', () => {
     const port = fakePort()
     await runMigration({
       port,
-      projectId: 'proj',
       dryRun: false,
     })
 
