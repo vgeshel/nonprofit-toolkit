@@ -263,7 +263,7 @@ describe('irsTeosSource.run', () => {
           'if-none-match': url.endsWith('pub78.zip') ? '"pub78"' : '"revoked"',
           'if-modified-since': 'Tue, 28 Apr 2026 00:00:00 GMT',
         })
-        return Promise.resolve(new Response('', { status: 304 }))
+        return Promise.resolve(new Response(null, { status: 304 }))
       }
       const body = url.endsWith('pub78.zip')
         ? zipString('pub78.txt', pub78Text)

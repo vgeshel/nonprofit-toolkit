@@ -451,7 +451,7 @@ describe('fetchDownloadWithCache', () => {
     const store = new MemoryDownloadCacheStore()
     store.artifact = makeArtifact()
     const fetch = vi.fn<FetchImpl>(() =>
-      Promise.resolve(new Response('', { status: 304 })),
+      Promise.resolve(new Response(null, { status: 304 })),
     )
 
     const result = await fetchDownloadWithCache({
@@ -479,7 +479,7 @@ describe('fetchDownloadWithCache', () => {
   it('fails loudly when an upstream returns 304 without a cache entry', async () => {
     const store = new MemoryDownloadCacheStore()
     const fetch = vi.fn<FetchImpl>(() =>
-      Promise.resolve(new Response('', { status: 304 })),
+      Promise.resolve(new Response(null, { status: 304 })),
     )
 
     const result = await fetchDownloadWithCache({
