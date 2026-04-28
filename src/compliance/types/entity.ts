@@ -84,9 +84,12 @@ export const EntitySchema = z.object({
   state_of_incorporation: z.string().length(2),
   fiscal_year_end_month: z.coerce.number().int().min(1).max(12),
   fiscal_year_end_day: z.coerce.number().int().min(1).max(31),
-  formation_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'formation_date must be YYYY-MM-DD'),
+  formation_date: z.preprocess(
+    extractTimestampValue,
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'formation_date must be YYYY-MM-DD'),
+  ),
   mailing_address_line1: z.string().min(1),
   mailing_address_line2: z.string().nullable(),
   mailing_address_city: z.string().min(1),

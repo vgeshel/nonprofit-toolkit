@@ -189,6 +189,14 @@ describe('EntitySchema', () => {
     })
     expect(result.updated_at).toBe('2024-02-02T00:00:00.000Z')
   })
+
+  it('extracts BigQueryDate .value into formation_date', () => {
+    const result = EntitySchema.parse({
+      ...valid,
+      formation_date: { value: '2010-01-15' },
+    })
+    expect(result.formation_date).toBe('2010-01-15')
+  })
 })
 
 describe('FindingSchema', () => {
