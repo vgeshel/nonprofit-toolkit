@@ -29,22 +29,31 @@ before running any sources — do NOT ask the user to run a migration script fir
 
 ## Wiring
 
-Build the orchestration with:
+Call **`runDiscoveryProduction`** from `src/compliance/skills/discover-wiring.ts`:
 
-- `createJurisdictionRegistry()` from `src/compliance/registry/jurisdiction-registry.ts`
-- `register(usFederalJurisdiction)` from
-  `src/compliance/jurisdictions/us-federal/index.ts`
-- `createEntityAccessor` (BigQuery)
-- `createEntityIdsAccessor` (Secret Manager)
-- A `RunRecorder` composed from `createDiscoveryRunsAccessor` and
-  `createFindingsAccessor`
-- `migrationPort` — built with `makeBqPort` from
-  `src/compliance/skills/migrate-cli.ts`, wrapping the same BigQuery client used by the
-  accessors
-- A `now: () => new Date()` clock and the global `fetch`
+```ts
+import { runDiscoveryProduction } from '../../src/compliance/skills/discover-wiring.ts'
 
-Then call `runDiscovery` from `src/compliance/skills/discover.ts`. The first thing it
-does is run the schema migration; on every subsequent invocation that step is a no-op.
+const result = await runDiscoveryProduction({ projectId })
+```
+
+That single call constructs the `BigQuery` and `SecretManagerServiceClient`, adapts them
+to all required ports, builds the recorder, registers the default jurisdictions
+(`[usFederalJurisdiction]`), runs the schema migration, and dispatches every source.
+There is no boilerplate to write. Tests inject `bqFactory` / `secretManagerFactory` /
+`now` / `fetch` / `jurisdictions`; production omits them and the defaults construct
+real SDK clients with the global `fetch` and system clock.
+
+If you would rather invoke from a shell, `scripts/compliance-discover.ts` is a thin
+wrapper that calls the same function and prints a compact summary (or full JSON with
+`--json`):
+
+```bash
+bun scripts/compliance-discover.ts --project <gcp-project-id>
+```
+
+The first thing `runDiscovery` (which `runDiscoveryProduction` delegates to) does is
+run the schema migration; on every subsequent invocation that step is a no-op.
 
 ## Report to the user
 
@@ -77,11 +86,14 @@ migration are routine and not worth chatter.
 
 ## Failure modes
 
-If `runDiscovery` returns:
+If `runDiscoveryProduction` returns:
 
 - `not_onboarded` — direct the user to `compliance-onboard`.
 - `load` — the entity row or identifiers couldn't be read; surface the underlying message.
   Most common cause: missing IAM permission on the service account.
+- `wiring` — jurisdiction registration failed (typically: a duplicate
+  `Jurisdiction.id`). This can only happen if a caller passed a custom `jurisdictions`
+  list with collisions; the default `[usFederalJurisdiction]` cannot trigger it.
 
 Per-source failures (in `runs`) include:
 
@@ -94,8 +106,15 @@ Per-source failures (in `runs`) include:
 
 ## Source code
 
+- `src/compliance/skills/discover-wiring.ts` — production wiring
+  (`runDiscoveryProduction`); construct GCP clients, build the registry / recorder, call
+  `runDiscovery`. **Use this from the agent.**
 - `src/compliance/skills/discover.ts` — orchestration logic (port-driven, fully tested)
+- `src/compliance/skills/wiring-common.ts` — shared `buildCommonDeps` helper
+- `src/compliance/state/bq-adapters.ts` — adapt `BigQuery` to the migration port and
+  the query-runner port
 - `src/compliance/sources/runner.ts` — per-source execution and persistence
 - `src/compliance/jurisdictions/us-federal/sources/irs-teos.ts` — the only Phase 1 source
 - `src/compliance/state/bq-runs.ts` — discovery_runs accessor
 - `src/compliance/state/bq-findings.ts` — findings accessor
+- `scripts/compliance-discover.ts` — thin CLI wrapper around `runDiscoveryProduction`

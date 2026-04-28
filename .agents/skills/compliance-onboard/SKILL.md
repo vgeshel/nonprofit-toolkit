@@ -47,15 +47,31 @@ Optional:
 
 ## Persist
 
-Once every required answer is in hand, call `runOnboarding` from
-`src/compliance/skills/onboard.ts` with the answer bundle and accessor instances built from:
+Once every required answer is in hand, call **`runOnboardingProduction`** from
+`src/compliance/skills/onboard-wiring.ts`:
 
-- `createEntityIdsAccessor` (Secret Manager) wired via `createGcpSecretManagerPort`
-- `createEntityAccessor` (BigQuery) wired via the project-wide BigQuery client
-- `migrationPort` — built with `makeBqPort` from
-  `src/compliance/skills/migrate-cli.ts`, wrapping the same BigQuery client
+```ts
+import { runOnboardingProduction } from '../../src/compliance/skills/onboard-wiring.ts'
 
-Order of operations is enforced inside `runOnboarding`:
+const result = await runOnboardingProduction({ projectId, answers })
+```
+
+That single call constructs the `BigQuery` and `SecretManagerServiceClient`, adapts them
+to the migration / entity / Secret Manager ports, runs the schema migration, writes the
+secret, and upserts the BQ row. There is no boilerplate to write. Tests inject
+`bqFactory` / `secretManagerFactory` / `now`; production omits them and the defaults
+construct real SDK clients.
+
+If you would rather invoke from a shell, `scripts/compliance-onboard.ts` is a thin
+wrapper that reads the answer JSON from stdin (or `--answers-file`) and calls the same
+function:
+
+```bash
+cat answers.json | bun scripts/compliance-onboard.ts --project <gcp-project-id>
+```
+
+Order of operations is enforced inside `runOnboarding` (which `runOnboardingProduction`
+delegates to):
 
 1. Validate the answer bundle (Zod). Validation errors abort before any I/O.
 2. Ensure the `compliance` dataset and four tables exist (no-op when they already do).
@@ -83,9 +99,16 @@ the first IRS Tax-Exempt-Organization Search lookup against their EIN.
 
 ## Source code
 
+- `src/compliance/skills/onboard-wiring.ts` — production wiring
+  (`runOnboardingProduction`); construct GCP clients, adapt, call `runOnboarding`. **Use
+  this from the agent.**
 - `src/compliance/skills/onboard.ts` — pure logic (interview definition, validation,
   persistence orchestration)
+- `src/compliance/skills/wiring-common.ts` — shared `buildCommonDeps` helper
+- `src/compliance/state/bq-adapters.ts` — adapt `BigQuery` to the migration port and the
+  query-runner port
 - `src/compliance/state/secret-manager.ts` — entity-IDs accessor
 - `src/compliance/state/secret-manager-gcp.ts` — GCP SDK adapter
 - `src/compliance/state/bq-entity.ts` — BigQuery entity-row accessor
 - `src/compliance/state/bq-rows.ts` — Zod row schemas
+- `scripts/compliance-onboard.ts` — thin CLI wrapper around `runOnboardingProduction`

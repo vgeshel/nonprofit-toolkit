@@ -12,43 +12,8 @@
  * appear in coverage measurement.
  */
 import { BigQuery } from '@google-cloud/bigquery'
-import {
-  runCli,
-  type BqClient,
-  type BqDataset,
-} from '../src/compliance/skills/migrate-cli.ts'
-
-/**
- * Adapt a real `BigQuery` client to the narrow `BqClient` shape `runCli`
- * expects. The `BigQuery` SDK's overloaded signatures don't structurally
- * match a single signature, so we wrap each call individually.
- */
-function adaptBigQuery(bq: BigQuery): BqClient {
-  return {
-    dataset(name: string): BqDataset {
-      const ds = bq.dataset(name)
-      return {
-        exists: () => ds.exists(),
-        createTable: (tableId, options) =>
-          ds.createTable(tableId, {
-            schema: {
-              fields: options.schema.fields.map((f) => ({
-                name: f.name,
-                type: f.type,
-                mode: f.mode,
-              })),
-            },
-            description: options.description,
-          }),
-        table: (tableId: string) => {
-          const t = ds.table(tableId)
-          return { exists: () => t.exists() }
-        },
-      }
-    },
-    createDataset: (name: string) => bq.createDataset(name),
-  }
-}
+import { runCli } from '../src/compliance/skills/migrate-cli.ts'
+import { adaptBigQueryToBqClient } from '../src/compliance/state/bq-adapters.ts'
 
 await runCli({
   argv: process.argv.slice(2),
@@ -57,5 +22,6 @@ await runCli({
     stderr: (s) => process.stderr.write(s),
     exit: (c) => process.exit(c),
   },
-  bqFactory: (projectId) => adaptBigQuery(new BigQuery({ projectId })),
+  bqFactory: (projectId) =>
+    adaptBigQueryToBqClient(new BigQuery({ projectId })),
 })
