@@ -344,11 +344,11 @@ the current public surfaces do not provide a confidently permitted automated pat
 ### Phase exit
 
 - [x] Mark completed Phase 2 items in this file.
-- [ ] Push branch and open a PR titled
+- [x] Push branch and open a PR titled
       `compliance phase 2: public-source discovery`.
-- [ ] PR description includes source-policy decisions, deliverables, acceptance-gate
+- [x] PR description includes source-policy decisions, deliverables, acceptance-gate
       output, and manual-verification notes.
-- [ ] Stop after PR creation and wait for review and merge.
+- [x] Stop after PR creation and wait for review and merge.
 
 ---
 
