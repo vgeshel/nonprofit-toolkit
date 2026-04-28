@@ -14,6 +14,8 @@ This is a toolkit for AI coding assistants to set up and manage donation ETL for
 
 **Answer questions before acting.** If the user asks a question, answer it — thoroughly, honestly, and completely. Double-check your answer. Do not jump to making changes, writing code, or doing other work until you have answered the question. Questions and tasks are different things: a question needs an answer, a task needs action. Do not confuse them.
 
+**Automate everything you can do yourself.** This is an automation toolkit. Never tell the user "first run X", "make sure Y is configured", or "run this command before invoking the skill" if you could do it yourself. Skills must verify and execute their own prerequisites — create datasets, run migrations, provision buckets, fetch credentials from configured sources, idempotently. The only acceptable thing to ask the user for is information _only they have_ (their EIN, a project ID not in env, a credential they hold, a decision about their data). Anything mechanical, you do. Setup CLIs may exist for human convenience, but every skill must reach the same setup logic programmatically — the CLI is not a prerequisite for the skill.
+
 ## Before Every Response
 
 Work through these in your thinking before producing any output:
