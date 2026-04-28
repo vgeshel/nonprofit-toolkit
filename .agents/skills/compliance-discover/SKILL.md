@@ -24,7 +24,8 @@ tier (Phase 3+).
 The user must have completed onboarding (see `compliance-onboard`). If `runDiscovery`
 returns `not_onboarded`, walk the user through onboarding first.
 
-The migration script must have run once. See `compliance-onboard`'s pre-flight.
+The skill provisions the `compliance` BigQuery dataset and tables itself (idempotently)
+before running any sources — do NOT ask the user to run a migration script first.
 
 ## Wiring
 
@@ -37,9 +38,13 @@ Build the orchestration with:
 - `createEntityIdsAccessor` (Secret Manager)
 - A `RunRecorder` composed from `createDiscoveryRunsAccessor` and
   `createFindingsAccessor`
+- `migrationPort` — built with `makeBqPort` from
+  `src/compliance/skills/migrate-cli.ts`, wrapping the same BigQuery client used by the
+  accessors
 - A `now: () => new Date()` clock and the global `fetch`
 
-Then call `runDiscovery` from `src/compliance/skills/discover.ts`.
+Then call `runDiscovery` from `src/compliance/skills/discover.ts`. The first thing it
+does is run the schema migration; on every subsequent invocation that step is a no-op.
 
 ## Report to the user
 
@@ -64,6 +69,11 @@ Tell the user that:
 - Findings are persisted in `compliance.findings`.
 - Failed sources are still recorded as runs with `status='failed'` so partial outages are
   visible in the audit trail.
+
+If the report's `migration` field shows the dataset or any tables were created
+(`createdDataset === true || createdTables.length > 0`), mention briefly that compliance
+storage was provisioned during this run. Otherwise stay silent on it — re-runs of the
+migration are routine and not worth chatter.
 
 ## Failure modes
 

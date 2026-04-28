@@ -90,9 +90,6 @@ follow-ups from Phase 1 and the high-level scope from the PLAN.
 
 ### Phase 1 follow-ups to pick up
 
-- [ ] Mirror SKILL.md files into `.claude/skills/compliance-onboard/SKILL.md` and
-      `.claude/skills/compliance-discover/SKILL.md` if the harness sandbox no longer
-      blocks writes there. Currently they live only at `.agents/skills/...`.
 - [ ] Manual verification of `compliance-onboard`, `compliance-discover`, and the
       migration script against a real GCP project (was deferred from Phase 1 for lack
       of credentials in the implementation VM).

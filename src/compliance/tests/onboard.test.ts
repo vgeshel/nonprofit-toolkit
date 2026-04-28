@@ -11,6 +11,7 @@
  */
 import { errAsync, okAsync } from 'neverthrow'
 import { describe, expect, it, vi } from 'vitest'
+import type { ComplianceMigrationPort } from '../skills/migrate.ts'
 import {
   ONBOARD_INTERVIEW_QUESTIONS,
   runOnboarding,
@@ -58,6 +59,31 @@ function fakeBq(): EntityAccessor & {
     upsertEntity: upsertMock,
     readMock,
     upsertMock,
+  }
+}
+
+/**
+ * Fake migration port for skill-level tests. Default behaviour: dataset and
+ * tables already exist, so `ensureComplianceSchema` is a silent no-op. Pass
+ * `overrides` to simulate "first run on a fresh project" or BQ failures.
+ */
+function fakeMigrationPort(
+  overrides: Partial<ComplianceMigrationPort> = {},
+): ComplianceMigrationPort {
+  return {
+    datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+      okAsync(true),
+    ),
+    createDataset: vi.fn<ComplianceMigrationPort['createDataset']>(() =>
+      okAsync(undefined),
+    ),
+    tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+      okAsync(true),
+    ),
+    createTable: vi.fn<ComplianceMigrationPort['createTable']>(() =>
+      okAsync(undefined),
+    ),
+    ...overrides,
   }
 }
 
@@ -109,6 +135,7 @@ describe('runOnboarding', () => {
       answers: ANSWERS,
       identifiersAccessor: ids,
       entityAccessor: bq,
+      migrationPort: fakeMigrationPort(),
     })
     expect(result.isOk()).toBe(true)
 
@@ -142,6 +169,7 @@ describe('runOnboarding', () => {
       answers,
       identifiersAccessor: ids,
       entityAccessor: bq,
+      migrationPort: fakeMigrationPort(),
     })
     expect(result.isOk()).toBe(true)
 
@@ -159,6 +187,7 @@ describe('runOnboarding', () => {
       answers: { ...ANSWERS, ein: '1234' },
       identifiersAccessor: ids,
       entityAccessor: bq,
+      migrationPort: fakeMigrationPort(),
     })
     expect(result.isErr()).toBe(true)
     if (result.isErr()) {
@@ -176,6 +205,7 @@ describe('runOnboarding', () => {
       answers: { ...ANSWERS, fiscalYearEndMonth: 13 },
       identifiersAccessor: ids,
       entityAccessor: bq,
+      migrationPort: fakeMigrationPort(),
     })
     expect(result.isErr()).toBe(true)
     if (result.isErr()) {
@@ -194,6 +224,7 @@ describe('runOnboarding', () => {
       answers: ANSWERS,
       identifiersAccessor: ids,
       entityAccessor: bq,
+      migrationPort: fakeMigrationPort(),
     })
     expect(result.isErr()).toBe(true)
     if (result.isErr()) {
@@ -215,6 +246,7 @@ describe('runOnboarding', () => {
       answers: ANSWERS,
       identifiersAccessor: ids,
       entityAccessor: bq,
+      migrationPort: fakeMigrationPort(),
     })
     expect(result.isErr()).toBe(true)
     if (result.isErr()) {
@@ -231,6 +263,7 @@ describe('runOnboarding', () => {
       answers: ANSWERS,
       identifiersAccessor: ids,
       entityAccessor: bq,
+      migrationPort: fakeMigrationPort(),
     })
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
@@ -243,5 +276,100 @@ describe('runOnboarding', () => {
         agCharityNumber: 'CT0123456',
       },
     })
+  })
+
+  it('runs the schema migration before any secret/BQ writes', async () => {
+    // Order matters: if the entity row write fired before ensureSchema, a
+    // fresh project would 404 on the table.
+    const ids = fakeIds()
+    const bq = fakeBq()
+    const port = fakeMigrationPort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        okAsync(false),
+      ),
+      tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+        okAsync(false),
+      ),
+    })
+
+    const result = await runOnboarding({
+      answers: ANSWERS,
+      identifiersAccessor: ids,
+      entityAccessor: bq,
+      migrationPort: port,
+    })
+    expect(result.isOk()).toBe(true)
+    expect(port.createDataset).toHaveBeenCalledTimes(1)
+    expect(port.createTable).toHaveBeenCalledTimes(4)
+    expect(ids.writeMock).toHaveBeenCalledTimes(1)
+    expect(bq.upsertMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports what the migration created on the success summary', async () => {
+    const ids = fakeIds()
+    const bq = fakeBq()
+    const port = fakeMigrationPort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        okAsync(false),
+      ),
+      tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+        okAsync(false),
+      ),
+    })
+
+    const result = await runOnboarding({
+      answers: ANSWERS,
+      identifiersAccessor: ids,
+      entityAccessor: bq,
+      migrationPort: port,
+    })
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value.migration.createdDataset).toBe(true)
+    expect(result.value.migration.createdTables.length).toBe(4)
+  })
+
+  it('does not write anything if the migration fails', async () => {
+    const ids = fakeIds()
+    const bq = fakeBq()
+    const port = fakeMigrationPort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        errAsync({ type: 'sdk', message: 'forbidden' }),
+      ),
+    })
+
+    const result = await runOnboarding({
+      answers: ANSWERS,
+      identifiersAccessor: ids,
+      entityAccessor: bq,
+      migrationPort: port,
+    })
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.type).toBe('storage')
+      expect(result.error.message).toContain('forbidden')
+    }
+    expect(ids.writeMock).not.toHaveBeenCalled()
+    expect(bq.upsertMock).not.toHaveBeenCalled()
+  })
+
+  it('reports a no-op migration when nothing needed creating', async () => {
+    const ids = fakeIds()
+    const bq = fakeBq()
+    // fakeMigrationPort default = dataset + tables all already exist.
+    const port = fakeMigrationPort()
+
+    const result = await runOnboarding({
+      answers: ANSWERS,
+      identifiersAccessor: ids,
+      entityAccessor: bq,
+      migrationPort: port,
+    })
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value.migration.createdDataset).toBe(false)
+    expect(result.value.migration.createdTables).toEqual([])
+    expect(port.createDataset).not.toHaveBeenCalled()
+    expect(port.createTable).not.toHaveBeenCalled()
   })
 })

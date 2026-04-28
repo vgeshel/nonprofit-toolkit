@@ -9,11 +9,13 @@ import type { ResultAsync } from 'neverthrow'
 import { errAsync } from 'neverthrow'
 import { z } from 'zod'
 import type { EntityAccessor, EntityInput } from '../state/bq-entity.ts'
+import { ensureComplianceSchema } from '../state/ensure-schema.ts'
 import type { EntityIdsAccessor } from '../state/secret-manager.ts'
 import {
   EntityIdentifiersSchema,
   type EntityIdentifiers,
 } from '../types/index.ts'
+import type { ComplianceMigrationPort, MigrationReport } from './migrate.ts'
 
 /**
  * Onboarding answer set. Each field corresponds to a question in the
@@ -147,12 +149,15 @@ export type OnboardingError =
   | { type: 'storage'; message: string }
 
 /**
- * Confirmation returned on success.
+ * Confirmation returned on success. `migration` reflects what
+ * `ensureComplianceSchema` did — usually a silent no-op (empty arrays);
+ * non-empty only on the very first onboarding run in a fresh GCP project.
  */
 export interface OnboardingSummary {
   readonly legalName: string
   readonly identifiers: EntityIdentifiers
   readonly entityRow: EntityInput
+  readonly migration: MigrationReport
 }
 
 /**
@@ -162,6 +167,7 @@ export interface RunOnboardingArgs {
   readonly answers: OnboardingAnswers
   readonly identifiersAccessor: EntityIdsAccessor
   readonly entityAccessor: EntityAccessor
+  readonly migrationPort: ComplianceMigrationPort
 }
 
 /**
@@ -232,8 +238,11 @@ function buildEntityRow(
  *
  * Order matters:
  *   1. Validate answers (fail fast, no I/O).
- *   2. Write secrets first — if BQ later fails, IDs are still safely stored.
- *   3. Write BQ row.
+ *   2. Ensure the compliance schema exists (idempotent; no-op on re-runs).
+ *      Doing this before any write means a first onboarding on a fresh GCP
+ *      project succeeds without the user pre-running a CLI migration.
+ *   3. Write secrets — if BQ later fails, IDs are still safely stored.
+ *   4. Write BQ row.
  *
  * If BQ fails after secrets are stored, the user can re-run onboarding to
  * complete the BQ side; the secret write is idempotent.
@@ -252,23 +261,31 @@ export function runOnboarding(
   const identifiers = buildIdentifiers(valid)
   const entityRow = buildEntityRow(valid)
 
-  return args.identifiersAccessor
-    .write(identifiers)
+  return ensureComplianceSchema(args.migrationPort)
     .mapErr<OnboardingError>((err) => ({
       type: 'storage',
-      message: `Secret Manager write failed: ${err.message}`,
+      message: `Compliance schema migration failed: ${err.message}`,
     }))
-    .andThen(() =>
-      args.entityAccessor
-        .upsertEntity(entityRow)
+    .andThen((migration) =>
+      args.identifiersAccessor
+        .write(identifiers)
         .mapErr<OnboardingError>((err) => ({
           type: 'storage',
-          message: `BigQuery upsert failed: ${err.message}`,
+          message: `Secret Manager write failed: ${err.message}`,
+        }))
+        .andThen(() =>
+          args.entityAccessor
+            .upsertEntity(entityRow)
+            .mapErr<OnboardingError>((err) => ({
+              type: 'storage',
+              message: `BigQuery upsert failed: ${err.message}`,
+            })),
+        )
+        .map<OnboardingSummary>(() => ({
+          legalName: valid.legalName,
+          identifiers,
+          entityRow,
+          migration,
         })),
     )
-    .map<OnboardingSummary>(() => ({
-      legalName: valid.legalName,
-      identifiers,
-      entityRow,
-    }))
 }

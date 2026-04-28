@@ -17,14 +17,10 @@ them so subsequent skills can run.
 
 ## Pre-flight
 
-Read `PROJECT_ID` from the GCP environment. The migration script must have run once before
-onboarding so the `compliance` dataset exists. If the user has not run it, walk them through:
-
-```bash
-bun scripts/compliance-migrate.ts --project <PROJECT_ID>
-```
-
-Re-runs of the migration are idempotent (no-op when dataset/tables already exist).
+Read `PROJECT_ID` from the GCP environment. The skill provisions the `compliance`
+BigQuery dataset and tables itself (idempotently) on the first run — do NOT ask the user
+to run a migration script first. The standalone CLI at `scripts/compliance-migrate.ts`
+exists for human convenience, but this skill must reach the same outcome programmatically.
 
 ## Interview
 
@@ -56,20 +52,29 @@ Once every required answer is in hand, call `runOnboarding` from
 
 - `createEntityIdsAccessor` (Secret Manager) wired via `createGcpSecretManagerPort`
 - `createEntityAccessor` (BigQuery) wired via the project-wide BigQuery client
+- `migrationPort` — built with `makeBqPort` from
+  `src/compliance/skills/migrate-cli.ts`, wrapping the same BigQuery client
 
 Order of operations is enforced inside `runOnboarding`:
 
 1. Validate the answer bundle (Zod). Validation errors abort before any I/O.
-2. Write the identifiers JSON document to Secret Manager (`compliance-entity-ids`).
-3. Upsert the non-secret attributes into `compliance.entity` in BigQuery.
+2. Ensure the `compliance` dataset and four tables exist (no-op when they already do).
+3. Write the identifiers JSON document to Secret Manager (`compliance-entity-ids`).
+4. Upsert the non-secret attributes into `compliance.entity` in BigQuery.
 
-If step 3 fails, the user can re-run onboarding to retry — the secret write is idempotent.
+If step 4 fails, the user can re-run onboarding to retry — the secret write is idempotent
+and the schema migration is a no-op the second time.
 
 ## Confirm back
 
 Show the user a summary of what was written (legal name, identifiers minus secrets, fiscal
 year end, formation date, mailing address). Ask them to verify each line. Do not invent
 fields they did not provide.
+
+If the success summary's `migration` field shows the dataset or any tables were created
+(`createdDataset === true || createdTables.length > 0`), mention briefly that compliance
+storage was provisioned for the first time. Otherwise stay silent on it — re-runs of the
+migration are routine and not worth chatter.
 
 ## Next steps
 

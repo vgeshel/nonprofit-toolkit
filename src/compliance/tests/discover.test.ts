@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { JurisdictionRegistry } from '../registry/jurisdiction-registry.ts'
 import { runDiscovery } from '../skills/discover.ts'
+import type { ComplianceMigrationPort } from '../skills/migrate.ts'
 import type { RunRecorder } from '../sources/runner.ts'
 import type { EntityAccessor } from '../state/bq-entity.ts'
 import type { EntityIdsAccessor } from '../state/secret-manager.ts'
@@ -64,6 +65,30 @@ function fakeRecorder(): RunRecorder {
     recordFindings: vi.fn<RunRecorder['recordFindings']>(() =>
       okAsync(undefined),
     ),
+  }
+}
+
+/**
+ * Default migration port for discover tests: dataset + tables already exist
+ * (the common case after a one-time provisioning).
+ */
+function fakeMigrationPort(
+  overrides: Partial<ComplianceMigrationPort> = {},
+): ComplianceMigrationPort {
+  return {
+    datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+      okAsync(true),
+    ),
+    createDataset: vi.fn<ComplianceMigrationPort['createDataset']>(() =>
+      okAsync(undefined),
+    ),
+    tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+      okAsync(true),
+    ),
+    createTable: vi.fn<ComplianceMigrationPort['createTable']>(() =>
+      okAsync(undefined),
+    ),
+    ...overrides,
   }
 }
 
@@ -149,6 +174,7 @@ describe('runDiscovery', () => {
         'us-federal': { ein: '12-3456789' },
       }),
       recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
       now: () => new Date('2024-05-01T00:00:00Z'),
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 200 })),
@@ -171,6 +197,7 @@ describe('runDiscovery', () => {
         'us-federal': { ein: '12-3456789' },
       }),
       recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
       now: () => new Date(),
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 200 })),
@@ -192,6 +219,7 @@ describe('runDiscovery', () => {
       entityAccessor: fakeEntityAccessor(ENTITY),
       identifiersAccessor: fakeIdsAccessor(null),
       recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
       now: () => new Date(),
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 200 })),
@@ -216,6 +244,7 @@ describe('runDiscovery', () => {
         'us-federal': { ein: '12-3456789' },
       }),
       recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
       now: () => new Date('2024-05-01T00:00:00Z'),
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 200 })),
@@ -248,6 +277,7 @@ describe('runDiscovery', () => {
         'us-federal': { ein: '12-3456789' },
       }),
       recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
       now: () => new Date('2024-05-01T00:00:00Z'),
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 200 })),
@@ -273,6 +303,7 @@ describe('runDiscovery', () => {
         'us-federal': { ein: '12-3456789' },
       }),
       recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
       now: () => fixedNow,
       fetch: fetchFn,
     })
@@ -300,6 +331,7 @@ describe('runDiscovery', () => {
         'us-federal': { ein: '12-3456789' },
       }),
       recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
       now: () => new Date(),
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 200 })),
@@ -325,6 +357,7 @@ describe('runDiscovery', () => {
       entityAccessor: fakeEntityAccessor(ENTITY),
       identifiersAccessor: accessor,
       recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
       now: () => new Date(),
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 200 })),
@@ -346,6 +379,7 @@ describe('runDiscovery', () => {
         'us-federal': { ein: '12-3456789' },
       }),
       recorder: fakeRecorder(),
+      migrationPort: fakeMigrationPort(),
       now: () => new Date(),
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 200 })),
@@ -356,5 +390,120 @@ describe('runDiscovery', () => {
     if (!result.isOk()) return
     expect(result.value.runs).toEqual([])
     expect(result.value.findings).toEqual([])
+  })
+
+  it('runs the schema migration before any sources execute', async () => {
+    const source = makeSource({ id: 'a' })
+    const port = fakeMigrationPort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        okAsync(false),
+      ),
+      tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+        okAsync(false),
+      ),
+    })
+
+    const result = await runDiscovery({
+      registry: fakeRegistry([makeJurisdiction([source])]),
+      entityAccessor: fakeEntityAccessor(ENTITY),
+      identifiersAccessor: fakeIdsAccessor({
+        'us-federal': { ein: '12-3456789' },
+      }),
+      recorder: fakeRecorder(),
+      migrationPort: port,
+      now: () => new Date('2024-05-01T00:00:00Z'),
+      fetch: vi.fn<FetchImpl>(() =>
+        Promise.resolve(new Response('', { status: 200 })),
+      ),
+    })
+    expect(result.isOk()).toBe(true)
+    expect(port.createDataset).toHaveBeenCalledTimes(1)
+    expect(port.createTable).toHaveBeenCalledTimes(4)
+    expect(source.run).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports what the migration created on the discovery report', async () => {
+    const source = makeSource({ id: 'a' })
+    const port = fakeMigrationPort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        okAsync(false),
+      ),
+      tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+        okAsync(false),
+      ),
+    })
+
+    const result = await runDiscovery({
+      registry: fakeRegistry([makeJurisdiction([source])]),
+      entityAccessor: fakeEntityAccessor(ENTITY),
+      identifiersAccessor: fakeIdsAccessor({
+        'us-federal': { ein: '12-3456789' },
+      }),
+      recorder: fakeRecorder(),
+      migrationPort: port,
+      now: () => new Date('2024-05-01T00:00:00Z'),
+      fetch: vi.fn<FetchImpl>(() =>
+        Promise.resolve(new Response('', { status: 200 })),
+      ),
+    })
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value.migration.createdDataset).toBe(true)
+    expect(result.value.migration.createdTables.length).toBe(4)
+  })
+
+  it('does not run sources if the migration fails', async () => {
+    const source = makeSource({ id: 'a' })
+    const port = fakeMigrationPort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        errAsync({ type: 'sdk', message: 'forbidden' }),
+      ),
+    })
+
+    const result = await runDiscovery({
+      registry: fakeRegistry([makeJurisdiction([source])]),
+      entityAccessor: fakeEntityAccessor(ENTITY),
+      identifiersAccessor: fakeIdsAccessor({
+        'us-federal': { ein: '12-3456789' },
+      }),
+      recorder: fakeRecorder(),
+      migrationPort: port,
+      now: () => new Date(),
+      fetch: vi.fn<FetchImpl>(() =>
+        Promise.resolve(new Response('', { status: 200 })),
+      ),
+    })
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.type).toBe('load')
+      expect(result.error.message).toContain('forbidden')
+    }
+    expect(source.run).not.toHaveBeenCalled()
+  })
+
+  it('reports a no-op migration when nothing needed creating', async () => {
+    const source = makeSource({ id: 'a' })
+    // Default fakeMigrationPort = everything already exists.
+    const port = fakeMigrationPort()
+
+    const result = await runDiscovery({
+      registry: fakeRegistry([makeJurisdiction([source])]),
+      entityAccessor: fakeEntityAccessor(ENTITY),
+      identifiersAccessor: fakeIdsAccessor({
+        'us-federal': { ein: '12-3456789' },
+      }),
+      recorder: fakeRecorder(),
+      migrationPort: port,
+      now: () => new Date('2024-05-01T00:00:00Z'),
+      fetch: vi.fn<FetchImpl>(() =>
+        Promise.resolve(new Response('', { status: 200 })),
+      ),
+    })
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value.migration.createdDataset).toBe(false)
+    expect(result.value.migration.createdTables).toEqual([])
+    expect(port.createDataset).not.toHaveBeenCalled()
+    expect(port.createTable).not.toHaveBeenCalled()
   })
 })

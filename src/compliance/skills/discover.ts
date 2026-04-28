@@ -14,6 +14,7 @@ import type { JurisdictionRegistry } from '../registry/jurisdiction-registry.ts'
 import type { SourceError } from '../sources/errors.ts'
 import { runSource, type RunRecorder } from '../sources/runner.ts'
 import type { EntityAccessor } from '../state/bq-entity.ts'
+import { ensureComplianceSchema } from '../state/ensure-schema.ts'
 import type { EntityIdsAccessor } from '../state/secret-manager.ts'
 import type {
   Entity,
@@ -23,6 +24,7 @@ import type {
   SourceContext,
   SourceRunOutput,
 } from '../types/index.ts'
+import type { ComplianceMigrationPort, MigrationReport } from './migrate.ts'
 
 /**
  * Failure modes for the orchestrator itself (not for individual sources —
@@ -51,12 +53,17 @@ export type DiscoveryRun =
 
 /**
  * Discovery result aggregate.
+ *
+ * `migration` reflects what `ensureComplianceSchema` did at the start of the
+ * run — a no-op on every call after the first onboarding; non-empty only the
+ * very first time `compliance-discover` runs in a fresh GCP project.
  */
 export interface DiscoveryReport {
   readonly entity: Entity
   readonly identifiers: EntityIdentifiers
   readonly runs: readonly DiscoveryRun[]
   readonly findings: readonly Finding[]
+  readonly migration: MigrationReport
 }
 
 /**
@@ -67,15 +74,46 @@ export interface RunDiscoveryArgs {
   readonly entityAccessor: EntityAccessor
   readonly identifiersAccessor: EntityIdsAccessor
   readonly recorder: RunRecorder
+  readonly migrationPort: ComplianceMigrationPort
   readonly now: () => Date
   readonly fetch: FetchImpl
 }
 
 /**
  * Run discovery. See module docstring for semantics.
+ *
+ * The compliance schema is ensured before any reads — running discovery on a
+ * fresh project where onboarding has not been completed will fail loudly on
+ * `not_onboarded` rather than on a missing-table error from BigQuery.
  */
 export function runDiscovery(
   args: RunDiscoveryArgs,
+): ResultAsync<DiscoveryReport, DiscoveryError> {
+  return ensureComplianceSchema(args.migrationPort)
+    .mapErr<DiscoveryError>((err) => ({
+      type: 'load',
+      message: `Compliance schema migration failed: ${err.message}`,
+    }))
+    .andThen((migration) => loadEntityAndRun({ ...args, migration }))
+}
+
+interface ExecuteArgs extends RunDiscoveryArgs {
+  readonly migration: MigrationReport
+  readonly entity: Entity
+  readonly identifiers: EntityIdentifiers
+}
+
+interface PostMigrationArgs extends RunDiscoveryArgs {
+  readonly migration: MigrationReport
+}
+
+/**
+ * After the schema is guaranteed, load identity state and dispatch sources.
+ * Split out so the migration step's error mapping stays in `runDiscovery` and
+ * the entity-load mapping stays here.
+ */
+function loadEntityAndRun(
+  args: PostMigrationArgs,
 ): ResultAsync<DiscoveryReport, DiscoveryError> {
   const entityResult = args.entityAccessor
     .readEntity()
@@ -103,11 +141,6 @@ export function runDiscovery(
       return executeAllSources({ ...args, entity, identifiers })
     }),
   )
-}
-
-interface ExecuteArgs extends RunDiscoveryArgs {
-  readonly entity: Entity
-  readonly identifiers: EntityIdentifiers
 }
 
 /**
@@ -164,6 +197,7 @@ function executeAllSources(
         identifiers: args.identifiers,
         runs,
         findings,
+        migration: args.migration,
       }
     },
   )
