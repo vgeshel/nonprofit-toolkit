@@ -14,6 +14,7 @@ import {
   runMigration,
   type AddTableColumnRequest,
   type ComplianceMigrationPort,
+  type CreateOrReplaceViewRequest,
   type CreateTableRequest,
   type MigrationPortError,
   type TableColumnExistsRequest,
@@ -133,6 +134,14 @@ export function makeBqPort(bq: BqClient): ComplianceMigrationPort {
         toPortError,
       ).map(() => undefined)
     },
+    createOrReplaceView(req: CreateOrReplaceViewRequest) {
+      return ResultAsync.fromPromise(
+        bq.query({
+          query: `CREATE OR REPLACE VIEW \`${req.dataset}.${req.viewId}\` AS ${req.query}`,
+        }),
+        toPortError,
+      ).map(() => undefined)
+    },
     tableColumnExists(req: TableColumnExistsRequest) {
       return ResultAsync.fromPromise(
         bq.query({
@@ -185,7 +194,8 @@ export async function runCli(args: RunCliArgs): Promise<void> {
     `compliance-migrate: dataset=${r.createdDataset ? 'created' : 'present'} ` +
       `created_tables=${r.createdTables.length} ` +
       `skipped_tables=${r.skippedTables.length} ` +
-      `added_columns=${r.addedColumns.length}` +
+      `added_columns=${r.addedColumns.length} ` +
+      `updated_views=${r.updatedViews.length}` +
       (opts.dryRun ? ' (dry-run)' : '') +
       '\n',
   )

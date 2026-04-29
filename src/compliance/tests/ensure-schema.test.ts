@@ -28,6 +28,9 @@ function fakePort(
     createTable: vi.fn<ComplianceMigrationPort['createTable']>(() =>
       okAsync(undefined),
     ),
+    createOrReplaceView: vi.fn<ComplianceMigrationPort['createOrReplaceView']>(
+      () => okAsync(undefined),
+    ),
     addTableColumn: vi.fn<ComplianceMigrationPort['addTableColumn']>(() =>
       okAsync(undefined),
     ),
@@ -104,6 +107,7 @@ describe('didCreateAnything', () => {
         createdTables: [],
         skippedTables: ['entity', 'discovery_runs', 'findings', 'sources'],
         addedColumns: [],
+        updatedViews: [],
       }),
     ).toBe(true)
   })
@@ -116,6 +120,7 @@ describe('didCreateAnything', () => {
         createdTables: ['findings'],
         skippedTables: ['entity', 'discovery_runs', 'sources'],
         addedColumns: [],
+        updatedViews: [],
       }),
     ).toBe(true)
   })
@@ -128,6 +133,7 @@ describe('didCreateAnything', () => {
         createdTables: [],
         skippedTables: ['entity', 'discovery_runs', 'findings', 'sources'],
         addedColumns: [],
+        updatedViews: ['current_open_findings'],
       }),
     ).toBe(false)
   })
@@ -140,6 +146,7 @@ describe('didCreateAnything', () => {
         createdTables: [],
         skippedTables: ['entity', 'discovery_runs', 'findings', 'sources'],
         addedColumns: ['sources.access_url'],
+        updatedViews: [],
       }),
     ).toBe(true)
   })

@@ -334,6 +334,38 @@ describe('makeBqPort', () => {
     })
   })
 
+  it('routes createOrReplaceView through BigQuery DDL', async () => {
+    const query = vi.fn<BqClient['query']>(() => Promise.resolve([]))
+    const bq = fakeBq({
+      dataset: {
+        exists: vi.fn<BqDataset['exists']>(() => Promise.resolve([true])),
+        createTable: vi.fn<BqDataset['createTable']>(() =>
+          Promise.resolve([{}]),
+        ),
+        tableExists: vi.fn<() => Promise<unknown>>(() =>
+          Promise.resolve([true]),
+        ),
+      },
+      createDataset: vi.fn<BqClient['createDataset']>(() =>
+        Promise.resolve([{}]),
+      ),
+      query,
+    })
+    const port = makeBqPort(bq)
+    const result = await port.createOrReplaceView({
+      dataset: 'compliance',
+      viewId: 'current_open_findings',
+      query: 'SELECT * FROM `compliance.findings`',
+      description: 'current findings',
+    })
+
+    expect(result.isOk()).toBe(true)
+    expect(query).toHaveBeenCalledWith({
+      query:
+        'CREATE OR REPLACE VIEW `compliance.current_open_findings` AS SELECT * FROM `compliance.findings`',
+    })
+  })
+
   it('routes tableColumnExists through INFORMATION_SCHEMA.COLUMNS', async () => {
     const query = vi.fn<BqClient['query']>(() =>
       Promise.resolve([[{ column_name: 'access_url' }], {}]),

@@ -129,30 +129,31 @@ describe('getComplianceStatus', () => {
     expect(result.value.overall).toBe('attention_required')
   })
 
-  it('deduplicates repeated stored findings and suppresses source failures resolved by latest success', async () => {
+  it('uses the current-open-findings accessor result without doing table-history filtering in memory', async () => {
+    const repeatedSourceFinding: Finding = {
+      ...FINDING,
+      finding_id: '550e8400-e29b-41d4-a716-446655440002',
+      source_id: 'irs-eo-bmf',
+      title: 'Source failed: IRS EO BMF',
+      evidence: { code: 'source.failed' },
+    }
     const result = await getComplianceStatus({
       entityAccessor: entityAccessor(ENTITY),
       identifiersAccessor: identifiersAccessor(IDENTIFIERS),
       runsAccessor: { listLatestRuns: () => okAsync([RUN]) },
       findingsAccessor: {
         listOpenFindings: () =>
-          okAsync([
-            FINDING,
-            FINDING,
-            {
-              ...FINDING,
-              finding_id: '550e8400-e29b-41d4-a716-446655440002',
-              source_id: 'irs-eo-bmf',
-              title: 'Source failed: IRS EO BMF',
-              evidence: { code: 'source.failed' },
-            },
-          ]),
+          okAsync([FINDING, FINDING, repeatedSourceFinding]),
       },
     })
 
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
-    expect(result.value.openFindings).toEqual([FINDING])
+    expect(result.value.openFindings).toEqual([
+      FINDING,
+      FINDING,
+      repeatedSourceFinding,
+    ])
   })
 
   it('marks status as unknown when no discovery runs are stored', async () => {

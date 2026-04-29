@@ -55,6 +55,7 @@ function report(findings: readonly Finding[] = []): DiscoveryReport {
       createdTables: [],
       skippedTables: [],
       addedColumns: [],
+      updatedViews: [],
     },
     findings,
     runs: [
@@ -203,6 +204,7 @@ describe('formatDiscoveryReport', () => {
         createdTables: ['findings'],
         skippedTables: [],
         addedColumns: ['discovery_runs.payload'],
+        updatedViews: ['current_open_findings'],
       },
       runs: [
         {

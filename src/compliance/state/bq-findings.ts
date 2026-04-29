@@ -1,7 +1,7 @@
 /**
  * `compliance.findings` accessor.
  *
- * Merges one row per finding. Trusts its caller's static types; the
+ * Inserts one row per finding. Trusts its caller's static types; the
  * Finding schema in `bq-rows.ts` is unit-tested as the runtime source of
  * truth.
  */
@@ -9,7 +9,11 @@ import type { ResultAsync } from 'neverthrow'
 import { errAsync, okAsync } from 'neverthrow'
 import type { Finding } from '../types/index.ts'
 import type { BqParameterType, BqQueryRunner, QueryParam } from './bq-entity.ts'
-import { COMPLIANCE_DATASET, ComplianceFindingRowSchema } from './bq-rows.ts'
+import {
+  COMPLIANCE_DATASET,
+  CURRENT_OPEN_FINDINGS_VIEW,
+  ComplianceFindingRowSchema,
+} from './bq-rows.ts'
 
 /**
  * Errors emitted by the findings accessor.
@@ -49,6 +53,7 @@ export function createFindingsAccessor(
   deps: FindingsAccessorDeps,
 ): FindingsAccessor {
   const tableName = `\`${deps.projectId}.${COMPLIANCE_DATASET}.findings\``
+  const currentOpenViewName = `\`${deps.projectId}.${COMPLIANCE_DATASET}.${CURRENT_OPEN_FINDINGS_VIEW}\``
 
   return {
     recordFindings(findings) {
@@ -57,30 +62,7 @@ export function createFindingsAccessor(
       }
 
       const sql = `
-        MERGE ${tableName} T
-        USING (
-          SELECT
-            @finding_id AS finding_id,
-            @jurisdiction_id AS jurisdiction_id,
-            @source_id AS source_id,
-            @severity AS severity,
-            @status AS status,
-            @title AS title,
-            @detail AS detail,
-            PARSE_JSON(@evidence) AS evidence,
-            @opened_at AS opened_at,
-            @resolved_at AS resolved_at
-        ) S
-        ON T.finding_id = S.finding_id
-        WHEN MATCHED THEN UPDATE SET
-          jurisdiction_id = S.jurisdiction_id,
-          source_id = S.source_id,
-          severity = S.severity,
-          title = S.title,
-          detail = S.detail,
-          evidence = S.evidence,
-          opened_at = S.opened_at
-        WHEN NOT MATCHED THEN INSERT (
+        INSERT INTO ${tableName} (
           finding_id,
           jurisdiction_id,
           source_id,
@@ -91,22 +73,23 @@ export function createFindingsAccessor(
           evidence,
           opened_at,
           resolved_at
-        ) VALUES (
-          S.finding_id,
-          S.jurisdiction_id,
-          S.source_id,
-          S.severity,
-          S.status,
-          S.title,
-          S.detail,
-          S.evidence,
-          S.opened_at,
-          S.resolved_at
+        )
+        VALUES (
+          @finding_id,
+          @jurisdiction_id,
+          @source_id,
+          @severity,
+          @status,
+          @title,
+          @detail,
+          PARSE_JSON(@evidence),
+          @opened_at,
+          @resolved_at
         )
       `
 
-      // Run merges in sequence so a later failure stops the rest.
-      // Phase 1 emits at most a few findings per run, so a batch merge is
+      // Run inserts in sequence so a later failure stops the rest.
+      // Phase 1 emits at most a few findings per run, so a multi-row INSERT is
       // not yet needed.
       //
       // BigQuery's nodejs SDK refuses null parameter values without an
@@ -148,7 +131,7 @@ export function createFindingsAccessor(
     listOpenFindings() {
       const sql = `
         SELECT *
-        FROM ${tableName}
+        FROM ${currentOpenViewName}
         WHERE status = 'open'
         ORDER BY
           CASE severity

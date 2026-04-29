@@ -35,6 +35,9 @@ function fakePort(
     createTable: vi.fn<ComplianceMigrationPort['createTable']>(() =>
       okAsync(undefined),
     ),
+    createOrReplaceView: vi.fn<ComplianceMigrationPort['createOrReplaceView']>(
+      () => okAsync(undefined),
+    ),
     addTableColumn: vi.fn<ComplianceMigrationPort['addTableColumn']>(() =>
       okAsync(undefined),
     ),
@@ -126,6 +129,7 @@ describe('runMigration', () => {
     expect(port.createDataset).toHaveBeenCalledTimes(1)
     expect(port.createDataset).toHaveBeenCalledWith('compliance')
     expect(port.createTable).toHaveBeenCalledTimes(4)
+    expect(port.createOrReplaceView).toHaveBeenCalledTimes(1)
     expect(port.addTableColumn).not.toHaveBeenCalled()
 
     expect(result.value.createdDataset).toBe(true)
@@ -135,6 +139,7 @@ describe('runMigration', () => {
       'findings',
       'sources',
     ])
+    expect(result.value.updatedViews).toEqual(['current_open_findings'])
   })
 
   it('skips dataset creation when dataset already exists', async () => {
@@ -169,6 +174,7 @@ describe('runMigration', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(port.createTable).not.toHaveBeenCalled()
+    expect(port.createOrReplaceView).toHaveBeenCalledTimes(1)
     expect(result.value.createdTables).toEqual([])
     expect(result.value.addedColumns).toEqual([
       'sources.access_url',
@@ -177,6 +183,7 @@ describe('runMigration', () => {
       'sources.manual_only_reason',
       'sources.source_freshness',
     ])
+    expect(result.value.updatedViews).toEqual(['current_open_findings'])
   })
 
   it('skips actual creation calls when dryRun is true', async () => {
@@ -189,11 +196,13 @@ describe('runMigration', () => {
     if (!result.isOk()) return
     expect(port.createDataset).not.toHaveBeenCalled()
     expect(port.createTable).not.toHaveBeenCalled()
+    expect(port.createOrReplaceView).not.toHaveBeenCalled()
     expect(port.addTableColumn).not.toHaveBeenCalled()
     // Plan still records what would have happened.
     expect(result.value.createdDataset).toBe(true)
     expect(result.value.createdTables.length).toBe(4)
     expect(result.value.addedColumns).toEqual([])
+    expect(result.value.updatedViews).toEqual(['current_open_findings'])
   })
 
   it('plans Phase 2 column upgrades on dry-run when sources table already exists', async () => {
@@ -220,6 +229,39 @@ describe('runMigration', () => {
       'sources.manual_only_reason',
       'sources.source_freshness',
     ])
+    expect(result.value.updatedViews).toEqual(['current_open_findings'])
+  })
+
+  it('defines current findings in a view using semantic fields rather than finding_id', async () => {
+    const port = fakePort({
+      datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
+        okAsync(true),
+      ),
+      tableExists: vi.fn<ComplianceMigrationPort['tableExists']>(() =>
+        okAsync(true),
+      ),
+      tableColumnExists: vi.fn<ComplianceMigrationPort['tableColumnExists']>(
+        () => okAsync(true),
+      ),
+    })
+
+    const result = await runMigration({
+      port,
+      dryRun: false,
+    })
+
+    expect(result.isOk()).toBe(true)
+    const [viewReq] = vi.mocked(port.createOrReplaceView).mock.calls[0] ?? []
+    expect(viewReq?.dataset).toBe('compliance')
+    expect(viewReq?.viewId).toBe('current_open_findings')
+    expect(viewReq?.query).toMatch(/ROW_NUMBER\(\) OVER/i)
+    expect(viewReq?.query).toMatch(/PARTITION BY/i)
+    expect(viewReq?.query).toMatch(/jurisdiction_id/i)
+    expect(viewReq?.query).toMatch(/source_id/i)
+    expect(viewReq?.query).toMatch(/title/i)
+    expect(viewReq?.query).toMatch(/detail/i)
+    expect(viewReq?.query).toMatch(/TO_JSON_STRING\(evidence\)/i)
+    expect(viewReq?.query).not.toMatch(/PARTITION BY\s+finding_id/i)
   })
 
   it('returns the underlying error if datasetExists fails', async () => {

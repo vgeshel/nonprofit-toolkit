@@ -4,8 +4,9 @@
  * Per the project-wide rule that skills automate their own prerequisites,
  * every compliance skill calls this helper before running its own queries.
  * The compliance dataset and tables are created on-demand the first time a
- * skill runs in a fresh GCP project; subsequent runs are a no-op because the
- * underlying migration is idempotent.
+ * skill runs in a fresh GCP project; subsequent runs leave existing tables in
+ * place and refresh managed views because the underlying migration is
+ * idempotent.
  *
  * This is a thin façade over `runMigration` (in `../skills/migrate.ts`):
  *   - The dataset id is fixed to `COMPLIANCE_DATASET`.
@@ -27,15 +28,16 @@ import {
 } from '../skills/migrate.ts'
 
 /**
- * Idempotently create the `compliance` dataset and its four tables if they
- * are missing. Caller passes a `ComplianceMigrationPort` (the same port the
- * CLI uses); production wiring builds one with `makeBqPort` from
+ * Idempotently create the `compliance` dataset, its four tables, and managed
+ * views if they are missing or stale. Caller passes a `ComplianceMigrationPort`
+ * (the same port the CLI uses); production wiring builds one with `makeBqPort` from
  * `../skills/migrate-cli.ts`.
  *
  * On success, returns a `MigrationReport`. The report is silent on no-op
- * re-runs (`createdDataset: false`, `createdTables: []`); callers that want
- * to mention what happened should use `didCreateAnything` to decide whether
- * the report is worth printing.
+ * re-runs (`createdDataset: false`, `createdTables: []`, `addedColumns: []`);
+ * callers that want to mention what happened should use `didCreateAnything` to
+ * decide whether the report is worth printing. View refreshes are expected on
+ * every run and do not count as user-visible creation.
  */
 export function ensureComplianceSchema(
   port: ComplianceMigrationPort,

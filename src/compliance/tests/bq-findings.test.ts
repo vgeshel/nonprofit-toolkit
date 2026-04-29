@@ -36,7 +36,7 @@ function fakeRunner(
 }
 
 describe('createFindingsAccessor.recordFindings', () => {
-  it('merges each finding by finding_id', async () => {
+  it('inserts each finding as raw history without using finding_id as an upsert key', async () => {
     const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
     const accessor = createFindingsAccessor({
       runner: fakeRunner(query),
@@ -49,33 +49,13 @@ describe('createFindingsAccessor.recordFindings', () => {
 
     const [firstSql, firstParams] = query.mock.calls[0] ?? []
     expect(firstSql).toMatch(/`proj\.compliance\.findings`/)
-    expect(firstSql).toMatch(/MERGE/i)
-    expect(firstSql).toMatch(/ON T\.finding_id = S\.finding_id/i)
+    expect(firstSql).toMatch(/INSERT INTO/i)
+    expect(firstSql).not.toMatch(/MERGE/i)
+    expect(firstSql).not.toMatch(/ON T\.finding_id = S\.finding_id/i)
     expect(firstParams).toMatchObject({ finding_id: FINDING_A.finding_id })
 
     const [, secondParams] = query.mock.calls[1] ?? []
     expect(secondParams).toMatchObject({ finding_id: FINDING_B.finding_id })
-  })
-
-  it('does not overwrite resolution state when merging an existing finding', async () => {
-    const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
-    const accessor = createFindingsAccessor({
-      runner: fakeRunner(query),
-      projectId: 'proj',
-    })
-
-    await accessor.recordFindings([FINDING_A])
-
-    const [sql] = query.mock.calls[0] ?? []
-    const matchedClause =
-      typeof sql === 'string' ? sql.split('WHEN NOT MATCHED')[0] : ''
-    expect(matchedClause).toMatch(/WHEN MATCHED THEN UPDATE SET/i)
-    expect(matchedClause).toMatch(/severity = S\.severity/i)
-    expect(matchedClause).toMatch(/detail = S\.detail/i)
-    expect(matchedClause).toMatch(/evidence = S\.evidence/i)
-    expect(matchedClause).toMatch(/opened_at = S\.opened_at/i)
-    expect(matchedClause).not.toMatch(/status\s*=/i)
-    expect(matchedClause).not.toMatch(/resolved_at\s*=/i)
   })
 
   it('passes a types map covering every nullable column', async () => {
@@ -123,7 +103,7 @@ describe('createFindingsAccessor.recordFindings', () => {
     }
   })
 
-  it('stops merging after the first runner error', async () => {
+  it('stops recording after the first runner error', async () => {
     const query = vi
       .fn<BqQueryRunner['query']>()
       .mockReturnValueOnce(errAsync({ type: 'query', message: 'BQ down' }))
@@ -143,7 +123,7 @@ describe('createFindingsAccessor.recordFindings', () => {
 })
 
 describe('createFindingsAccessor.listOpenFindings', () => {
-  it('reads and validates open findings ordered by severity and source', async () => {
+  it('reads and validates current open findings from the view ordered by severity and source', async () => {
     const query = vi.fn<BqQueryRunner['query']>(() =>
       okAsync([FINDING_A, FINDING_B]),
     )
@@ -158,6 +138,7 @@ describe('createFindingsAccessor.listOpenFindings', () => {
     if (!result.isOk()) return
     expect(result.value).toEqual([FINDING_A, FINDING_B])
     const [sql] = query.mock.calls[0] ?? []
+    expect(sql).toMatch(/`proj\.compliance\.current_open_findings`/)
     expect(sql).toMatch(/WHERE status = 'open'/i)
     expect(sql).toMatch(/ORDER BY/i)
   })

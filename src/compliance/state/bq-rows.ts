@@ -86,6 +86,15 @@ export interface ComplianceTableDefinition {
 }
 
 /**
+ * One BigQuery view definition.
+ */
+export interface ComplianceViewDefinition {
+  readonly name: string
+  readonly description: string
+  readonly query: string
+}
+
+/**
  * Wrap an array of fields into the shape BigQuery's `createTable` expects.
  *
  * Returns a fresh array so callers cannot mutate the table definitions.
@@ -180,6 +189,82 @@ export const COMPLIANCE_TABLES: readonly ComplianceTableDefinition[] = [
     ],
   },
 ] as const
+
+export const CURRENT_OPEN_FINDINGS_VIEW = 'current_open_findings'
+
+/**
+ * Query for the current-open-findings view.
+ *
+ * The raw `findings` table is append-only history. This view owns the
+ * current-state contract by selecting the latest row for each semantic finding
+ * key. It deliberately does not partition by `finding_id`, because source-level
+ * findings can emit a fresh UUID on each run for the same underlying issue.
+ */
+export function currentOpenFindingsViewQuery(
+  datasetRef: string = COMPLIANCE_DATASET,
+): string {
+  const findingsTable = `\`${datasetRef}.findings\``
+  const runsTable = `\`${datasetRef}.discovery_runs\``
+  return `
+    WITH latest_runs AS (
+      SELECT source_id, status
+      FROM (
+        SELECT
+          source_id,
+          status,
+          ROW_NUMBER() OVER (
+            PARTITION BY source_id
+            ORDER BY completed_at DESC, started_at DESC, run_id DESC
+          ) AS rn
+        FROM ${runsTable}
+      )
+      WHERE rn = 1
+    ),
+    ranked_findings AS (
+      SELECT
+        f.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY
+            jurisdiction_id,
+            source_id,
+            title,
+            detail,
+            COALESCE(TO_JSON_STRING(evidence), '')
+          ORDER BY opened_at DESC, finding_id DESC
+        ) AS rn
+      FROM ${findingsTable} f
+    )
+    SELECT
+      f.finding_id,
+      f.jurisdiction_id,
+      f.source_id,
+      f.severity,
+      f.status,
+      f.title,
+      f.detail,
+      f.evidence,
+      f.opened_at,
+      f.resolved_at
+    FROM ranked_findings f
+    LEFT JOIN latest_runs r
+      ON r.source_id = f.source_id
+    WHERE f.rn = 1
+      AND f.status = 'open'
+      AND NOT (
+        JSON_VALUE(f.evidence, '$.code') = 'source.failed'
+        AND r.status = 'succeeded'
+      )
+  `
+}
+
+export const COMPLIANCE_VIEWS: readonly ComplianceViewDefinition[] = [
+  {
+    name: CURRENT_OPEN_FINDINGS_VIEW,
+    description:
+      'Latest open compliance findings derived from append-only finding history.',
+    query: currentOpenFindingsViewQuery(),
+  },
+]
 
 /**
  * Row schema for the `entity` table — same shape as the underlying

@@ -19,6 +19,7 @@ import { z } from 'zod'
 import {
   COMPLIANCE_DATASET,
   COMPLIANCE_TABLES,
+  COMPLIANCE_VIEWS,
   type TableSchemaField,
 } from '../state/bq-rows.ts'
 
@@ -60,6 +61,16 @@ export interface TableColumnExistsRequest {
 }
 
 /**
+ * Create-or-replace request for one managed BigQuery view.
+ */
+export interface CreateOrReplaceViewRequest {
+  readonly dataset: string
+  readonly viewId: string
+  readonly query: string
+  readonly description: string
+}
+
+/**
  * Port abstracting just the BigQuery operations we need. The production
  * adapter lives in `scripts/compliance-migrate.ts` and wraps the real
  * `BigQuery` client; tests inject a `vi.fn()`-based fake.
@@ -75,6 +86,9 @@ export interface ComplianceMigrationPort {
   addTableColumn(
     req: AddTableColumnRequest,
   ): ResultAsync<void, MigrationPortError>
+  createOrReplaceView(
+    req: CreateOrReplaceViewRequest,
+  ): ResultAsync<void, MigrationPortError>
   tableColumnExists(
     req: TableColumnExistsRequest,
   ): ResultAsync<boolean, MigrationPortError>
@@ -88,6 +102,7 @@ export interface MigrationReport {
   readonly createdTables: readonly string[]
   readonly skippedTables: readonly string[]
   readonly addedColumns: readonly string[]
+  readonly updatedViews: readonly string[]
 }
 
 /**
@@ -115,12 +130,15 @@ export function runMigration(
             : args.port.createDataset(COMPLIANCE_DATASET).map(() => true)
 
       return datasetWork.andThen((createdDataset) =>
-        ensureAllTables(args).map((tableReport) => ({
-          createdDataset,
-          createdTables: tableReport.created,
-          skippedTables: tableReport.skipped,
-          addedColumns: tableReport.addedColumns,
-        })),
+        ensureAllTables(args).andThen((tableReport) =>
+          ensureAllViews(args).map((updatedViews) => ({
+            createdDataset,
+            createdTables: tableReport.created,
+            skippedTables: tableReport.skipped,
+            addedColumns: tableReport.addedColumns,
+            updatedViews,
+          })),
+        ),
       )
     })
 }
@@ -268,6 +286,26 @@ function ensureSchemaUpgradeColumn(
       })
       .map(() => columnName)
   })
+}
+
+function ensureAllViews(
+  args: RunMigrationArgs,
+): ResultAsync<readonly string[], MigrationPortError> {
+  if (args.dryRun) {
+    return okAsync(COMPLIANCE_VIEWS.map((view) => view.name))
+  }
+  return ResultAsync.combine(
+    COMPLIANCE_VIEWS.map((view) =>
+      args.port
+        .createOrReplaceView({
+          dataset: COMPLIANCE_DATASET,
+          viewId: view.name,
+          query: view.query,
+          description: view.description,
+        })
+        .map(() => view.name),
+    ),
+  )
 }
 
 /**

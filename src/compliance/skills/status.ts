@@ -97,58 +97,11 @@ function loadStoredStatus(
             entity: args.entity,
             identifiers: args.identifiers,
             latestRuns,
-            openFindings: filterOpenFindings(latestRuns, openFindings),
-            overall: computeOverall(
-              latestRuns,
-              filterOpenFindings(latestRuns, openFindings),
-            ),
+            openFindings,
+            overall: computeOverall(latestRuns, openFindings),
           }),
         ),
     )
-}
-
-function filterOpenFindings(
-  latestRuns: readonly ComplianceDiscoveryRunRow[],
-  openFindings: readonly Finding[],
-): readonly Finding[] {
-  const latestRunStatusBySource = new Map<string, ComplianceDiscoveryRunRow>()
-  for (const run of latestRuns) {
-    latestRunStatusBySource.set(run.source_id, run)
-  }
-
-  const seen = new Set<string>()
-  const filtered: Finding[] = []
-  for (const finding of openFindings) {
-    const latestRun = latestRunStatusBySource.get(finding.source_id)
-    if (
-      evidenceCode(finding) === 'source.failed' &&
-      latestRun?.status === 'succeeded'
-    ) {
-      continue
-    }
-    const key = semanticFindingKey(finding)
-    if (seen.has(key)) {
-      continue
-    }
-    seen.add(key)
-    filtered.push(finding)
-  }
-  return filtered
-}
-
-function evidenceCode(finding: Finding): string | null {
-  const code = finding.evidence.code
-  return typeof code === 'string' ? code : null
-}
-
-function semanticFindingKey(finding: Finding): string {
-  return [
-    finding.jurisdiction_id,
-    finding.source_id,
-    finding.severity,
-    finding.title,
-    finding.detail,
-  ].join('|')
 }
 
 function computeOverall(
