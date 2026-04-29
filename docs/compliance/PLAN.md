@@ -228,23 +228,91 @@ refresh this before coding and capture the final URLs in source definitions.
 7. **Verification and PR.** Run all gates, perform live/manual verification against
    the onboarded nonprofit, update the checklist, push the branch, and open the PR.
 
-### Phase 3 — Authenticated discovery (TBD)
+### Phase 3 — Authenticated and user-assisted California discovery
 
-High level only. Playwright sessions with credentials from Secret Manager, MFA passed to the user, per-portal adapters (MyFTB, AG Registry login, possibly IRS Tax Pro account). Only built where authenticated data demonstrably adds value beyond public sources — we do not implement an authenticated source if the public source already answers the question.
+**Goal.** Add the authenticated/source-gated layer that Phase 2 intentionally
+deferred. The system should now tell the user, in detail, which private portal
+checks are needed, what authority each portal has, what evidence to capture, and
+which actions remain forbidden. If a source cannot be scanned automatically
+without credentials, MFA, or a user-owned account, discovery must persist an
+`AUTH` or `MANUAL` source outcome rather than hiding the gap.
 
-Add CDTFA as an explicit Phase 3 source candidate for California sales-and-use-tax
-and tax/fee account standing:
+**Boundary.** Phase 3 is still read-only. It may prepare for authenticated
+browser sessions and credential/session handoff, but it must not submit filings,
+pay fees, register or close accounts, upload documents, request relief, grant or
+cancel portal access, create POA/TIA requests, or mutate account data.
 
-- First determine whether the nonprofit has any CDTFA-managed account, such as a
-  seller's permit, use-tax registration, or special tax/fee account.
-- Review CDTFA Online Services, permit/license/account verification, source terms,
-  and any official bulk or authenticated read-only paths before implementation.
-- If the account can be verified through an allowed public lookup, implement it as
-  a public read-only source. If it requires an account login, implement it only
-  through authenticated discovery with user-assisted MFA. If no permitted
-  automated path exists, keep it manual with typed evidence capture.
-- The source must never file returns, register or close accounts, request relief,
-  make payments, or mutate CDTFA account data.
+**Source research snapshot, checked 2026-04-29.** The implementation phase must
+refresh this before coding and capture final URLs in source definitions.
+
+| Source                                           | Official URLs to start from                                                                                                                                         | Planning implication                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CDTFA public permit/license/account verification | `https://www.cdtfa.ca.gov/services/permits-licenses.htm`, `https://onlineservices.cdtfa.ca.gov/`, `https://www.cdtfa.ca.gov/use.htm`                                | CDTFA documents a verification webpage for seller's permits, cigarette/tobacco retailer licenses, and eWaste accounts. Start with typed manual evidence unless an allowed automated read-only request shape is documented.                                                                                                            |
+| CDTFA Online Services                            | `https://www.cdtfa.ca.gov/services/`, `https://www.cdtfa.ca.gov/services/resources.htm`, `https://onlineservices.cdtfa.ca.gov/`, `https://www.cdtfa.ca.gov/use.htm` | Authenticated access can show accounts, filing obligations, correspondence, billing notices, return/payment history, and account-maintenance actions. Model as user-assisted authenticated read-only discovery; explicitly forbid filing, paying, registration, closure, access changes, relief, extensions, appeals, or POA actions. |
+| MyFTB                                            | `https://www.ftb.ca.gov/myftb/general-terms-and-conditions.html`, `https://www.ftb.ca.gov/help/business/entity-status-letter.asp`                                   | MyFTB accounts are individual, non-transferable, and user credentials must not be shared. Business representatives must have authority. Model as user-assisted authenticated read-only discovery with manual evidence capture; keep the public Entity Status Letter source separate.                                                  |
+| CA AG Online Filing Service                      | `https://www.oag.ca.gov/charities`, `https://www.oag.ca.gov/charities/initial-reg`, `https://rct.doj.ca.gov`                                                        | CA AG is rolling out a replacement online filing system. Use public CSVs from Phase 2 for registry standing and add authenticated/user-assisted detail only for filing-dashboard state that CSVs cannot answer.                                                                                                                       |
+| IRS Tax Pro Account                              | `https://www.irs.gov/tax-professionals/tax-pro-account`, `https://www.irs.gov/taxpro`                                                                               | Do not implement by default unless a later source review proves incremental nonprofit compliance value. Tax Pro Account requires taxpayer/CAF authorization and contains mutating authorization/payment flows; public IRS TEOS/BMF remains the default federal discovery surface.                                                     |
+
+**In scope:**
+
+- Source auth metadata:
+  - login URL and source terms URL
+  - credential/session mode (`secret_manager` where permitted, otherwise
+    `user_entered_session`)
+  - credential fields that may be needed, marked secret or non-secret
+  - MFA mode and user-assisted MFA instructions
+  - typed evidence fields to capture from the authenticated page
+  - forbidden actions per source
+- Runner and report behavior:
+  - authenticated sources without an available session return detailed `AUTH`
+    outcomes and write discovery-run history
+  - reports render exact login/setup steps, evidence fields, and forbidden actions
+  - derived findings include stable auth-required findings until evidence or an
+    authenticated read-only adapter resolves the gap
+- California sources:
+  - CDTFA public permit/license/account verification as a source with typed manual
+    evidence capture
+  - CDTFA Online Services as a user-assisted authenticated read-only source
+  - MyFTB as a user-assisted authenticated read-only source, while preserving the
+    Phase 2 public Entity Status Letter source
+  - CA AG Online Filing Service as a user-assisted authenticated read-only source
+    supplementing the Phase 2 public Registry Reports source
+- Skill layer:
+  - keep `compliance-discover` focused on orchestration and reporting
+  - move portal-specific instructions into skill reference files
+  - update `compliance-status` if stored `AUTH` outcomes need clearer presentation
+- Verification:
+  - run against the currently onboarded nonprofit
+  - confirm public sources still work
+  - confirm Phase 3 sources persist `AUTH` or `MANUAL` outcomes with no account
+    mutation and no credential leakage
+
+**Out of scope:**
+
+- Fully automated portal login without a user-assisted session and MFA handoff
+- Capturing or storing passwords for portals whose terms prohibit credential sharing
+- Filing submissions, payment flows, account registration, account closure, document
+  upload, access delegation, POA/TIA creation or withdrawal, appeals, relief,
+  extensions, address/account changes, or any other external mutation
+- Replacing IRS TEOS/BMF public-source discovery with Tax Pro Account
+
+**Work packages:**
+
+1. **Source-policy refresh and plan.** Refresh official pages for CDTFA, MyFTB, CA
+   AG Online Filing Service, and IRS Tax Pro Account; document source decisions.
+2. **Auth metadata and outcome contract.** Add schemas and types for authenticated
+   source requirements, user-assisted sessions, credential fields, MFA mode,
+   evidence fields, and forbidden actions.
+3. **Runner/report integration.** Ensure auth-required sources return actionable
+   `AUTH` outcomes before unsupported browser dispatch, persist bounded metadata, and
+   render detailed instructions in reports and findings.
+4. **California Phase 3 sources.** Add CDTFA public/manual verification, CDTFA
+   Online Services, MyFTB, and CA AG Online Filing Service sources with tests.
+5. **Skills and references.** Update `compliance-discover` and reference files so
+   portal-specific details live under `references/`, not in the main skill file.
+6. **Live verification and PR.** Run migrations/discovery/status against the
+   onboarded nonprofit, confirm persisted outcomes, run all gates, push, open a PR,
+   and address CI/review feedback until clean.
 
 ### Phase 4 — Planning + Calendar (TBD)
 

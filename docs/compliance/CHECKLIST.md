@@ -352,9 +352,134 @@ the current public surfaces do not provide a confidently permitted automated pat
 
 ---
 
-## Phase 3 — Authenticated discovery
+## Phase 3 — Authenticated and user-assisted California discovery
 
-Stub. To be detailed when reached.
+Phase 3 adds the authenticated/source-gated layer that Phase 2 deliberately did
+not attempt. The implementation must remain read-only: if credentials, MFA, or a
+user-owned account are required, discovery persists a detailed `AUTH` outcome and
+prints exact evidence instructions instead of guessing or mutating portal state.
+
+### Pre-flight
+
+- [x] Read `CLAUDE.md`, every file in `.claude/rules/`,
+      `docs/compliance/PLAN.md`, this checklist, and the relevant compliance
+      skill docs.
+- [x] Fetch origin, checkout `main`, pull the merged Phase 2 branch, and create
+      `compliance/phase-3-authenticated-discovery`.
+- [x] Run `bun typecheck`, `bun lint`, and `bun test:run` once on a clean Phase 3
+      branch.
+- [x] Refresh current official URLs and source terms for:
+  - [x] CDTFA public permit/license/account verification
+  - [x] CDTFA Online Services
+  - [x] MyFTB terms and public Entity Status Letter context
+  - [x] CA AG Online Filing Service / Registry transition
+  - [x] IRS Tax Pro Account
+- [x] Update `docs/compliance/PLAN.md` with detailed Phase 3 scope, boundaries,
+      source research, work packages, and forbidden actions.
+
+### Auth metadata and outcome contract (TDD)
+
+- [ ] Tests for authenticated source metadata:
+  - [ ] login URL
+  - [ ] credential/session mode
+  - [ ] credential fields marked secret or non-secret
+  - [ ] MFA mode
+  - [ ] user-facing auth instructions
+  - [ ] typed evidence fields
+  - [ ] forbidden actions
+- [ ] Implement source auth metadata schemas and TypeScript types without `any` or
+      `as`.
+- [ ] Tests that an authenticated `playwright` source returns `AUTH` before the
+      runner rejects unsupported browser automation.
+- [ ] Tests that auth-required discovery-run rows persist bounded auth metadata and
+      never include credential values.
+- [ ] Implement runner support for detailed auth-required outcomes.
+
+### Reports and findings (TDD)
+
+- [ ] Tests for `compliance-discover` rendering detailed `AUTH` source states:
+  - [ ] login URL
+  - [ ] source terms URL
+  - [ ] auth/setup steps
+  - [ ] evidence fields
+  - [ ] forbidden actions
+- [ ] Tests that auth-required findings include stable source/evidence metadata but
+      no secrets.
+- [ ] Implement report and findings updates.
+- [ ] Update `compliance-status` output only if stored Phase 3 outcomes require a
+      clearer presentation than the existing failed-run format.
+
+### California Phase 3 sources (TDD)
+
+- [ ] Tests that `us-ca` registers all Phase 3 sources independently:
+  - [ ] `ca-cdtfa-permit-license-verification`
+  - [ ] `ca-cdtfa-online-services`
+  - [ ] `ca-ftb-myftb`
+  - [ ] `ca-ag-online-filing`
+- [ ] Tests for optional California CDTFA identifiers:
+  - [ ] seller's permit / account number
+  - [ ] use-tax account number
+  - [ ] special tax or fee account number
+- [ ] Implement CDTFA public permit/license/account verification as manual or
+      policy-blocked according to the refreshed source review.
+- [ ] Implement CDTFA Online Services as user-assisted authenticated read-only
+      discovery with explicit forbidden actions.
+- [ ] Implement MyFTB as user-assisted authenticated read-only discovery with terms
+      that prohibit shared credentials and require authorized business access.
+- [ ] Implement CA AG Online Filing Service as user-assisted authenticated read-only
+      discovery supplementing the Phase 2 public Registry Reports source.
+- [ ] Confirm IRS Tax Pro Account remains unregistered unless the source review
+      identifies nonprofit-specific value beyond TEOS/BMF and a safe read-only path.
+
+### Skill docs and progressive disclosure
+
+- [ ] Keep `.agents/skills/compliance-discover/SKILL.md` focused on workflow.
+- [ ] Update `.agents/skills/compliance-discover/references/california-sources.md`
+      with Phase 3 portal-specific source details.
+- [ ] Update `.agents/skills/compliance-discover/references/manual-sources.md` with
+      auth-required handoff guidance.
+- [ ] Add a federal reference note explaining why IRS Tax Pro Account is not a
+      default Phase 3 discovery source.
+
+### Manual verification
+
+- [ ] Confirm `.env` / `.env.local` provide the GCP project and credential settings
+      needed for compliance commands.
+- [ ] Run migrations in the real dev project and confirm idempotency.
+- [ ] Run `compliance-discover` against the currently onboarded nonprofit.
+- [ ] Confirm Phase 2 public sources still produce live/cache-backed results.
+- [ ] Confirm Phase 3 sources persist `AUTH` or `MANUAL` outcomes with detailed
+      evidence instructions and no credential leakage.
+- [ ] Run `compliance-status` and verify stored Phase 3 outcomes are visible without
+      network discovery.
+
+### Acceptance gates
+
+- [ ] `bun typecheck` — zero errors
+- [ ] `bun lint` — zero errors, zero warnings
+- [ ] `bun test:run` — all tests pass
+- [ ] `bun test:coverage` — 100% statements / branches / functions / lines on all
+      new files
+- [ ] `bun format:check` — all files formatted
+- [ ] `git diff --check` — no whitespace errors
+- [ ] No `any` types
+- [ ] No `as` casts except the documented JSONB exception
+- [ ] No inline ESLint suppression comments unless required by a framework and
+      explained
+- [ ] No skipped tests
+- [ ] All external data Zod-validated
+- [ ] All CLI parsing via `commander`
+- [ ] Production errors via `Result` / `ResultAsync`
+
+### Phase exit
+
+- [ ] Mark completed Phase 3 items in this file.
+- [ ] Push branch and open a PR titled
+      `compliance phase 3: authenticated discovery`.
+- [ ] PR description includes source-policy decisions, deliverables,
+      acceptance-gate output, and live verification notes.
+- [ ] Monitor CI and code review until clean; address every finding.
+- [ ] Stop after PR is ready for user review.
 
 ## Phase 4 — Planning + Calendar
 
