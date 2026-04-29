@@ -19,6 +19,7 @@ import type {
   Entity,
   Finding,
   Source,
+  SourceAuthRequirement,
   SourceContext,
   SourceRunOutcome,
   SourceRunOutput,
@@ -114,6 +115,10 @@ export function runSourceOutcome(
     return finishBlockedByPolicy({ source, ctx, recorder })
   }
 
+  if (source.authRequired) {
+    return finishAuthRequired({ source, ctx, recorder })
+  }
+
   if (source.kind !== 'api') {
     return finishFailureOutcome({
       sourceError: {
@@ -125,10 +130,6 @@ export function runSourceOutcome(
       ctx,
       recorder,
     })
-  }
-
-  if (source.authRequired) {
-    return finishAuthRequired({ source, ctx, recorder })
   }
 
   const startedAt = ctx.now()
@@ -293,7 +294,10 @@ function finishAuthRequired(
   const { source, ctx, recorder } = args
   const startedAt = ctx.now()
   const completedAt = ctx.now()
-  const message = `Source "${source.id}" requires auth, but no auth context is available.`
+  const message =
+    source.auth === undefined
+      ? `Source "${source.id}" requires auth, but no auth context is available.`
+      : `Source "${source.id}" requires an authenticated user session.`
   const row: ComplianceDiscoveryRunRow = {
     run_id: uuidv4(),
     source_id: source.id,
@@ -304,7 +308,8 @@ function finishAuthRequired(
     duration_ms: completedAt.getTime() - startedAt.getTime(),
     error_type: 'auth_required',
     error_message: message,
-    payload: null,
+    payload:
+      source.auth === undefined ? null : authRequirementPayload(source.auth),
   }
 
   return recorder
@@ -317,7 +322,44 @@ function finishAuthRequired(
       status: 'auth_required',
       source_id: source.id,
       message,
+      ...authOutcomeDetails(source.auth),
     }))
+}
+
+type AuthOutcomeDetails = Omit<
+  Extract<SourceRunOutcome, { readonly status: 'auth_required' }>,
+  'status' | 'source_id' | 'message'
+>
+
+function authOutcomeDetails(
+  auth: SourceAuthRequirement | undefined,
+): AuthOutcomeDetails {
+  if (auth === undefined) {
+    return {}
+  }
+  return {
+    loginUrl: auth.loginUrl,
+    credentialMode: auth.credentialMode,
+    credentialFields: auth.credentialFields.slice(),
+    mfa: auth.mfa,
+    instructions: auth.instructions.slice(),
+    evidenceFields: auth.evidenceFields.slice(),
+    forbiddenActions: auth.forbiddenActions.slice(),
+  }
+}
+
+function authRequirementPayload(
+  auth: SourceAuthRequirement,
+): Record<string, unknown> {
+  return {
+    loginUrl: auth.loginUrl,
+    credentialMode: auth.credentialMode,
+    credentialFields: auth.credentialFields.slice(),
+    mfa: auth.mfa,
+    instructions: auth.instructions.slice(),
+    evidenceFields: auth.evidenceFields.slice(),
+    forbiddenActions: auth.forbiddenActions.slice(),
+  }
 }
 
 function finishFailureOutcome(

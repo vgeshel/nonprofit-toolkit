@@ -5,8 +5,8 @@ description: >
   findings. Use this skill when the user asks "are we compliant?", "check our IRS status",
   "verify our tax-exempt status", "run a compliance check", "is our 501(c)(3) still
   active?", or when they want to refresh the compliance picture before a board meeting,
-  audit, or grant application. Phase 2 covers IRS TEOS, IRS EO BMF, CA AG Registry
-  Reports, and manual-required CA SOS/FTB checks.
+  audit, or grant application. Phase 3 covers IRS TEOS/BMF, CA AG Registry reports,
+  manual CA SOS/FTB/CDTFA checks, and user-assisted authenticated CA portal checks.
 ---
 
 # Compliance Discovery
@@ -21,11 +21,12 @@ current report needs that detail.
 
 ## Reference files
 
-- `references/manual-sources.md` - use when a report contains `MANUAL` or `BLOCKED`
-  sources, or when the user asks how to complete a source by hand.
-- `references/california-sources.md` - use for CA AG Registry, CA SOS bizfile, CA FTB
-  Entity Status Letter, and planned CDTFA work.
-- `references/federal-sources.md` - use for IRS TEOS and IRS EO BMF details.
+- `references/manual-sources.md` - use when a report contains `MANUAL`, `BLOCKED`,
+  or `AUTH` sources, or when the user asks how to complete a source by hand.
+- `references/california-sources.md` - use for CA AG Registry, CA AG Online Filing,
+  CA SOS bizfile, CA FTB Entity Status Letter, MyFTB, and CDTFA details.
+- `references/federal-sources.md` - use for IRS TEOS, IRS EO BMF, and IRS Tax Pro
+  Account source decisions.
 
 ## Pre-flight
 
@@ -45,7 +46,7 @@ import { runDiscoveryProduction } from '../../src/compliance/skills/discover-wir
 const result = await runDiscoveryProduction({ projectId })
 ```
 
-That call constructs GCP clients, builds the recorder, registers the default Phase 2
+That call constructs GCP clients, builds the recorder, registers the default compliance
 jurisdictions (`usFederalJurisdiction` and `usCaJurisdiction`), runs the schema migration,
 and dispatches every source.
 
@@ -67,16 +68,19 @@ shows:
 - For `MANUAL` sources: why automation is unavailable, the official URL to open, manual
   steps, required/optional evidence fields, and a suggested reply format the user can send
   back to this skill.
+- For `AUTH` sources: login URL, source terms URL, credential/session mode, MFA mode,
+  setup steps, credential/session fields, evidence fields, and forbidden actions.
 - Findings ordered by severity, then jurisdiction, then source.
 
 Tell the user that successful, failed, manual-required, policy-blocked, and auth-required
 source outcomes are persisted in `compliance.discovery_runs`, and findings are persisted
 in `compliance.findings`.
 
-When a source is not `OK`, do not summarize it as compliant. For manual-required sources,
-preserve the report's field names exactly when asking the user for evidence. If the user
-returns manual evidence, do not claim it was persisted unless a dedicated manual-evidence
-ingestion path has been implemented and successfully run.
+When a source is not `OK`, do not summarize it as compliant. For manual-required and
+auth-required sources, preserve the report's field names exactly when asking the user for
+evidence. If the user returns manual or authenticated evidence, do not claim it was
+persisted unless a dedicated evidence-ingestion path has been implemented and successfully
+run.
 
 ## Failure modes
 
@@ -92,9 +96,10 @@ Per-source outcomes include:
 - `source_failure` - source was unreachable, rate-limited, invalid, or changed schema.
 - `manual_required` - source policy requires manual evidence capture.
 - `policy_blocked` - source cannot be read under current policy.
-- `auth_required` - source unexpectedly requires authentication.
+- `auth_required` - source requires a user-assisted authenticated session, credentials,
+  MFA, or portal access before it can be treated as checked.
 
-Do not treat a failed, blocked, or manual-required source as an all-clear.
+Do not treat a failed, blocked, manual-required, or auth-required source as an all-clear.
 
 ## Source code
 

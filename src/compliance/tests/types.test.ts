@@ -13,6 +13,8 @@ import {
   FindingStatusSchema,
   JurisdictionIdSchema,
   SourceAccessMethodSchema,
+  SourceAuthRequirementSchema,
+  SourceCredentialFieldSchema,
   SourceFreshnessSchema,
   SourceKindSchema,
   SourceMetadataSchema,
@@ -185,6 +187,21 @@ describe('EntityIdentifiersSchema', () => {
     expect(parsed['us-ca']?.ftbEntityName).toBe('Foo Foundation')
   })
 
+  it('accepts optional CA CDTFA account identifiers without normalising them', () => {
+    const parsed = EntityIdentifiersSchema.parse({
+      'us-ca': {
+        sosEntityNumber: 'C0123456',
+        cdtfaSellerPermitNumber: '102-345678',
+        cdtfaUseTaxAccountNumber: 'UT-00123456',
+        cdtfaSpecialTaxAccountNumber: 'STF-000123',
+      },
+    })
+
+    expect(parsed['us-ca']?.cdtfaSellerPermitNumber).toBe('102-345678')
+    expect(parsed['us-ca']?.cdtfaUseTaxAccountNumber).toBe('UT-00123456')
+    expect(parsed['us-ca']?.cdtfaSpecialTaxAccountNumber).toBe('STF-000123')
+  })
+
   it('rejects empty CA SOS entity number', () => {
     expect(() =>
       EntityIdentifiersSchema.parse({ 'us-ca': { sosEntityNumber: '' } }),
@@ -202,6 +219,14 @@ describe('EntityIdentifiersSchema', () => {
         'us-ca': {
           sosEntityNumber: 'C0123456',
           agCharityNumber: 'charity 123',
+        },
+      }),
+    ).toThrow()
+    expect(() =>
+      EntityIdentifiersSchema.parse({
+        'us-ca': {
+          sosEntityNumber: 'C0123456',
+          cdtfaSellerPermitNumber: '',
         },
       }),
     ).toThrow()
@@ -472,6 +497,130 @@ describe('SourceMetadataSchema', () => {
       expect(parsed.manualOnlyReason).toContain('scraping')
     }
   })
+
+  it('parses authenticated source metadata without accepting credential values', () => {
+    const parsed = SourceMetadataSchema.parse({
+      ...validAutomated,
+      accessMethod: 'playwright_readonly',
+      auth: {
+        loginUrl: 'https://onlineservices.cdtfa.ca.gov/',
+        credentialMode: 'user_entered_session',
+        credentialFields: [
+          {
+            key: 'username',
+            label: 'Username',
+            required: true,
+            secret: false,
+          },
+        ],
+        mfa: 'user_assisted',
+        instructions: ['Sign in using an authorized read-only account.'],
+        evidenceFields: [
+          {
+            key: 'account_status',
+            label: 'Account status',
+            required: true,
+          },
+        ],
+        forbiddenActions: ['Do not file returns.'],
+      },
+    })
+
+    expect(parsed.auth?.loginUrl).toBe('https://onlineservices.cdtfa.ca.gov/')
+    expect(parsed.auth?.credentialFields[0]?.secret).toBe(false)
+    expect(JSON.stringify(parsed.auth)).not.toContain('password-value')
+  })
+})
+
+describe('SourceCredentialFieldSchema', () => {
+  it('parses public and secret credential field descriptors', () => {
+    expect(
+      SourceCredentialFieldSchema.parse({
+        key: 'username',
+        label: 'Username',
+        required: true,
+        secret: false,
+      }),
+    ).toEqual({
+      key: 'username',
+      label: 'Username',
+      required: true,
+      secret: false,
+    })
+
+    expect(
+      SourceCredentialFieldSchema.parse({
+        key: 'password',
+        label: 'Password',
+        required: true,
+        secret: true,
+      }).secret,
+    ).toBe(true)
+  })
+
+  it('rejects empty credential field keys', () => {
+    expect(() =>
+      SourceCredentialFieldSchema.parse({
+        key: '',
+        label: 'Password',
+        required: true,
+        secret: true,
+      }),
+    ).toThrow()
+  })
+})
+
+describe('SourceAuthRequirementSchema', () => {
+  const validAuth = {
+    loginUrl: 'https://onlineservices.cdtfa.ca.gov/',
+    credentialMode: 'user_entered_session',
+    credentialFields: [
+      { key: 'username', label: 'Username', required: true, secret: false },
+    ],
+    mfa: 'user_assisted',
+    instructions: ['Sign in using an authorized read-only account.'],
+    evidenceFields: [
+      { key: 'account_status', label: 'Account status', required: true },
+    ],
+    forbiddenActions: ['Do not file returns.'],
+  }
+
+  it('parses user-assisted authenticated source requirements', () => {
+    const parsed = SourceAuthRequirementSchema.parse(validAuth)
+
+    expect(parsed.credentialMode).toBe('user_entered_session')
+    expect(parsed.mfa).toBe('user_assisted')
+    expect(parsed.forbiddenActions).toEqual(['Do not file returns.'])
+  })
+
+  it('parses Secret Manager credential mode with a secret name', () => {
+    const parsed = SourceAuthRequirementSchema.parse({
+      ...validAuth,
+      credentialMode: 'secret_manager',
+      credentialSecretName: 'compliance-credentials-ca-cdtfa-online-services',
+      credentialFields: [
+        { key: 'username', label: 'Username', required: true, secret: false },
+        { key: 'password', label: 'Password', required: true, secret: true },
+      ],
+    })
+
+    expect(parsed.credentialSecretName).toBe(
+      'compliance-credentials-ca-cdtfa-online-services',
+    )
+    expect(parsed.credentialFields.map((field) => field.key)).toEqual([
+      'username',
+      'password',
+    ])
+  })
+
+  it('rejects missing forbidden actions', () => {
+    expect(() =>
+      SourceAuthRequirementSchema.parse({
+        ...validAuth,
+        forbiddenActions: [],
+      }),
+    ).toThrow()
+  })
 })
 
 describe('SourceRunOutputSchema', () => {
@@ -549,6 +698,17 @@ describe('SourceRunOutcomeSchema', () => {
         status: 'auth_required',
         source_id: 'ca-ftb-entity-status-letter',
         message: 'The public page unexpectedly required login.',
+        loginUrl: 'https://www.ftb.ca.gov/myftb/',
+        credentialMode: 'user_entered_session',
+        credentialFields: [
+          { key: 'username', label: 'Username', required: true, secret: false },
+        ],
+        mfa: 'user_assisted',
+        instructions: ['Sign in as an authorized business representative.'],
+        evidenceFields: [
+          { key: 'account_status', label: 'Account status', required: true },
+        ],
+        forbiddenActions: ['Do not file returns.'],
       }).status,
     ).toBe('auth_required')
   })

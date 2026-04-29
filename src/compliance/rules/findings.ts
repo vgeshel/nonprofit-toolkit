@@ -52,6 +52,13 @@ type SuccessDiscoveryRun = DiscoveryRun & {
   >
 }
 
+type AuthRequiredDiscoveryRun = DiscoveryRun & {
+  readonly outcome: Extract<
+    DiscoveryRun['outcome'],
+    { readonly status: 'auth_required' }
+  >
+}
+
 export function deriveComplianceFindings(
   args: DeriveComplianceFindingsArgs,
 ): Finding[] {
@@ -112,7 +119,7 @@ function deriveRunFindings(
     return [policyBlockedFinding(run, outcome.reason)]
   }
   if (outcome.status === 'auth_required') {
-    return [authRequiredFinding(run, outcome.message)]
+    return [authRequiredFinding({ ...run, outcome }, outcome.message)]
   }
   if (outcome.status === 'source_failure') {
     return [sourceFailureFinding(run, outcome.error_type, outcome.message)]
@@ -160,7 +167,10 @@ function policyBlockedFinding(run: DiscoveryRun, reason: string): FindingDraft {
   }
 }
 
-function authRequiredFinding(run: DiscoveryRun, message: string): FindingDraft {
+function authRequiredFinding(
+  run: AuthRequiredDiscoveryRun,
+  message: string,
+): FindingDraft {
   return {
     code: 'source.auth_required',
     jurisdictionId: run.jurisdictionId,
@@ -168,11 +178,32 @@ function authRequiredFinding(run: DiscoveryRun, message: string): FindingDraft {
     severity: 'warn',
     title: `Authentication required: ${run.description}`,
     detail: message,
-    evidence: {
-      code: 'source.auth_required',
-      accessMethod: run.accessMethod,
-    },
+    evidence: authRequiredEvidence(run),
   }
+}
+
+function authRequiredEvidence(
+  run: AuthRequiredDiscoveryRun,
+): Record<string, unknown> {
+  const evidence: Record<string, unknown> = {
+    code: 'source.auth_required',
+    accessMethod: run.accessMethod,
+  }
+  if (run.outcome.loginUrl !== undefined) {
+    evidence.loginUrl = run.outcome.loginUrl
+  }
+  if (run.outcome.credentialMode !== undefined) {
+    evidence.credentialMode = run.outcome.credentialMode
+  }
+  if (run.outcome.evidenceFields !== undefined) {
+    evidence.requiredFields = run.outcome.evidenceFields.map(
+      (field) => field.key,
+    )
+  }
+  if (run.outcome.forbiddenActions !== undefined) {
+    evidence.forbiddenActions = run.outcome.forbiddenActions.slice()
+  }
+  return evidence
 }
 
 function sourceFailureFinding(

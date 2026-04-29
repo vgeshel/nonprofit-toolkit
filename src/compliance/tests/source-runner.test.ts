@@ -70,6 +70,38 @@ function makeSuccessSource(
   }
 }
 
+function makeAuthenticatedPortalSource(): Source {
+  return {
+    id: 'ca-cdtfa-online-services',
+    jurisdiction: 'us-ca',
+    kind: 'playwright',
+    authRequired: true,
+    description: 'CDTFA Online Services',
+    accessUrl: 'https://onlineservices.cdtfa.ca.gov/',
+    accessMethod: 'playwright_readonly',
+    automationAllowed: true,
+    tosUrl: 'https://www.cdtfa.ca.gov/use.htm',
+    auth: {
+      loginUrl: 'https://onlineservices.cdtfa.ca.gov/',
+      credentialMode: 'user_entered_session',
+      credentialFields: [
+        { key: 'username', label: 'Username', required: true, secret: false },
+        { key: 'password', label: 'Password', required: true, secret: true },
+      ],
+      mfa: 'user_assisted',
+      instructions: [
+        'Sign in using an authorized account.',
+        'Stop after the account overview loads.',
+      ],
+      evidenceFields: [
+        { key: 'account_status', label: 'Account status', required: true },
+      ],
+      forbiddenActions: ['Do not file returns.', 'Do not make payments.'],
+    },
+    run: () => errAsync({ type: 'internal', message: 'must not run' }),
+  }
+}
+
 function makeFailingSource(
   error: SourceError,
   kind: Source['kind'] = 'api',
@@ -511,6 +543,72 @@ describe('runSource', () => {
       status: 'auth_required',
       source_id: 'fake',
       message: 'Source "fake" requires auth, but no auth context is available.',
+    })
+  })
+
+  it('returns detailed auth-required outcome for authenticated browser sources before unsupported dispatch', async () => {
+    const source = makeAuthenticatedPortalSource()
+    const fetch = vi.fn<FetchImpl>(() =>
+      Promise.resolve(new Response('', { status: 200 })),
+    )
+    const ctx = makeContext({ fetch })
+
+    const result = await runSourceOutcome({
+      source,
+      entity: ENTITY,
+      ctx,
+      recorder,
+    })
+
+    expect(result.isOk()).toBe(true)
+    expect(fetch).not.toHaveBeenCalled()
+    expect(recorder.recordRun).toHaveBeenCalledTimes(1)
+    const row = recorder.recordRun.mock.calls[0]?.[0]
+    expect(row).toMatchObject({
+      status: 'failed',
+      error_type: 'auth_required',
+      error_message:
+        'Source "ca-cdtfa-online-services" requires an authenticated user session.',
+      payload: {
+        loginUrl: 'https://onlineservices.cdtfa.ca.gov/',
+        credentialMode: 'user_entered_session',
+        credentialFields: [
+          { key: 'username', label: 'Username', required: true, secret: false },
+          { key: 'password', label: 'Password', required: true, secret: true },
+        ],
+        mfa: 'user_assisted',
+        instructions: [
+          'Sign in using an authorized account.',
+          'Stop after the account overview loads.',
+        ],
+        evidenceFields: [
+          { key: 'account_status', label: 'Account status', required: true },
+        ],
+        forbiddenActions: ['Do not file returns.', 'Do not make payments.'],
+      },
+    })
+    expect(JSON.stringify(row?.payload)).not.toContain('password-value')
+    if (!result.isOk()) return
+    expect(result.value).toEqual({
+      status: 'auth_required',
+      source_id: 'ca-cdtfa-online-services',
+      message:
+        'Source "ca-cdtfa-online-services" requires an authenticated user session.',
+      loginUrl: 'https://onlineservices.cdtfa.ca.gov/',
+      credentialMode: 'user_entered_session',
+      credentialFields: [
+        { key: 'username', label: 'Username', required: true, secret: false },
+        { key: 'password', label: 'Password', required: true, secret: true },
+      ],
+      mfa: 'user_assisted',
+      instructions: [
+        'Sign in using an authorized account.',
+        'Stop after the account overview loads.',
+      ],
+      evidenceFields: [
+        { key: 'account_status', label: 'Account status', required: true },
+      ],
+      forbiddenActions: ['Do not file returns.', 'Do not make payments.'],
     })
   })
 

@@ -355,8 +355,12 @@ describe('runDiscoveryProduction', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(result.value.runs.map((run) => run.sourceId).sort()).toEqual([
+      'ca-ag-online-filing',
       'ca-ag-registry',
+      'ca-cdtfa-online-services',
+      'ca-cdtfa-permit-license-verification',
       'ca-ftb-entity-status-letter',
+      'ca-ftb-myftb',
       'ca-sos-bizfile',
       'irs-eo-bmf',
       'irs-teos',

@@ -309,6 +309,90 @@ describe('formatDiscoveryReport', () => {
     )
   })
 
+  it('renders detailed auth-required instructions without credential values', () => {
+    const base = report()
+    const rendered = formatDiscoveryReport({
+      ...base,
+      runs: [
+        {
+          sourceId: 'ca-cdtfa-online-services',
+          jurisdictionId: 'us-ca',
+          description: 'CDTFA Online Services',
+          accessUrl: 'https://onlineservices.cdtfa.ca.gov/',
+          accessMethod: 'playwright_readonly',
+          automationAllowed: true,
+          tosUrl: 'https://www.cdtfa.ca.gov/use.htm',
+          outcome: {
+            status: 'auth_required',
+            source_id: 'ca-cdtfa-online-services',
+            message:
+              'Source "ca-cdtfa-online-services" requires an authenticated user session.',
+            loginUrl: 'https://onlineservices.cdtfa.ca.gov/',
+            credentialMode: 'user_entered_session',
+            credentialFields: [
+              {
+                key: 'username',
+                label: 'Username',
+                required: true,
+                secret: false,
+              },
+              {
+                key: 'password',
+                label: 'Password',
+                required: true,
+                secret: true,
+              },
+              {
+                key: 'backup_code',
+                label: 'Backup code',
+                required: false,
+                secret: true,
+              },
+            ],
+            mfa: 'user_assisted',
+            instructions: [
+              'Sign in using an authorized account.',
+              'Stop after the account overview loads.',
+            ],
+            evidenceFields: [
+              {
+                key: 'account_status',
+                label: 'Account status',
+                required: true,
+              },
+            ],
+            forbiddenActions: ['Do not file returns.', 'Do not make payments.'],
+          },
+        },
+      ],
+    })
+
+    expect(rendered).toContain(
+      '- AUTH us-ca/ca-cdtfa-online-services: authenticated verification required',
+    )
+    expect(rendered).toContain(
+      'Login URL: https://onlineservices.cdtfa.ca.gov/',
+    )
+    expect(rendered).toContain(
+      'Source terms reviewed: https://www.cdtfa.ca.gov/use.htm',
+    )
+    expect(rendered).toContain('Credential/session mode: user_entered_session')
+    expect(rendered).toContain('MFA: user_assisted')
+    expect(rendered).toContain('Auth/setup steps:')
+    expect(rendered).toContain('1. Sign in using an authorized account.')
+    expect(rendered).toContain('Credential/session fields:')
+    expect(rendered).toContain('- username (required, non-secret): Username')
+    expect(rendered).toContain('- password (required, secret): Password')
+    expect(rendered).toContain('- backup_code (optional, secret): Backup code')
+    expect(rendered).toContain(
+      'Give these values back to the compliance-discover skill:',
+    )
+    expect(rendered).toContain('- account_status (required): Account status')
+    expect(rendered).toContain('Forbidden actions:')
+    expect(rendered).toContain('1. Do not file returns.')
+    expect(rendered).not.toContain('password-value')
+  })
+
   it('renders complete status when every source succeeds and no findings remain', () => {
     const complete = report()
     const rendered = formatDiscoveryReport({

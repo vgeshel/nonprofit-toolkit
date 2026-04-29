@@ -188,6 +188,32 @@ describe('deriveComplianceFindings', () => {
             status: 'auth_required',
             source_id: 'auth-source',
             message: 'Authentication is required.',
+            loginUrl: 'https://example.com/login',
+            credentialMode: 'user_entered_session',
+            credentialFields: [
+              {
+                key: 'username',
+                label: 'Username',
+                required: true,
+                secret: false,
+              },
+              {
+                key: 'password',
+                label: 'Password',
+                required: true,
+                secret: true,
+              },
+            ],
+            mfa: 'user_assisted',
+            instructions: ['Sign in and stop at the overview page.'],
+            evidenceFields: [
+              {
+                key: 'account_status',
+                label: 'Account status',
+                required: true,
+              },
+            ],
+            forbiddenActions: ['Do not file returns.'],
           },
         },
       ],
@@ -207,7 +233,51 @@ describe('deriveComplianceFindings', () => {
       severity: 'warn',
       title: 'Authentication required: Auth source',
       detail: 'Authentication is required.',
+      evidence: {
+        code: 'source.auth_required',
+        loginUrl: 'https://example.com/login',
+        credentialMode: 'user_entered_session',
+        requiredFields: ['account_status'],
+        forbiddenActions: ['Do not file returns.'],
+      },
     })
+    expect(JSON.stringify(findings[1]?.evidence)).not.toContain(
+      'password-value',
+    )
+  })
+
+  it('creates auth-required findings when no detailed auth metadata is present', () => {
+    const findings = deriveComplianceFindings({
+      entity: ENTITY,
+      identifiers: IDENTIFIERS,
+      runs: [
+        {
+          ...SOURCE,
+          sourceId: 'legacy-auth-source',
+          description: 'Legacy auth source',
+          outcome: {
+            status: 'auth_required',
+            source_id: 'legacy-auth-source',
+            message: 'Authentication is required.',
+          },
+        },
+      ],
+      now: () => new Date('2026-04-28T12:00:00.000Z'),
+    })
+
+    expect(findings).toHaveLength(1)
+    expect(findings[0]).toMatchObject({
+      severity: 'warn',
+      title: 'Authentication required: Legacy auth source',
+      evidence: {
+        code: 'source.auth_required',
+        accessMethod: 'official_bulk_download',
+      },
+    })
+    expect(findings[0]?.evidence).not.toHaveProperty('loginUrl')
+    expect(findings[0]?.evidence).not.toHaveProperty('credentialMode')
+    expect(findings[0]?.evidence).not.toHaveProperty('requiredFields')
+    expect(findings[0]?.evidence).not.toHaveProperty('forbiddenActions')
   })
 
   it('flags IRS EO BMF not-found results', () => {

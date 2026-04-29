@@ -24,3 +24,18 @@ Source id: `us-federal/irs-eo-bmf`
   date, tax period, NTEE code, and basic financial fields where present.
 - User-facing note: EO BMF supplements TEOS. A successful BMF match does not resolve
   California charity, corporate, or tax-agency standing.
+
+## IRS Tax Pro Account
+
+Source id: not registered by default.
+
+- Access method: not implemented in Phase 3.
+- Source decision: Tax Pro Account is not a default nonprofit compliance-discovery source
+  because IRS TEOS and EO BMF already provide the public federal exemption signals this
+  toolkit currently needs, while Tax Pro Account requires taxpayer/CAF authorization and
+  exposes mutating flows such as authorization withdrawal and payments.
+- Official URL: `https://www.irs.gov/tax-professionals/tax-pro-account`
+- Tax professional hub: `https://www.irs.gov/taxpro`
+
+Do not tell the user that IRS Tax Pro Account was checked unless a later phase adds a
+safe, read-only, user-authorized source and the source actually runs.

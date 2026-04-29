@@ -67,6 +67,11 @@ const CaFtbEntityIdSchema = z
   .min(1)
   .regex(/^[A-Za-z0-9-]+$/, 'CA FTB entity id must be alphanumeric')
 
+const CaCdtfaAccountIdentifierSchema = z
+  .string()
+  .min(1)
+  .regex(/^[A-Za-z0-9-]+$/, 'CA CDTFA account identifiers must be alphanumeric')
+
 /**
  * Per-jurisdiction identifiers. Jurisdictions added in later phases plug new
  * keys in here. Unknown keys are rejected so typos surface immediately.
@@ -80,6 +85,9 @@ export const EntityIdentifiersSchema = z
         agCharityNumber: CaAgCharityNumberSchema.optional(),
         ftbEntityId: CaFtbEntityIdSchema.optional(),
         ftbEntityName: z.string().min(1).optional(),
+        cdtfaSellerPermitNumber: CaCdtfaAccountIdentifierSchema.optional(),
+        cdtfaUseTaxAccountNumber: CaCdtfaAccountIdentifierSchema.optional(),
+        cdtfaSpecialTaxAccountNumber: CaCdtfaAccountIdentifierSchema.optional(),
       })
       .optional(),
   })

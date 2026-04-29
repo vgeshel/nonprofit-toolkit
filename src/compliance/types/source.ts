@@ -33,6 +33,15 @@ export const SourceAccessMethodSchema = z.enum([
 ])
 export type SourceAccessMethod = z.infer<typeof SourceAccessMethodSchema>
 
+export const SourceCredentialModeSchema = z.enum([
+  'secret_manager',
+  'user_entered_session',
+])
+export type SourceCredentialMode = z.infer<typeof SourceCredentialModeSchema>
+
+export const SourceMfaModeSchema = z.enum(['none', 'user_assisted'])
+export type SourceMfaMode = z.infer<typeof SourceMfaModeSchema>
+
 /**
  * Source freshness metadata. `observedAt` is when we checked or fetched the
  * source. `upstreamPublishedAt` is whatever posting date the authority gives
@@ -45,11 +54,44 @@ export const SourceFreshnessSchema = z.object({
 
 export type SourceFreshness = z.infer<typeof SourceFreshnessSchema>
 
+export const SourceManualEvidenceFieldSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  required: z.boolean(),
+})
+
+export type SourceManualEvidenceField = z.infer<
+  typeof SourceManualEvidenceFieldSchema
+>
+
+export const SourceCredentialFieldSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  required: z.boolean(),
+  secret: z.boolean(),
+})
+
+export type SourceCredentialField = z.infer<typeof SourceCredentialFieldSchema>
+
+export const SourceAuthRequirementSchema = z.object({
+  loginUrl: z.string().url(),
+  credentialMode: SourceCredentialModeSchema,
+  credentialSecretName: z.string().min(1).optional(),
+  credentialFields: z.array(SourceCredentialFieldSchema).min(1),
+  mfa: SourceMfaModeSchema,
+  instructions: z.array(z.string().min(1)).min(1),
+  evidenceFields: z.array(SourceManualEvidenceFieldSchema).min(1),
+  forbiddenActions: z.array(z.string().min(1)).min(1),
+})
+
+export type SourceAuthRequirement = z.infer<typeof SourceAuthRequirementSchema>
+
 const SourceMetadataBaseSchema = z.object({
   accessUrl: z.string().url(),
   tosUrl: z.string().url(),
   accessMethod: SourceAccessMethodSchema,
   sourceFreshness: SourceFreshnessSchema.optional(),
+  auth: SourceAuthRequirementSchema.optional(),
 })
 
 const AutomatedSourceMetadataSchema = SourceMetadataBaseSchema.extend({
@@ -114,16 +156,6 @@ export const SourceRunOutputSchema = z.object({
   findings: z.array(FindingSchema),
 })
 
-export const SourceManualEvidenceFieldSchema = z.object({
-  key: z.string().min(1),
-  label: z.string().min(1),
-  required: z.boolean(),
-})
-
-export type SourceManualEvidenceField = z.infer<
-  typeof SourceManualEvidenceFieldSchema
->
-
 /**
  * Typed source outcomes used by Phase 2 orchestration and reporting.
  *
@@ -157,6 +189,13 @@ export const SourceRunOutcomeSchema = z.discriminatedUnion('status', [
     status: z.literal('auth_required'),
     source_id: z.string().min(1),
     message: z.string().min(1),
+    loginUrl: z.string().url().optional(),
+    credentialMode: SourceCredentialModeSchema.optional(),
+    credentialFields: z.array(SourceCredentialFieldSchema).optional(),
+    mfa: SourceMfaModeSchema.optional(),
+    instructions: z.array(z.string().min(1)).optional(),
+    evidenceFields: z.array(SourceManualEvidenceFieldSchema).optional(),
+    forbiddenActions: z.array(z.string().min(1)).optional(),
   }),
 ])
 
@@ -212,6 +251,7 @@ interface SourceBase {
   readonly accessUrl: string
   readonly accessMethod: SourceAccessMethod
   readonly sourceFreshness?: SourceFreshness
+  readonly auth?: SourceAuthRequirement
   readonly run: (
     entity: Entity,
     ctx: SourceContext,
