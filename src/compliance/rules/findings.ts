@@ -363,10 +363,11 @@ function normaliseName(name: string): string {
 }
 
 function isStaleTaxPeriod(taxPeriod: string, now: Date): boolean {
-  const year = Number(taxPeriod.slice(0, 4))
-  if (!Number.isInteger(year)) {
+  const yearText = taxPeriod.slice(0, 4)
+  if (!/^\d{4}$/.test(yearText)) {
     return false
   }
+  const year = Number(yearText)
   return now.getUTCFullYear() - year > 2
 }
 

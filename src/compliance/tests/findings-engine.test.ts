@@ -326,31 +326,34 @@ describe('deriveComplianceFindings', () => {
     })
   })
 
-  it('does not flag IRS BMF tax periods that cannot be interpreted as a year', () => {
-    const findings = deriveComplianceFindings({
-      entity: ENTITY,
-      identifiers: IDENTIFIERS,
-      runs: [
-        {
-          ...SOURCE,
-          sourceId: 'irs-eo-bmf',
-          jurisdictionId: 'us-federal',
-          description: 'IRS EO BMF',
-          accessMethod: 'official_bulk_download',
-          outcome: {
-            status: 'success',
-            output: output({
-              matchStatus: 'found',
-              row: { name: 'Foo Foundation', taxPeriod: 'unknown' },
-            }),
+  it.each(['unknown', '', '   ', '12'])(
+    'does not flag IRS BMF tax period %j when it cannot be interpreted as a year',
+    (taxPeriod) => {
+      const findings = deriveComplianceFindings({
+        entity: ENTITY,
+        identifiers: IDENTIFIERS,
+        runs: [
+          {
+            ...SOURCE,
+            sourceId: 'irs-eo-bmf',
+            jurisdictionId: 'us-federal',
+            description: 'IRS EO BMF',
+            accessMethod: 'official_bulk_download',
+            outcome: {
+              status: 'success',
+              output: output({
+                matchStatus: 'found',
+                row: { name: 'Foo Foundation', taxPeriod },
+              }),
+            },
           },
-        },
-      ],
-      now: () => new Date('2026-04-28T12:00:00.000Z'),
-    })
+        ],
+        now: () => new Date('2026-04-28T12:00:00.000Z'),
+      })
 
-    expect(findings).toEqual([])
-  })
+      expect(findings).toEqual([])
+    },
+  )
 
   it('flags CA AG not-found results from the official Registry reports', () => {
     const findings = deriveComplianceFindings({
