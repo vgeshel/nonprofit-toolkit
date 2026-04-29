@@ -355,6 +355,17 @@ describe('formatDiscoveryReport', () => {
 })
 
 describe('isDiscoveryComplete', () => {
+  it('is false when no sources ran', () => {
+    const empty: DiscoveryReport = {
+      ...report(),
+      runs: [],
+      findings: [],
+    }
+
+    expect(isDiscoveryComplete(empty)).toBe(false)
+    expect(formatDiscoveryReport(empty)).toContain('Status: incomplete')
+  })
+
   it('is false when any source is failed or manual', () => {
     expect(isDiscoveryComplete(report())).toBe(false)
   })

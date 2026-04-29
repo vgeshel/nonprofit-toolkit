@@ -460,7 +460,6 @@ describe('fetchDownloadWithCache', () => {
       fetch,
       cache: store,
       now: () => NOW,
-      maxAgeMs: 60_000,
     })
 
     expect(result.isOk()).toBe(true)
@@ -474,6 +473,30 @@ describe('fetchDownloadWithCache', () => {
       expect(result.value.cacheStatus).toBe('revalidated')
       expect(new TextDecoder().decode(result.value.bytes)).toBe('cached body')
     }
+  })
+
+  it('returns a fresh cache artifact without a network request when maxAgeMs allows it', async () => {
+    const store = new MemoryDownloadCacheStore()
+    store.artifact = makeArtifact()
+    const fetch = vi.fn<FetchImpl>(() =>
+      Promise.resolve(response('network body')),
+    )
+
+    const result = await fetchDownloadWithCache({
+      sourceId: 'irs-teos',
+      url: makeArtifact().metadata.url,
+      fetch,
+      cache: store,
+      now: () => NOW,
+      maxAgeMs: 60_000,
+    })
+
+    expect(result.isOk()).toBe(true)
+    expect(fetch).not.toHaveBeenCalled()
+    expect(store.written).toHaveLength(0)
+    if (!result.isOk()) return
+    expect(result.value.cacheStatus).toBe('revalidated')
+    expect(new TextDecoder().decode(result.value.bytes)).toBe('cached body')
   })
 
   it('refetches when a structurally valid cache artifact is stale', async () => {
@@ -554,7 +577,6 @@ describe('fetchDownloadWithCache', () => {
       fetch,
       cache: store,
       now: () => NOW,
-      maxAgeMs: 60_000,
     })
 
     expect(result.isErr()).toBe(true)

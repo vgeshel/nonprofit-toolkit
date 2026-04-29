@@ -23,6 +23,7 @@ import type {
 } from '../../../types/index.ts'
 
 const REPORTS_URL = 'https://www.oag.ca.gov/charities/reports'
+const REGISTRY_REPORTS_UPSTREAM_PUBLISHED_AT = '2026-04-15'
 
 export const CA_AG_REGISTRY_LISTS = [
   {
@@ -270,7 +271,7 @@ function buildOutput(
               state: match.row.state,
               lastRenewal: match.row.lastRenewal,
               dateStatusSet: match.row.dateStatusSet,
-              upstreamPublishedAt: '2026-04-15',
+              upstreamPublishedAt: REGISTRY_REPORTS_UPSTREAM_PUBLISHED_AT,
               evidence: downloadEvidence,
             },
     },
@@ -290,7 +291,7 @@ export const caAgRegistrySource: Source = {
   automationAllowed: true,
   sourceFreshness: {
     observedAt: '2026-04-28T00:00:00.000Z',
-    upstreamPublishedAt: '2026-04-15',
+    upstreamPublishedAt: REGISTRY_REPORTS_UPSTREAM_PUBLISHED_AT,
   },
   tosUrl: REPORTS_URL,
   run(_entity: Entity, ctx: SourceContext) {
@@ -314,4 +315,5 @@ export const _internal = {
   parseRegistryCsv,
   normaliseEin,
   findMatch,
+  registryReportsUpstreamPublishedAt: REGISTRY_REPORTS_UPSTREAM_PUBLISHED_AT,
 }

@@ -9,6 +9,7 @@ const SEVERITY_ORDER: Record<Finding['severity'], number> = {
 
 export function isDiscoveryComplete(report: DiscoveryReport): boolean {
   return (
+    report.runs.length > 0 &&
     report.runs.every((run) => run.outcome.status === 'success') &&
     report.findings.every((finding) => finding.severity === 'info')
   )

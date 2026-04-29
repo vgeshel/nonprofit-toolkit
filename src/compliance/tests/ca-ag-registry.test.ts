@@ -99,6 +99,29 @@ describe('caAgRegistrySource metadata', () => {
     })
     expect(CA_AG_REGISTRY_LISTS).toHaveLength(4)
   })
+
+  it('uses one upstream-published date for source metadata and payloads', async () => {
+    const mayOperateUrl = CA_AG_REGISTRY_LISTS[0]?.url ?? ''
+    const fetch = fetchForLists({
+      [mayOperateUrl]: `${HEADER}\n${csvRow({
+        status: 'Current',
+        charity: 'CT0123456',
+        fein: '123456789',
+        sos: 'C0123456',
+      })}`,
+    })
+
+    const result = await caAgRegistrySource.run(ENTITY, makeContext(fetch))
+
+    expect(_internal.registryReportsUpstreamPublishedAt).toBe(
+      caAgRegistrySource.sourceFreshness?.upstreamPublishedAt,
+    )
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value.record.payload).toMatchObject({
+      upstreamPublishedAt: _internal.registryReportsUpstreamPublishedAt,
+    })
+  })
 })
 
 describe('_internal.parseRegistryCsv', () => {

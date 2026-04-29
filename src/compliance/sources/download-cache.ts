@@ -191,6 +191,7 @@ export function fetchDownloadWithCache(
   return args.cache
     .read(cacheKey)
     .andThen(validateCachedOrNull)
+    .andThen((cached) => returnFreshCachedOrNull(args, cached))
     .andThen((cached) => fetchAndCache(args, cacheKey, cached))
 }
 
@@ -206,11 +207,35 @@ function validateCachedOrNull(
     : errAsync(validation.error)
 }
 
+function returnFreshCachedOrNull(
+  args: FetchDownloadWithCacheArgs,
+  cached: CachedDownload | null,
+): ResultAsync<CachedDownload | null | CachedDownloadResult, SourceError> {
+  if (cached === null) {
+    return okAsync(null)
+  }
+  const freshness = validateFreshness({
+    artifact: cached,
+    now: args.now,
+    maxAgeMs: args.maxAgeMs,
+  })
+  if (freshness.isErr()) {
+    return okAsync(cached)
+  }
+  if (args.maxAgeMs === undefined) {
+    return okAsync(cached)
+  }
+  return okAsync({ ...cached, cacheStatus: 'revalidated' })
+}
+
 function fetchAndCache(
   args: FetchDownloadWithCacheArgs,
   cacheKey: string,
-  cached: CachedDownload | null,
+  cached: CachedDownload | null | CachedDownloadResult,
 ): ResultAsync<CachedDownloadResult, SourceError> {
+  if (cached !== null && 'cacheStatus' in cached) {
+    return okAsync(cached)
+  }
   const requestedAt = args.now().toISOString()
   return ResultAsync.fromPromise(
     args.fetch(args.url, { headers: revalidationHeaders(cached) }),
