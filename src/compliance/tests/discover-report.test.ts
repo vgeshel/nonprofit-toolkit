@@ -256,6 +256,38 @@ describe('formatDiscoveryReport', () => {
     expect(rendered).toContain('Status: complete')
     expect(rendered).toContain('- None.')
   })
+
+  it('renders complete status when every source succeeds and findings are informational', () => {
+    const complete = report()
+    const rendered = formatDiscoveryReport({
+      ...complete,
+      runs: complete.runs.filter((run) => run.outcome.status === 'success'),
+      findings: [
+        finding({
+          severity: 'info',
+          title: 'EIN listed in IRS Pub. 78',
+          jurisdiction: 'us-federal',
+          source: 'irs-teos',
+        }),
+      ],
+    })
+
+    expect(rendered).toContain('Status: complete')
+    expect(
+      isDiscoveryComplete({
+        ...complete,
+        runs: complete.runs.filter((run) => run.outcome.status === 'success'),
+        findings: [
+          finding({
+            severity: 'warn',
+            title: 'Manual verification required',
+            jurisdiction: 'us-ca',
+            source: 'ca-sos-bizfile',
+          }),
+        ],
+      }),
+    ).toBe(false)
+  })
 })
 
 describe('isDiscoveryComplete', () => {

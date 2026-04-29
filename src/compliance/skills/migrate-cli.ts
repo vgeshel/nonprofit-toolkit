@@ -41,7 +41,11 @@ export interface BqDataset {
 export interface BqClient {
   dataset(name: string): BqDataset
   createDataset(name: string): Promise<unknown>
-  query(options: { query: string }): Promise<unknown>
+  query(options: {
+    query: string
+    params?: Record<string, string>
+    parameterMode?: 'named'
+  }): Promise<unknown>
 }
 
 /**
@@ -147,9 +151,11 @@ export function makeBqPort(bq: BqClient): ComplianceMigrationPort {
         bq.query({
           query:
             `SELECT 1 FROM \`${req.dataset}.INFORMATION_SCHEMA.COLUMNS\` ` +
-            `WHERE table_name = '${req.tableId}' ` +
-            `AND column_name = '${req.columnName}' ` +
+            'WHERE table_name = @tableId ' +
+            'AND column_name = @columnName ' +
             'LIMIT 1',
+          params: { tableId: req.tableId, columnName: req.columnName },
+          parameterMode: 'named',
         }),
         toPortError,
       ).map(parseQueryHasRows)

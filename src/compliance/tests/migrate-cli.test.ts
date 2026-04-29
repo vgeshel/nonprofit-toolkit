@@ -395,10 +395,15 @@ describe('makeBqPort', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(result.value).toBe(true)
-    const [arg] = query.mock.calls[0] ?? []
-    expect(arg?.query).toContain('INFORMATION_SCHEMA.COLUMNS')
-    expect(arg?.query).toContain("table_name = 'sources'")
-    expect(arg?.query).toContain("column_name = 'access_url'")
+    expect(query).toHaveBeenCalledWith({
+      query:
+        'SELECT 1 FROM `compliance.INFORMATION_SCHEMA.COLUMNS` ' +
+        'WHERE table_name = @tableId ' +
+        'AND column_name = @columnName ' +
+        'LIMIT 1',
+      params: { tableId: 'sources', columnName: 'access_url' },
+      parameterMode: 'named',
+    })
   })
 
   it('returns a typed error when addTableColumn rejects', async () => {
