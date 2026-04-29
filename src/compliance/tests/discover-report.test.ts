@@ -47,6 +47,35 @@ function finding(args: {
 }
 
 function report(findings: readonly Finding[] = []): DiscoveryReport {
+  const manualRun: DiscoveryReport['runs'][number] & {
+    readonly accessUrl: string
+    readonly manualOnlyReason: string
+    readonly tosUrl: string
+  } = {
+    sourceId: 'ca-sos-bizfile',
+    jurisdictionId: 'us-ca',
+    description: 'CA SOS bizfile',
+    accessMethod: 'manual',
+    automationAllowed: false,
+    accessUrl: 'https://bizfileonline.sos.ca.gov/search/business',
+    tosUrl:
+      'https://www.sos.ca.gov/business-programs/bizfile/privacy-warning-terms-and-conditions-use',
+    manualOnlyReason:
+      'CA SOS bizfile terms prohibit automated collection by robots or spiders.',
+    outcome: {
+      status: 'manual_required',
+      source_id: 'ca-sos-bizfile',
+      instructions: [
+        'Open bizfile.',
+        'Search for the exact SOS entity number.',
+      ],
+      evidenceFields: [
+        { key: 'entity_status', label: 'Entity status', required: true },
+        { key: 'status_date', label: 'Status date', required: false },
+      ],
+    },
+  }
+
   return {
     entity: ENTITY,
     identifiers: IDENTIFIERS,
@@ -63,8 +92,10 @@ function report(findings: readonly Finding[] = []): DiscoveryReport {
         sourceId: 'irs-eo-bmf',
         jurisdictionId: 'us-federal',
         description: 'IRS EO BMF',
+        accessUrl: 'https://www.irs.gov/charities-non-profits',
         accessMethod: 'official_bulk_download',
         automationAllowed: true,
+        tosUrl: 'https://www.irs.gov/privacy-disclosure/irs-privacy-policy',
         outcome: {
           status: 'success',
           output: {
@@ -78,27 +109,15 @@ function report(findings: readonly Finding[] = []): DiscoveryReport {
           },
         },
       },
-      {
-        sourceId: 'ca-sos-bizfile',
-        jurisdictionId: 'us-ca',
-        description: 'CA SOS bizfile',
-        accessMethod: 'manual',
-        automationAllowed: false,
-        outcome: {
-          status: 'manual_required',
-          source_id: 'ca-sos-bizfile',
-          instructions: ['Open bizfile.'],
-          evidenceFields: [
-            { key: 'entity_status', label: 'Entity status', required: true },
-          ],
-        },
-      },
+      manualRun,
       {
         sourceId: 'ca-ag-registry',
         jurisdictionId: 'us-ca',
         description: 'CA AG Registry',
+        accessUrl: 'https://www.oag.ca.gov/charities/reports',
         accessMethod: 'official_bulk_download',
         automationAllowed: true,
+        tosUrl: 'https://www.oag.ca.gov/privacy',
         outcome: {
           status: 'source_failure',
           source_id: 'ca-ag-registry',
@@ -123,6 +142,46 @@ describe('formatDiscoveryReport', () => {
     )
     expect(rendered).toContain('- OK us-federal/irs-eo-bmf: success')
     expect(rendered).not.toContain('all clear')
+  })
+
+  it('renders detailed manual evidence instructions for manual-required sources', () => {
+    const rendered = formatDiscoveryReport(report())
+
+    expect(rendered).toContain(
+      'Why automatic scan is unavailable: CA SOS bizfile terms prohibit automated collection by robots or spiders.',
+    )
+    expect(rendered).toContain(
+      'Open manually: https://bizfileonline.sos.ca.gov/search/business',
+    )
+    expect(rendered).toContain('Manual steps:')
+    expect(rendered).toContain('1. Open bizfile.')
+    expect(rendered).toContain('2. Search for the exact SOS entity number.')
+    expect(rendered).toContain(
+      'Give these values back to the compliance-discover skill:',
+    )
+    expect(rendered).toContain('- entity_status (required): Entity status')
+    expect(rendered).toContain('- status_date (optional): Status date')
+    expect(rendered).toContain('Suggested reply format:')
+    expect(rendered).toContain('source: us-ca/ca-sos-bizfile')
+    expect(rendered).toContain('entity_status: <Entity status>')
+  })
+
+  it('uses a clear fallback when a manual-required run lacks a reason', () => {
+    const base = report()
+    const rendered = formatDiscoveryReport({
+      ...base,
+      runs: base.runs.map((run) => {
+        if (run.outcome.status !== 'manual_required') {
+          return run
+        }
+        return { ...run, manualOnlyReason: undefined }
+      }),
+    })
+
+    expect(rendered).toContain(
+      'Why automatic scan is unavailable: No manual-only reason was captured for this source.',
+    )
+    expect(rendered).not.toContain('undefined')
   })
 
   it('orders findings by severity, jurisdiction, then source', () => {
@@ -211,8 +270,11 @@ describe('formatDiscoveryReport', () => {
           sourceId: 'policy-source',
           jurisdictionId: 'us-ca',
           description: 'Policy source',
+          accessUrl: 'https://example.com/policy-source',
           accessMethod: 'manual',
           automationAllowed: false,
+          manualOnlyReason: 'No permitted automated access path was found.',
+          tosUrl: 'https://example.com/tos',
           outcome: {
             status: 'policy_blocked',
             source_id: 'policy-source',
@@ -223,8 +285,10 @@ describe('formatDiscoveryReport', () => {
           sourceId: 'auth-source',
           jurisdictionId: 'us-federal',
           description: 'Auth source',
+          accessUrl: 'https://example.com/auth-source',
           accessMethod: 'official_api',
           automationAllowed: true,
+          tosUrl: 'https://example.com/tos',
           outcome: {
             status: 'auth_required',
             source_id: 'auth-source',

@@ -24,6 +24,7 @@ import type {
   EntityIdentifiers,
   FetchImpl,
   Finding,
+  Source,
   SourceAccessMethod,
   SourceContext,
   SourceFreshness,
@@ -48,9 +49,12 @@ export interface DiscoveryRunSourceSummary {
   readonly sourceId: string
   readonly jurisdictionId: string
   readonly description: string
+  readonly accessUrl: string
   readonly accessMethod: SourceAccessMethod
   readonly automationAllowed: boolean
+  readonly manualOnlyReason?: string
   readonly sourceFreshness?: SourceFreshness
+  readonly tosUrl: string
 }
 
 /**
@@ -169,6 +173,7 @@ function executeAllSources(
   const promises: Promise<DiscoveryRun>[] = []
   for (const j of args.registry.list()) {
     for (const source of j.sources) {
+      const summary = summarizeSourceForReport(source, j.id)
       promises.push(
         runSourceOutcome({
           source,
@@ -177,22 +182,9 @@ function executeAllSources(
           recorder: args.recorder,
         })
           .match<DiscoveryRun>(
-            (outcome): DiscoveryRun => ({
-              sourceId: source.id,
-              jurisdictionId: j.id,
-              description: source.description,
-              accessMethod: source.accessMethod,
-              automationAllowed: source.automationAllowed,
-              sourceFreshness: source.sourceFreshness,
-              outcome,
-            }),
+            (outcome): DiscoveryRun => ({ ...summary, outcome }),
             (error): DiscoveryRun => ({
-              sourceId: source.id,
-              jurisdictionId: j.id,
-              description: source.description,
-              accessMethod: source.accessMethod,
-              automationAllowed: source.automationAllowed,
-              sourceFreshness: source.sourceFreshness,
+              ...summary,
               outcome: sourceErrorToOutcome(source.id, error),
             }),
           )
@@ -228,6 +220,26 @@ function executeAllSources(
         })
     },
   )
+}
+
+function summarizeSourceForReport(
+  source: Source,
+  jurisdictionId: string,
+): DiscoveryRunSourceSummary {
+  const summary: DiscoveryRunSourceSummary = {
+    sourceId: source.id,
+    jurisdictionId,
+    description: source.description,
+    accessUrl: source.accessUrl,
+    accessMethod: source.accessMethod,
+    automationAllowed: source.automationAllowed,
+    sourceFreshness: source.sourceFreshness,
+    tosUrl: source.tosUrl,
+  }
+  if (source.automationAllowed) {
+    return summary
+  }
+  return { ...summary, manualOnlyReason: source.manualOnlyReason }
 }
 
 function sourceErrorToOutcome(

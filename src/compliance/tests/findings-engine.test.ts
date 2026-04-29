@@ -34,12 +34,14 @@ const SOURCE: DiscoveryRunSourceSummary = {
   sourceId: 'ca-ag-registry',
   jurisdictionId: 'us-ca',
   description: 'CA AG Registry',
+  accessUrl: 'https://www.oag.ca.gov/charities/reports',
   accessMethod: 'official_bulk_download',
   automationAllowed: true,
   sourceFreshness: {
     observedAt: '2026-04-28T00:00:00.000Z',
     upstreamPublishedAt: '2026-04-15',
   },
+  tosUrl: 'https://www.oag.ca.gov/privacy',
 }
 
 type SuccessOutcome = Extract<SourceRunOutcome, { status: 'success' }>

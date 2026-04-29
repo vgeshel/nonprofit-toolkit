@@ -552,6 +552,13 @@ describe('runDiscovery', () => {
     if (!result.isOk()) return
     expect(manualSource.run).not.toHaveBeenCalled()
     expect(result.value.runs[0]?.outcome.status).toBe('manual_required')
+    expect(result.value.runs[0]).toMatchObject({
+      accessUrl: 'https://bizfileonline.sos.ca.gov/search/business',
+      manualOnlyReason:
+        'CA SOS bizfile terms prohibit automated collection by robots or spiders.',
+      tosUrl:
+        'https://www.sos.ca.gov/business-programs/bizfile/privacy-warning-terms-and-conditions-use',
+    })
     expect(result.value.findings).toHaveLength(1)
     expect(result.value.findings[0]).toMatchObject({
       source_id: 'ca-sos-bizfile',

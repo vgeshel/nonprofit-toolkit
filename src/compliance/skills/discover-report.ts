@@ -58,7 +58,7 @@ function formatRun(run: DiscoveryRun): string {
     return `- OK ${label}: success`
   }
   if (outcome.status === 'manual_required') {
-    return `- MANUAL ${label}: manual verification required`
+    return formatManualRun(label, run, outcome)
   }
   if (outcome.status === 'policy_blocked') {
     return `- BLOCKED ${label}: ${outcome.reason}`
@@ -67,6 +67,54 @@ function formatRun(run: DiscoveryRun): string {
     return `- AUTH ${label}: ${outcome.message}`
   }
   return `- ERROR ${label}: failed (${outcome.error_type}) ${outcome.message}`
+}
+
+function formatManualRun(
+  label: string,
+  run: DiscoveryRun,
+  outcome: Extract<DiscoveryRun['outcome'], { status: 'manual_required' }>,
+): string {
+  return [
+    `- MANUAL ${label}: manual verification required`,
+    `  Why automatic scan is unavailable: ${formatManualOnlyReason(run)}`,
+    `  Open manually: ${run.accessUrl}`,
+    `  Source terms reviewed: ${run.tosUrl}`,
+    '  Manual steps:',
+    ...outcome.instructions.map(
+      (instruction, index) => `  ${index + 1}. ${instruction}`,
+    ),
+    '  Give these values back to the compliance-discover skill:',
+    ...outcome.evidenceFields.map(formatEvidenceField),
+    '  Suggested reply format:',
+    `  source: ${label}`,
+    ...outcome.evidenceFields.map(formatReplyField),
+  ].join('\n')
+}
+
+function formatManualOnlyReason(run: DiscoveryRun): string {
+  if (run.manualOnlyReason === undefined) {
+    return 'No manual-only reason was captured for this source.'
+  }
+  return run.manualOnlyReason
+}
+
+function formatEvidenceField(
+  field: Extract<
+    DiscoveryRun['outcome'],
+    { status: 'manual_required' }
+  >['evidenceFields'][number],
+): string {
+  const requirement = field.required ? 'required' : 'optional'
+  return `  - ${field.key} (${requirement}): ${field.label}`
+}
+
+function formatReplyField(
+  field: Extract<
+    DiscoveryRun['outcome'],
+    { status: 'manual_required' }
+  >['evidenceFields'][number],
+): string {
+  return `  ${field.key}: <${field.label}>`
 }
 
 function formatFindings(findings: readonly Finding[]): string[] {

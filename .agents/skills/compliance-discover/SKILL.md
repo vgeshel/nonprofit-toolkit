@@ -15,13 +15,17 @@ Runs every registered compliance source for the onboarded nonprofit, captures ea
 BigQuery (`compliance.discovery_runs`), records typed findings (`compliance.findings`), and
 prints a markdown report.
 
-Phase 2 public sources:
+Keep this file focused on the discovery workflow. Source-specific and jurisdiction-specific
+details live in `references/` and should be loaded only when the user's question or the
+current report needs that detail.
 
-- IRS Pub. 78 + Automatic Revocation list lookup by EIN.
-- IRS EO Business Master File CSV lookup by EIN.
-- CA AG Registry Reports CSV lookup by EIN, AG charity number, or SOS/FTB number.
-- CA SOS bizfile and CA FTB Entity Status Letter as manual-required sources under the
-  current source-policy decisions.
+## Reference files
+
+- `references/manual-sources.md` - use when a report contains `MANUAL` or `BLOCKED`
+  sources, or when the user asks how to complete a source by hand.
+- `references/california-sources.md` - use for CA AG Registry, CA SOS bizfile, CA FTB
+  Entity Status Letter, and planned CDTFA work.
+- `references/federal-sources.md` - use for IRS TEOS and IRS EO BMF details.
 
 ## Pre-flight
 
@@ -60,11 +64,19 @@ shows:
 
 - Overall completeness.
 - Per-source state: `OK`, `MANUAL`, `BLOCKED`, `AUTH`, or `ERROR`.
+- For `MANUAL` sources: why automation is unavailable, the official URL to open, manual
+  steps, required/optional evidence fields, and a suggested reply format the user can send
+  back to this skill.
 - Findings ordered by severity, then jurisdiction, then source.
 
 Tell the user that successful, failed, manual-required, policy-blocked, and auth-required
 source outcomes are persisted in `compliance.discovery_runs`, and findings are persisted
 in `compliance.findings`.
+
+When a source is not `OK`, do not summarize it as compliant. For manual-required sources,
+preserve the report's field names exactly when asking the user for evidence. If the user
+returns manual evidence, do not claim it was persisted unless a dedicated manual-evidence
+ingestion path has been implemented and successfully run.
 
 ## Failure modes
 
@@ -90,7 +102,5 @@ Do not treat a failed, blocked, or manual-required source as an all-clear.
 - `src/compliance/skills/discover.ts` - orchestration logic.
 - `src/compliance/skills/discover-report.ts` - markdown report formatter.
 - `src/compliance/rules/findings.ts` - Phase 2 findings/gap engine.
-- `src/compliance/jurisdictions/us-federal/sources/irs-teos.ts`.
-- `src/compliance/jurisdictions/us-federal/sources/irs-bmf.ts`.
-- `src/compliance/jurisdictions/us-ca/` - California source definitions.
+- `src/compliance/jurisdictions/` - jurisdiction modules and source definitions.
 - `scripts/compliance-discover.ts` - CLI wrapper.
