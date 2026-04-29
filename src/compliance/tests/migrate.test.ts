@@ -261,6 +261,9 @@ describe('runMigration', () => {
     expect(viewReq?.query).toMatch(/title/i)
     expect(viewReq?.query).toMatch(/detail/i)
     expect(viewReq?.query).toMatch(/TO_JSON_STRING\(evidence\)/i)
+    expect(viewReq?.query).toMatch(
+      /NOT COALESCE\(\s*JSON_VALUE\(f\.evidence, '\$\.code'\) = 'source\.failed'/i,
+    )
     expect(viewReq?.query).not.toMatch(/PARTITION BY\s+finding_id/i)
   })
 

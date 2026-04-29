@@ -250,9 +250,10 @@ export function currentOpenFindingsViewQuery(
       ON r.source_id = f.source_id
     WHERE f.rn = 1
       AND f.status = 'open'
-      AND NOT (
+      AND NOT COALESCE(
         JSON_VALUE(f.evidence, '$.code') = 'source.failed'
-        AND r.status = 'succeeded'
+          AND r.status = 'succeeded',
+        FALSE
       )
   `
 }

@@ -131,15 +131,31 @@ describeBigQuery('compliance findings BigQuery integration', () => {
       openedAt: '2026-04-29T00:10:00.000Z',
       evidence: '{"code":"source.failed","attempt":2}',
     })
+    await insertDiscoveryRun({
+      runId: randomUUID(),
+      sourceId: 'irs-teos',
+      status: 'succeeded',
+      completedAt: '2026-04-29T00:12:00.000Z',
+    })
+    await insertFinding({
+      findingId: randomUUID(),
+      sourceId: 'irs-teos',
+      severity: 'info',
+      title: 'EIN listed in IRS Pub. 78',
+      detail: 'IRS Publication 78 lists this EIN with deductibility code "PC".',
+      openedAt: '2026-04-29T00:12:00.000Z',
+      evidence: '{"deductibilityCode":"PC"}',
+    })
 
     const rawCount = await queryCount(
       `SELECT COUNT(*) AS count FROM \`${PROJECT_ID}.${datasetId}.findings\``,
     )
-    expect(rawCount).toBe(3)
+    expect(rawCount).toBe(4)
 
     const currentBeforeSuccess = await queryCurrentFindings()
     expect(currentBeforeSuccess.map((row) => row.detail).sort()).toEqual([
       'Current source failure detail.',
+      'IRS Publication 78 lists this EIN with deductibility code "PC".',
       'Original source failure detail.',
     ])
 
@@ -151,12 +167,14 @@ describeBigQuery('compliance findings BigQuery integration', () => {
     })
 
     const currentAfterSuccess = await queryCurrentFindings()
-    expect(currentAfterSuccess).toEqual([])
+    expect(currentAfterSuccess.map((row) => row.detail)).toEqual([
+      'IRS Publication 78 lists this EIN with deductibility code "PC".',
+    ])
     expect(
       await queryCount(
         `SELECT COUNT(*) AS count FROM \`${PROJECT_ID}.${datasetId}.findings\``,
       ),
-    ).toBe(3)
+    ).toBe(4)
   })
 
   async function insertDiscoveryRun(args: {
@@ -215,6 +233,8 @@ describeBigQuery('compliance findings BigQuery integration', () => {
   async function insertFinding(args: {
     readonly findingId: string
     readonly sourceId: string
+    readonly severity?: 'error' | 'info' | 'warn'
+    readonly title?: string
     readonly detail: string
     readonly openedAt: string
     readonly evidence: string
@@ -237,9 +257,9 @@ describeBigQuery('compliance findings BigQuery integration', () => {
           @finding_id,
           'us-federal',
           @source_id,
-          'error',
+          @severity,
           'open',
-          'Source failed: IRS EO BMF',
+          @title,
           @detail,
           PARSE_JSON(@evidence),
           @opened_at,
@@ -249,6 +269,8 @@ describeBigQuery('compliance findings BigQuery integration', () => {
       params: {
         finding_id: args.findingId,
         source_id: args.sourceId,
+        severity: args.severity ?? 'error',
+        title: args.title ?? 'Source failed: IRS EO BMF',
         detail: args.detail,
         evidence: args.evidence,
         opened_at: new Date(args.openedAt),
