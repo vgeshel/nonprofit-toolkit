@@ -476,6 +476,50 @@ describe('fetchDownloadWithCache', () => {
     }
   })
 
+  it('refetches when a structurally valid cache artifact is stale', async () => {
+    const store = new MemoryDownloadCacheStore()
+    store.artifact = makeArtifact({
+      metadata: {
+        ...makeArtifact().metadata,
+        fetchedAt: '2026-04-28T11:00:00.000Z',
+      },
+    })
+    const fetch = vi.fn<FetchImpl>(() =>
+      Promise.resolve(
+        response('refetched body', {
+          headers: {
+            etag: '"fresh"',
+            'last-modified': 'Tue, 28 Apr 2026 12:00:00 GMT',
+          },
+        }),
+      ),
+    )
+
+    const result = await fetchDownloadWithCache({
+      sourceId: 'irs-teos',
+      url: makeArtifact().metadata.url,
+      fetch,
+      cache: store,
+      now: () => NOW,
+      maxAgeMs: 1_000,
+    })
+
+    expect(result.isOk()).toBe(true)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch.mock.calls[0]?.[1]?.headers).toEqual({
+      'if-none-match': '"abc123"',
+      'if-modified-since': 'Tue, 28 Apr 2026 00:00:00 GMT',
+    })
+    expect(store.written).toHaveLength(1)
+    if (result.isOk()) {
+      expect(result.value.cacheStatus).toBe('fetched')
+      expect(new TextDecoder().decode(result.value.bytes)).toBe(
+        'refetched body',
+      )
+      expect(result.value.metadata.etag).toBe('"fresh"')
+    }
+  })
+
   it('fails loudly when an upstream returns 304 without a cache entry', async () => {
     const store = new MemoryDownloadCacheStore()
     const fetch = vi.fn<FetchImpl>(() =>

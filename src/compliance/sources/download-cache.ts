@@ -140,29 +140,9 @@ export function buildDownloadCacheKey(input: DownloadCacheKeyInput): string {
 export function validateCachedDownload(
   args: ValidateCachedDownloadArgs,
 ): Result<CachedDownload, SourceError> {
-  const parsedMetadata = CachedDownloadMetadataSchema.safeParse(
-    args.artifact.metadata,
-  )
-  if (!parsedMetadata.success) {
-    return err({
-      type: 'parse',
-      message: `Cached download failed schema validation: ${parsedMetadata.error.message}`,
-    })
-  }
-
-  const actualHash = hashBytes(args.artifact.bytes)
-  if (actualHash !== args.artifact.metadata.contentHash) {
-    return err({
-      type: 'parse',
-      message: `Cached download hash mismatch for ${args.artifact.metadata.cacheKey}`,
-    })
-  }
-
-  if (args.artifact.bytes.byteLength !== args.artifact.metadata.sizeBytes) {
-    return err({
-      type: 'parse',
-      message: `Cached download size mismatch for ${args.artifact.metadata.cacheKey}`,
-    })
+  const integrityResult = validateCachedIntegrity(args.artifact)
+  if (integrityResult.isErr()) {
+    return err(integrityResult.error)
   }
 
   const staleResult = validateFreshness(args)
@@ -173,28 +153,54 @@ export function validateCachedDownload(
   return ok(args.artifact)
 }
 
+function validateCachedIntegrity(
+  artifact: CachedDownload,
+): Result<CachedDownload, SourceError> {
+  const parsedMetadata = CachedDownloadMetadataSchema.safeParse(
+    artifact.metadata,
+  )
+  if (!parsedMetadata.success) {
+    return err({
+      type: 'parse',
+      message: `Cached download failed schema validation: ${parsedMetadata.error.message}`,
+    })
+  }
+
+  const actualHash = hashBytes(artifact.bytes)
+  if (actualHash !== artifact.metadata.contentHash) {
+    return err({
+      type: 'parse',
+      message: `Cached download hash mismatch for ${artifact.metadata.cacheKey}`,
+    })
+  }
+
+  if (artifact.bytes.byteLength !== artifact.metadata.sizeBytes) {
+    return err({
+      type: 'parse',
+      message: `Cached download size mismatch for ${artifact.metadata.cacheKey}`,
+    })
+  }
+
+  return ok(artifact)
+}
+
 export function fetchDownloadWithCache(
   args: FetchDownloadWithCacheArgs,
 ): ResultAsync<CachedDownloadResult, SourceError> {
   const cacheKey = buildDownloadCacheKey(args)
   return args.cache
     .read(cacheKey)
-    .andThen((cached) => validateCachedOrNull(cached, args))
+    .andThen(validateCachedOrNull)
     .andThen((cached) => fetchAndCache(args, cacheKey, cached))
 }
 
 function validateCachedOrNull(
   cached: CachedDownload | null,
-  args: FetchDownloadWithCacheArgs,
 ): ResultAsync<CachedDownload | null, SourceError> {
   if (cached === null) {
     return okAsync(null)
   }
-  const validation = validateCachedDownload({
-    artifact: cached,
-    now: args.now,
-    maxAgeMs: args.maxAgeMs,
-  })
+  const validation = validateCachedIntegrity(cached)
   return validation.isOk()
     ? okAsync(validation.value)
     : errAsync(validation.error)
