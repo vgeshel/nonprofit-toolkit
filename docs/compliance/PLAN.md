@@ -136,12 +136,13 @@ least invasive allowed access method:
 **Source research snapshot, checked 2026-04-28.** The implementation phase must
 refresh this before coding and capture the final URLs in source definitions.
 
-| Source         | Official URLs to start from                                                                                                                                                                                                        | Planning implication                                                                                                                                                                                      |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CA SOS         | `https://www.sos.ca.gov/business-programs/business-entities/information-requests`, `https://www.sos.ca.gov/business-programs/bizfile`, `https://www.sos.ca.gov/business-programs/bizfile/privacy-warning-terms-and-conditions-use` | bizfile exposes entity status and related fields, but its terms include anti-scraping restrictions. Start as manual or authorized bulk/public-data access, not blind scrape.                              |
-| CA AG Registry | `https://www.oag.ca.gov/charities`, `https://www.oag.ca.gov/charities/reports`, `https://oag.ca.gov/charities/content/info`, `https://rct.doj.ca.gov`                                                                              | Prefer the downloadable Registry Reports CSVs for status. The search tool remains useful for latest filings and documents, but its replacement by a 2026 online filing system must be handled explicitly. |
-| CA FTB         | `https://www.ftb.ca.gov/help/business/entity-status-letter.asp`, `https://webapp.ftb.ca.gov/eletter/`                                                                                                                              | Entity Status Letter is public and free for supported entity types, including exempt organizations. Treat it as FTB-only status; it does not reflect other agencies.                                      |
-| IRS EO BMF     | `https://www.irs.gov/charities-non-profits/exempt-organizations-business-master-file-extract-eo-bmf`, `https://www.irs.gov/charities-non-profits/tax-exempt-organization-search-bulk-data-downloads`                               | Official CSV bulk data. Add caching before another large federal download source is introduced.                                                                                                           |
+| Source         | Official URLs to start from                                                                                                                                                                                                        | Planning implication                                                                                                                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CA SOS         | `https://www.sos.ca.gov/business-programs/business-entities/information-requests`, `https://www.sos.ca.gov/business-programs/bizfile`, `https://www.sos.ca.gov/business-programs/bizfile/privacy-warning-terms-and-conditions-use` | bizfile exposes entity status and related fields, but its terms include anti-scraping restrictions. Start as manual or authorized bulk/public-data access, not blind scrape.                                  |
+| CA AG Registry | `https://www.oag.ca.gov/charities`, `https://www.oag.ca.gov/charities/reports`, `https://oag.ca.gov/charities/content/info`, `https://rct.doj.ca.gov`                                                                              | Prefer the downloadable Registry Reports CSVs for status. The search tool remains useful for latest filings and documents, but its replacement by a 2026 online filing system must be handled explicitly.     |
+| CA FTB         | `https://www.ftb.ca.gov/help/business/entity-status-letter.asp`, `https://webapp.ftb.ca.gov/eletter/`                                                                                                                              | Entity Status Letter is public and free for supported entity types, including exempt organizations. Treat it as FTB-only status; it does not reflect other agencies.                                          |
+| CA CDTFA       | `https://www.cdtfa.ca.gov/services/`, `https://www.cdtfa.ca.gov/services/permits-licenses.htm`, `https://onlineservices.cdtfa.ca.gov/`                                                                                             | Added 2026-04-29 as a next-source candidate. Research seller's permit, use-tax registration, and other CDTFA account verification; CDTFA notes not all permits, licenses, or accounts are publicly disclosed. |
+| IRS EO BMF     | `https://www.irs.gov/charities-non-profits/exempt-organizations-business-master-file-extract-eo-bmf`, `https://www.irs.gov/charities-non-profits/tax-exempt-organization-search-bulk-data-downloads`                               | Official CSV bulk data. Add caching before another large federal download source is introduced.                                                                                                               |
 
 **In scope:**
 
@@ -230,6 +231,20 @@ refresh this before coding and capture the final URLs in source definitions.
 ### Phase 3 — Authenticated discovery (TBD)
 
 High level only. Playwright sessions with credentials from Secret Manager, MFA passed to the user, per-portal adapters (MyFTB, AG Registry login, possibly IRS Tax Pro account). Only built where authenticated data demonstrably adds value beyond public sources — we do not implement an authenticated source if the public source already answers the question.
+
+Add CDTFA as an explicit Phase 3 source candidate for California sales-and-use-tax
+and tax/fee account standing:
+
+- First determine whether the nonprofit has any CDTFA-managed account, such as a
+  seller's permit, use-tax registration, or special tax/fee account.
+- Review CDTFA Online Services, permit/license/account verification, source terms,
+  and any official bulk or authenticated read-only paths before implementation.
+- If the account can be verified through an allowed public lookup, implement it as
+  a public read-only source. If it requires an account login, implement it only
+  through authenticated discovery with user-assisted MFA. If no permitted
+  automated path exists, keep it manual with typed evidence capture.
+- The source must never file returns, register or close accounts, request relief,
+  make payments, or mutate CDTFA account data.
 
 ### Phase 4 — Planning + Calendar (TBD)
 
