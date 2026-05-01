@@ -51,5 +51,16 @@ discovery runs exist yet.
 If the status is `attention_required`, do not stop after listing open findings. Relay the
 `Next Steps` section and walk the user through the manual or authenticated items one at a
 time. Use the exact URLs and configured values printed by the report, and accept plain
-sentences or bullets from the user. Do not claim manual or authenticated evidence was
-persisted unless a dedicated ingestion path has actually run.
+sentences or bullets from the user.
+
+When directing the user to any website, make the task easy: include a complete
+organization-context block before the site steps with every value that may be useful on a
+government form or portal, including legal entity name, FEIN, state of incorporation,
+state registration or formation date, mailing address, California SOS entity number, CA AG
+charity registration number, FTB entity ID/name, CDTFA identifiers, IRS ruling or
+registration date when stored, and CA AG registry dates/status when stored. If a value is
+missing, say that it is not configured or not available in stored status. Do not make the
+user infer identifiers from internal field names.
+
+Do not claim manual or authenticated evidence was persisted unless a dedicated ingestion
+path has actually run.

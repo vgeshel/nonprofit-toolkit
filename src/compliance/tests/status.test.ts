@@ -50,6 +50,35 @@ const RUN: ComplianceDiscoveryRunRow = {
   payload: { matchStatus: 'found' },
 }
 
+const IRS_BMF_RUN: ComplianceDiscoveryRunRow = {
+  ...RUN,
+  source_id: 'irs-eo-bmf',
+  jurisdiction_id: 'us-federal',
+  status: 'succeeded',
+  payload: JSON.stringify({
+    matchStatus: 'found',
+    row: {
+      ein: '123456789',
+      name: 'FOO FOUNDATION',
+      ruling: '201005',
+    },
+  }),
+}
+
+const CA_AG_REGISTRY_RUN: ComplianceDiscoveryRunRow = {
+  ...RUN,
+  source_id: 'ca-ag-registry',
+  jurisdiction_id: 'us-ca',
+  status: 'succeeded',
+  payload: JSON.stringify({
+    matchStatus: 'found',
+    registryStatus: 'Current',
+    stateCharityRegistrationNumber: 'CT1234567',
+    dateStatusSet: '2024/03/20',
+    lastRenewal: '2025/07/15',
+  }),
+}
+
 const FINDING: Finding = {
   finding_id: '550e8400-e29b-41d4-a716-446655440001',
   jurisdiction_id: 'us-ca',
@@ -327,6 +356,8 @@ describe('formatComplianceStatusReport', () => {
       entity: ENTITY,
       identifiers: IDENTIFIERS,
       latestRuns: [
+        IRS_BMF_RUN,
+        CA_AG_REGISTRY_RUN,
         caSosRun,
         caCdtfaRun,
         caAgRun,
@@ -339,6 +370,31 @@ describe('formatComplianceStatusReport', () => {
     })
 
     expect(rendered).toContain('## Next Steps')
+    expect(rendered).toContain('Use these exact values if a site asks:')
+    expect(rendered).toContain('- Legal entity name: Foo Foundation')
+    expect(rendered).toContain('- FEIN: 12-3456789')
+    expect(rendered).toContain('- State of incorporation: CA')
+    expect(rendered).toContain(
+      '- State registration or formation date: 2010-01-15',
+    )
+    expect(rendered).toContain(
+      '- Mailing address: 1 Mission St, San Francisco, CA 94105, US',
+    )
+    expect(rendered).toContain('- California SOS entity number: C0123456')
+    expect(rendered).toContain(
+      '- California AG charity registration number: CT1234567',
+    )
+    expect(rendered).toContain('- FTB entity ID: FTB-1234567')
+    expect(rendered).toContain('- FTB entity name: Foo Foundation FTB')
+    expect(rendered).toContain(
+      '- CDTFA account identifiers: 202-822944, UT-123456, ST-123456',
+    )
+    expect(rendered).toContain(
+      '- IRS ruling or registration date from IRS EO BMF: 2010-05',
+    )
+    expect(rendered).toContain('- CA AG registry status: Current')
+    expect(rendered).toContain('- CA AG registry status date: 2024/03/20')
+    expect(rendered).toContain('- CA AG last renewal: 2025/07/15')
     expect(rendered).toContain('CA Secretary of State bizfile:')
     expect(rendered).toContain(
       'Open https://bizfileonline.sos.ca.gov/search/business and search SOS entity number C0123456.',
@@ -378,8 +434,10 @@ describe('formatComplianceStatusReport', () => {
   })
 
   it('falls back to legal names and generic guidance when source identifiers are absent', () => {
-    const withoutCaliforniaIdentifiers: EntityIdentifiers = {
-      'us-federal': { ein: '12-3456789' },
+    const withoutFederalOrCaliforniaIdentifiers: EntityIdentifiers = {}
+    const entityWithUnit: Entity = {
+      ...ENTITY,
+      mailing_address_line2: 'Suite 200',
     }
     const failedRun = (
       sourceId: string,
@@ -394,8 +452,8 @@ describe('formatComplianceStatusReport', () => {
     })
 
     const rendered = formatComplianceStatusReport({
-      entity: ENTITY,
-      identifiers: withoutCaliforniaIdentifiers,
+      entity: entityWithUnit,
+      identifiers: withoutFederalOrCaliforniaIdentifiers,
       latestRuns: [
         failedRun('ca-ag-online-filing', 'auth_required'),
         failedRun('ca-cdtfa-online-services', 'auth_required'),
@@ -427,9 +485,84 @@ describe('formatComplianceStatusReport', () => {
     expect(rendered).toContain(
       'No CDTFA account identifier is configured. If the portal shows a CDTFA-managed account for this organization, use that account; otherwise tell me no CDTFA-managed account is present.',
     )
+    expect(rendered).toContain('- FEIN: not configured')
+    expect(rendered).toContain(
+      '- Mailing address: 1 Mission St Suite 200, San Francisco, CA 94105, US',
+    )
+    expect(rendered).toContain('- California SOS entity number: not configured')
+    expect(rendered).toContain(
+      '- California AG charity registration number: not configured',
+    )
+    expect(rendered).toContain('- FTB entity ID: not configured')
+    expect(rendered).toContain('- FTB entity name: not configured')
+    expect(rendered).toContain('- CDTFA account identifiers: not configured')
+    expect(rendered).toContain(
+      '- IRS ruling or registration date from IRS EO BMF: not available in stored status',
+    )
     expect(rendered).toContain('local-manual-source:')
     expect(rendered).toContain(
       'Review the finding detail below, resolve the issue with the official source, then run compliance-discover again.',
+    )
+  })
+
+  it('uses stored source payloads for organization context when configured identifiers are incomplete', () => {
+    const rendered = formatComplianceStatusReport({
+      entity: ENTITY,
+      identifiers: {
+        'us-federal': { ein: '12-3456789' },
+        'us-ca': { sosEntityNumber: 'C0123456' },
+      },
+      latestRuns: [
+        IRS_BMF_RUN,
+        CA_AG_REGISTRY_RUN,
+        {
+          ...RUN,
+          source_id: 'ca-sos-bizfile',
+          jurisdiction_id: 'us-ca',
+          status: 'failed',
+          error_type: 'manual_required',
+          error_message: 'Manual SOS check required.',
+        },
+      ],
+      openFindings: [],
+      overall: 'attention_required',
+    })
+
+    expect(rendered).toContain(
+      '- California AG charity registration number: CT1234567',
+    )
+    expect(rendered).toContain(
+      '- IRS ruling or registration date from IRS EO BMF: 2010-05',
+    )
+    expect(rendered).toContain('- CA AG registry status: Current')
+    expect(rendered).toContain('- CA AG registry status date: 2024/03/20')
+    expect(rendered).toContain('- CA AG last renewal: 2025/07/15')
+  })
+
+  it('ignores malformed stored JSON payloads in organization context', () => {
+    const rendered = formatComplianceStatusReport({
+      entity: ENTITY,
+      identifiers: IDENTIFIERS,
+      latestRuns: [
+        {
+          ...IRS_BMF_RUN,
+          payload: 'not-json',
+        },
+        {
+          ...RUN,
+          source_id: 'ca-sos-bizfile',
+          jurisdiction_id: 'us-ca',
+          status: 'failed',
+          error_type: 'manual_required',
+          error_message: 'Manual SOS check required.',
+        },
+      ],
+      openFindings: [],
+      overall: 'attention_required',
+    })
+
+    expect(rendered).toContain(
+      '- IRS ruling or registration date from IRS EO BMF: not available in stored status',
     )
   })
 

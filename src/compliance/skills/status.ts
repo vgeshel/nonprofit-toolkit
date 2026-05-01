@@ -179,10 +179,137 @@ function formatNextSteps(report: ComplianceStatusReport): string[] {
     '',
     '## Next Steps',
     'Stored status needs follow-up. Address these items, then run compliance-discover again to refresh stored status.',
+    'Use these exact values if a site asks:',
+    ...formatOrganizationContext(report),
     ...actionSourceIds.flatMap((sourceId) =>
       formatSourceAction(report, sourceId),
     ),
   ]
+}
+
+function formatOrganizationContext(report: ComplianceStatusReport): string[] {
+  const caIdentifiers = report.identifiers['us-ca']
+  const caAgCharityNumber = getCaAgCharityNumber(report)
+  return [
+    `- Legal entity name: ${report.entity.legal_name}`,
+    `- FEIN: ${report.identifiers['us-federal']?.ein ?? 'not configured'}`,
+    `- State of incorporation: ${report.entity.state_of_incorporation}`,
+    `- State registration or formation date: ${report.entity.formation_date}`,
+    `- Mailing address: ${formatMailingAddress(report.entity)}`,
+    `- California SOS entity number: ${caIdentifiers?.sosEntityNumber ?? 'not configured'}`,
+    `- California AG charity registration number: ${caAgCharityNumber ?? 'not configured'}`,
+    `- FTB entity ID: ${caIdentifiers?.ftbEntityId ?? 'not configured'}`,
+    `- FTB entity name: ${caIdentifiers?.ftbEntityName ?? 'not configured'}`,
+    `- CDTFA account identifiers: ${formatConfiguredList(
+      listCdtfaAccountIdentifiers(report),
+    )}`,
+    `- IRS ruling or registration date from IRS EO BMF: ${extractIrsRulingDate(report) ?? 'not available in stored status'}`,
+    `- CA AG registry status: ${extractPayloadString(
+      report,
+      'ca-ag-registry',
+      'registryStatus',
+    )}`,
+    `- CA AG registry status date: ${extractPayloadString(
+      report,
+      'ca-ag-registry',
+      'dateStatusSet',
+    )}`,
+    `- CA AG last renewal: ${extractPayloadString(
+      report,
+      'ca-ag-registry',
+      'lastRenewal',
+    )}`,
+  ]
+}
+
+function getCaAgCharityNumber(report: ComplianceStatusReport): string | null {
+  return (
+    report.identifiers['us-ca']?.agCharityNumber ??
+    readString(
+      findPayload(report, 'ca-ag-registry'),
+      'stateCharityRegistrationNumber',
+    )
+  )
+}
+
+function formatMailingAddress(entity: Entity): string {
+  const street =
+    entity.mailing_address_line2 === null
+      ? entity.mailing_address_line1
+      : `${entity.mailing_address_line1} ${entity.mailing_address_line2}`
+  return `${street}, ${entity.mailing_address_city}, ${entity.mailing_address_region} ${entity.mailing_address_postal_code}, ${entity.mailing_address_country}`
+}
+
+function formatConfiguredList(values: readonly string[]): string {
+  if (values.length === 0) {
+    return 'not configured'
+  }
+  return formatList(values)
+}
+
+function extractIrsRulingDate(report: ComplianceStatusReport): string | null {
+  const payload = findPayload(report, 'irs-eo-bmf')
+  const row = readRecord(payload, 'row')
+  const ruling = readString(row, 'ruling')
+  if (ruling === null) {
+    return null
+  }
+  return ruling.replace(/^(\d{4})(\d{2})$/, '$1-$2')
+}
+
+function extractPayloadString(
+  report: ComplianceStatusReport,
+  sourceId: string,
+  key: string,
+): string {
+  return (
+    readString(findPayload(report, sourceId), key) ??
+    'not available in stored status'
+  )
+}
+
+function findPayload(
+  report: ComplianceStatusReport,
+  sourceId: string,
+): unknown {
+  return parsePayload(
+    report.latestRuns.find((run) => run.source_id === sourceId)?.payload,
+  )
+}
+
+function parsePayload(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value
+  }
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return parsed
+  } catch {
+    return value
+  }
+}
+
+function readRecord(value: unknown, key: string): object | null {
+  const field = readField(value, key)
+  if (field === null || typeof field !== 'object') {
+    return null
+  }
+  return field
+}
+
+function readString(value: unknown, key: string): string | null {
+  const field = readField(value, key)
+  return typeof field === 'string' && field.trim().length > 0
+    ? field.trim()
+    : null
+}
+
+function readField(value: unknown, key: string): unknown {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+  const field: unknown = Reflect.get(value, key)
+  return field
 }
 
 function listActionSourceIds(report: ComplianceStatusReport): string[] {
@@ -326,8 +453,8 @@ function formatFtbEntityName(report: ComplianceStatusReport): string {
 function formatAgRenewalAccountInstruction(
   report: ComplianceStatusReport,
 ): string {
-  const agCharityNumber = report.identifiers['us-ca']?.agCharityNumber
-  if (agCharityNumber !== undefined) {
+  const agCharityNumber = getCaAgCharityNumber(report)
+  if (agCharityNumber !== null) {
     return `Open the renewal account for AG charity registration number ${agCharityNumber}.`
   }
   return `Open the renewal account for exact legal name ${report.entity.legal_name}.`
