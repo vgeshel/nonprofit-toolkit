@@ -57,6 +57,7 @@ describe('SourceAccessMethodSchema', () => {
   it.each([
     'official_api',
     'official_bulk_download',
+    'official_public_page',
     'playwright_readonly',
     'manual',
   ])('accepts %s', (method) => {

@@ -22,12 +22,14 @@ export type SourceKind = z.infer<typeof SourceKindSchema>
 
 /**
  * How the source is accessed. This is policy metadata, not runner dispatch:
- * an `api` source can use an official bulk download, and a `manual` source can
- * point to a public search page that cannot be automated under current terms.
+ * an `api` source can use an official bulk download or public read-only page,
+ * and a `manual` source can point to a public search page that cannot be
+ * automated under current terms.
  */
 export const SourceAccessMethodSchema = z.enum([
   'official_api',
   'official_bulk_download',
+  'official_public_page',
   'playwright_readonly',
   'manual',
 ])

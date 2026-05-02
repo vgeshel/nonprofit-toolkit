@@ -96,9 +96,9 @@ the current public surfaces do not provide a confidently permitted automated pat
       migration script against a real GCP project.
 - [x] Confirm the user's existing onboarded entity IDs and attributes can be read from
       Secret Manager and BigQuery before running any live discovery.
-- [x] Add shared download/cache support before adding IRS BMF or CA AG CSV downloads.
-      Phase 1 downloads the full IRS Pub. 78 and Auto-Revocation files on every run;
-      Phase 2 should stop repeating identical bulk downloads.
+- [x] Add shared download/cache support before adding IRS BMF downloads and bounded
+      public-page evidence. Phase 1 downloads the full IRS Pub. 78 and Auto-Revocation
+      files on every run; Phase 2 should stop repeating identical bulk downloads.
 - [x] Consume the existing `us-ca` keys in `EntityIdentifiers` rather than inventing a
       second California identifier shape.
 
@@ -195,23 +195,19 @@ the current public surfaces do not provide a confidently permitted automated pat
 
 - [x] Refresh and document the current CA AG Registry Search Tool / Online Filing
       Service transition state.
-- [x] Tests for downloading and parsing Registry Reports CSVs for:
-  - [x] may operate or solicit
-  - [x] may not operate or solicit
-  - [x] undetermined
-  - [x] not operating / dissolving
+- [x] Tests for submitting the public Registry Search Tool and parsing the public detail
+      page for:
+  - [x] real-time registry status
+  - [x] RCT registration number and FEIN
+  - [x] renewal due date, issue/effective dates, and last-renewal date
+  - [x] annual renewal rows
 - [x] Tests for Registry status normalization using the official filing-status
       definitions.
 - [x] Tests for AG annual renewal information statuses: accepted, e-accepted, in
-      process, incomplete, not submitted, and rejected. Phase 2 covers missing
-      last-renewal evidence from the official reports; detailed filing-status ingestion
-      is deferred until a permitted search/detail source is added.
-- [x] Tests for incomplete report data where downloadable lists omit the entity but the
-      search tool may still have current detail.
-- [x] Implement Registry Reports CSV source first.
-- [x] Implement search-tool supplementation only if the refreshed policy permits it and
-      the CSV source leaves a real data gap. Otherwise emit manual-required evidence
-      instructions for the search-tool detail page.
+      process, incomplete, not submitted, and rejected. Public detail-page ingestion now
+      captures the annual renewal rows exposed without authentication.
+- [x] Tests for no-result searches and public page schema changes.
+- [x] Implement the public Registry Search Tool/detail-page source.
 
 ### CA FTB Entity Status Letter source (TDD)
 
@@ -314,9 +310,10 @@ the current public surfaces do not provide a confidently permitted automated pat
 - [x] Run `compliance-discover` against the onboarded nonprofit.
 - [x] For each source, record whether the result came from live public data, cache,
       manual evidence, policy-blocked manual requirement, or source failure.
-      Live verification result: CA AG Registry = public CSV success; IRS EO BMF =
-      public CSV success; IRS TEOS = public bulk-download success; CA SOS = manual
-      required by source policy; CA FTB = manual required pending source-policy review.
+      Live verification result: CA AG Registry = public search/detail-page success; IRS
+      EO BMF = public CSV success; IRS TEOS = public bulk-download success; CA SOS =
+      manual required by source policy; CA FTB = manual required pending source-policy
+      review.
 - [x] Run `compliance-status` and verify it reads the stored discovery state without
       performing network discovery.
 - [x] Re-run discovery and confirm cache behavior is visible and correct. Local cache
@@ -429,8 +426,9 @@ prints exact evidence instructions instead of guessing or mutating portal state.
       discovery with explicit forbidden actions.
 - [x] Implement MyFTB as user-assisted authenticated read-only discovery with terms
       that prohibit shared credentials and require authorized business access.
-- [x] Implement CA AG Online Filing Service as user-assisted authenticated read-only
-      discovery supplementing the Phase 2 public Registry Reports source.
+- [x] Implement CA AG Online Filing Service as optional user-assisted dashboard-only
+      detail supplementing the public Registry Search Tool/detail-page source. It must
+      not be treated as a default compliance-status blocker.
 - [x] Confirm IRS Tax Pro Account remains unregistered unless the source review
       identifies nonprofit-specific value beyond TEOS/BMF and a safe read-only path.
 
@@ -460,9 +458,10 @@ prints exact evidence instructions instead of guessing or mutating portal state.
       evidence instructions and no credential leakage. Verified
       `ca-cdtfa-permit-license-verification`, `ca-sos-bizfile`, and
       `ca-ftb-entity-status-letter` returned `manual_required`; verified
-      `ca-cdtfa-online-services`, `ca-ftb-myftb`, and `ca-ag-online-filing`
-      returned `auth_required` with login URLs, field descriptors, evidence
-      fields, and forbidden actions only.
+      `ca-cdtfa-online-services` and `ca-ftb-myftb` returned `auth_required`
+      with login URLs, field descriptors, evidence fields, and forbidden actions only.
+      `ca-ag-online-filing` remains an optional dashboard-only source because public
+      CA AG status is fetched from `ca-ag-registry`.
 - [x] Run `compliance-status` and verify stored Phase 3 outcomes are visible without
       network discovery. Verified latest stored state reports 9 runs with overall
       status `attention_required`.

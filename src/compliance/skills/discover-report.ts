@@ -8,10 +8,12 @@ const SEVERITY_ORDER: Record<Finding['severity'], number> = {
 }
 
 export function isDiscoveryComplete(report: DiscoveryReport): boolean {
+  const requiredRuns = report.runs.filter(isRequiredDiscoveryRun)
+  const actionableFindings = report.findings.filter(isActionableFinding)
   return (
-    report.runs.length > 0 &&
-    report.runs.every((run) => run.outcome.status === 'success') &&
-    report.findings.every((finding) => finding.severity === 'info')
+    requiredRuns.length > 0 &&
+    requiredRuns.every((run) => run.outcome.status === 'success') &&
+    actionableFindings.every((finding) => finding.severity === 'info')
   )
 }
 
@@ -64,7 +66,7 @@ type AuthRequiredRun = DiscoveryRun & {
 
 const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   'ca-ag-online-filing': 'CA Attorney General Online Renewal System',
-  'ca-ag-registry': 'CA Attorney General Registry Reports',
+  'ca-ag-registry': 'CA Attorney General Registry Search Tool',
   'ca-cdtfa-online-services': 'CA CDTFA Online Services',
   'ca-cdtfa-permit-license-verification':
     'CA CDTFA Permit, License, or Account Verification',
@@ -74,9 +76,6 @@ const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   'irs-eo-bmf': 'IRS Exempt Organizations Business Master File',
   'irs-teos': 'IRS Tax Exempt Organization Search',
 }
-
-const CA_AG_REGISTRY_SEARCH_URL =
-  'https://rct.doj.ca.gov/Verification/Web/Search.aspx?facility=Y'
 
 function sortRuns(runs: readonly DiscoveryRun[]): DiscoveryRun[] {
   return runs
@@ -90,8 +89,14 @@ function sortRuns(runs: readonly DiscoveryRun[]): DiscoveryRun[] {
 
 function formatActionRequired(report: DiscoveryReport): string[] {
   const sortedRuns = sortRuns(report.runs)
-  const manualRuns = sortedRuns.filter(isManualRequiredRun)
-  const authRuns = sortedRuns.filter(isAuthRequiredRun)
+  const manualRuns = sortedRuns.filter(
+    (run): run is ManualRequiredRun =>
+      isRequiredDiscoveryRun(run) && isManualRequiredRun(run),
+  )
+  const authRuns = sortedRuns.filter(
+    (run): run is AuthRequiredRun =>
+      isRequiredDiscoveryRun(run) && isAuthRequiredRun(run),
+  )
   if (manualRuns.length === 0 && authRuns.length === 0) {
     return []
   }
@@ -163,6 +168,9 @@ function formatRun(report: DiscoveryReport, run: DiscoveryRun): string {
     case 'policy_blocked':
       return `- BLOCKED ${label}: ${outcome.reason}`
     case 'auth_required':
+      if (isOptionalCaAgOnlineRenewalRun(run)) {
+        return `- INFO ${label}: optional dashboard review not required because CA AG public registry status is checked automatically`
+      }
       return formatAuthRun(report, label, run, outcome)
     case 'source_failure':
       return `- ERROR ${label}: failed (${outcome.error_type}) ${outcome.message}`
@@ -237,11 +245,27 @@ function formatAuthRun(
 }
 
 function formatFindings(findings: readonly Finding[]): string[] {
-  if (findings.length === 0) {
+  const actionableFindings = findings.filter(isActionableFinding)
+  if (actionableFindings.length === 0) {
     return ['- None.']
   }
 
-  return findings.slice().sort(compareFindings).map(formatFinding)
+  return actionableFindings.slice().sort(compareFindings).map(formatFinding)
+}
+
+function isRequiredDiscoveryRun(run: DiscoveryRun): boolean {
+  return !isOptionalCaAgOnlineRenewalRun(run)
+}
+
+function isActionableFinding(finding: Finding): boolean {
+  return finding.source_id !== 'ca-ag-online-filing'
+}
+
+function isOptionalCaAgOnlineRenewalRun(run: DiscoveryRun): boolean {
+  return (
+    run.sourceId === 'ca-ag-online-filing' &&
+    run.outcome.status === 'auth_required'
+  )
 }
 
 function compareFindings(left: Finding, right: Finding): number {
@@ -326,9 +350,6 @@ function formatAuthSteps(
   run: DiscoveryRun,
   outcome: Extract<DiscoveryRun['outcome'], { status: 'auth_required' }>,
 ): string[] {
-  if (run.sourceId === 'ca-ag-online-filing') {
-    return formatCaAgOnlineFilingAuthSteps(report, run, outcome)
-  }
   if (run.sourceId === 'ca-ftb-myftb') {
     return formatCaFtbMyFtbAuthSteps(report, run, outcome)
   }
@@ -383,27 +404,6 @@ function formatCaCdtfaPermitLicenseVerificationManualSteps(
     'Choose the option to verify a permit, license, or account.',
     formatCdtfaManualIdentifierStep(report),
     'Tell me the account type, account number, verification status, owner name if shown, and status date if shown.',
-  ]
-}
-
-function formatCaAgOnlineFilingAuthSteps(
-  report: DiscoveryReport,
-  run: DiscoveryRun,
-  outcome: Extract<DiscoveryRun['outcome'], { status: 'auth_required' }>,
-): string[] {
-  const caIdentifiers = report.identifiers['us-ca']
-  const dashboardStep =
-    caIdentifiers?.agCharityNumber === undefined
-      ? `Open the renewal account for this exact legal name: ${report.entity.legal_name}.`
-      : `Open the renewal account for this AG charity registration number: ${caIdentifiers.agCharityNumber}.`
-  return [
-    formatAuthOpenStep(run, outcome),
-    `CA AG public charity status is already checked automatically from CA Attorney General Registry Reports. Use the Registry Search Tool at ${CA_AG_REGISTRY_SEARCH_URL} only if you need to confirm online-renewal eligibility.`,
-    'Use the renewal login only if the Registry Search Tool shows the organization as Current or Current - Awaiting Reporting and an authorized agent has a User ID and Password, Account Code, or Registration Code.',
-    'Sign in yourself with an authorized account and complete MFA yourself. Do not create, edit, submit, or pay for a filing.',
-    dashboardStep,
-    'If there is no login option or the organization is not eligible for online renewal, tell me that Online Renewal System access is unavailable and give the reason shown.',
-    'Tell me whether Online Renewal System access is available, the dashboard status or unavailable reason, latest submission status if shown, deficiency or correspondence messages if shown, and the reviewed-at date.',
   ]
 }
 

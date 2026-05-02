@@ -115,7 +115,7 @@ describe('usCaJurisdiction', () => {
     })
     expect(byId.get('ca-ag-registry')).toMatchObject({
       kind: 'api',
-      accessMethod: 'official_bulk_download',
+      accessMethod: 'official_public_page',
       automationAllowed: true,
     })
     expect(byId.get('ca-cdtfa-online-services')).toMatchObject({
@@ -181,7 +181,7 @@ describe('usCaJurisdiction', () => {
       'https://rct.doj.ca.gov/eGov/Home.aspx',
     )
     expect(caAgOnlineFilingSource.auth?.instructions.join(' ')).toContain(
-      'Current or Current - Awaiting Reporting',
+      'optional dashboard-only details',
     )
     expect(caAgOnlineFilingSource.auth?.instructions.join(' ')).toContain(
       'https://rct.doj.ca.gov/Verification/Web/Search.aspx?facility=Y',

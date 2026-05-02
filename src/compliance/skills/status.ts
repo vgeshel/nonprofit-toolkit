@@ -111,9 +111,11 @@ function computeOverall(
   if (latestRuns.length === 0) {
     return 'unknown'
   }
+  const actionableRuns = latestRuns.filter(isActionableRun)
+  const actionableFindings = openFindings.filter(isActionableFinding)
   if (
-    latestRuns.some((run) => run.status === 'failed') ||
-    openFindings.some((finding) => finding.severity !== 'info')
+    actionableRuns.some((run) => run.status === 'failed') ||
+    actionableFindings.some((finding) => finding.severity !== 'info')
   ) {
     return 'attention_required'
   }
@@ -130,17 +132,17 @@ export function formatComplianceStatusReport(
     ...formatNextSteps(report),
     '',
     '## Latest Runs',
-    ...formatRuns(report.latestRuns),
+    ...formatRuns(report),
     '',
     '## Open Findings',
-    ...formatFindings(report.openFindings),
+    ...formatFindings(report),
   ]
   return `${lines.join('\n')}\n`
 }
 
 const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   'ca-ag-online-filing': 'CA Attorney General Online Renewal System',
-  'ca-ag-registry': 'CA Attorney General Registry Reports',
+  'ca-ag-registry': 'CA Attorney General Registry Search Tool',
   'ca-cdtfa-online-services': 'CA CDTFA Online Services',
   'ca-cdtfa-permit-license-verification':
     'CA CDTFA Permit, License, or Account Verification',
@@ -150,9 +152,6 @@ const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   'irs-eo-bmf': 'IRS Exempt Organizations Business Master File',
   'irs-teos': 'IRS Tax Exempt Organization Search',
 }
-
-const CA_AG_REGISTRY_SEARCH_URL =
-  'https://rct.doj.ca.gov/Verification/Web/Search.aspx?facility=Y'
 
 function formatNextSteps(report: ComplianceStatusReport): string[] {
   if (report.overall === 'clear') {
@@ -209,11 +208,10 @@ function formatOrganizationContext(report: ComplianceStatusReport): string[] {
       'ca-ag-registry',
       'registryStatus',
     )}`,
-    `- CA AG registry status date: ${extractPayloadString(
-      report,
-      'ca-ag-registry',
-      'dateStatusSet',
-    )}`,
+    `- CA AG registry status date: ${extractPayloadStringWithFallbacks(report, 'ca-ag-registry', ['dateStatusSet', 'effectiveDate'])}`,
+    `- CA AG renewal due or expiration date: ${extractPayloadString(report, 'ca-ag-registry', 'renewalDueDate')}`,
+    `- CA AG issue date: ${extractPayloadString(report, 'ca-ag-registry', 'issueDate')}`,
+    `- CA AG effective date: ${extractPayloadString(report, 'ca-ag-registry', 'effectiveDate')}`,
     `- CA AG last renewal: ${extractPayloadString(
       report,
       'ca-ag-registry',
@@ -268,6 +266,21 @@ function extractPayloadString(
   )
 }
 
+function extractPayloadStringWithFallbacks(
+  report: ComplianceStatusReport,
+  sourceId: string,
+  keys: readonly string[],
+): string {
+  const payload = findPayload(report, sourceId)
+  for (const key of keys) {
+    const value = readString(payload, key)
+    if (value !== null) {
+      return value
+    }
+  }
+  return 'not available in stored status'
+}
+
 function findPayload(
   report: ComplianceStatusReport,
   sourceId: string,
@@ -315,12 +328,12 @@ function readField(value: unknown, key: string): unknown {
 function listActionSourceIds(report: ComplianceStatusReport): string[] {
   const sourceIds = new Set<string>()
   for (const run of report.latestRuns) {
-    if (run.status === 'failed') {
+    if (isActionableRun(run) && run.status === 'failed') {
       sourceIds.add(run.source_id)
     }
   }
   for (const finding of report.openFindings) {
-    if (finding.severity !== 'info') {
+    if (isActionableFinding(finding) && finding.severity !== 'info') {
       sourceIds.add(finding.source_id)
     }
   }
@@ -334,8 +347,6 @@ function formatSourceAction(
   sourceId: string,
 ): string[] {
   switch (sourceId) {
-    case 'ca-ag-online-filing':
-      return formatCaAgOnlineRenewalAction(report)
     case 'ca-cdtfa-online-services':
       return formatCaCdtfaOnlineServicesAction(report)
     case 'ca-cdtfa-permit-license-verification':
@@ -384,19 +395,6 @@ function formatCaCdtfaPermitVerificationAction(
     '- Open https://onlineservices.cdtfa.ca.gov/ and choose the option to verify a permit, license, or account.',
     `- ${formatCdtfaPublicIdentifierInstruction(report)}`,
     '- Tell me the account type, account number, verification status, owner name if shown, and start or status date if shown.',
-  ]
-}
-
-function formatCaAgOnlineRenewalAction(
-  report: ComplianceStatusReport,
-): string[] {
-  return [
-    `${formatSourceName('ca-ag-online-filing')}:`,
-    '- Public CA AG charity status is already checked from CA Attorney General Registry Reports.',
-    `- Use the Registry Search Tool at ${CA_AG_REGISTRY_SEARCH_URL} only if you need to confirm online-renewal eligibility.`,
-    '- Open https://rct.doj.ca.gov/eGov/Home.aspx only if you need renewal-dashboard details and an authorized agent can sign in.',
-    `- ${formatAgRenewalAccountInstruction(report)}`,
-    '- Tell me whether Online Renewal System access is available, the dashboard status or unavailable reason, latest submission status if shown, deficiency or correspondence messages if shown, and the reviewed-at date.',
   ]
 }
 
@@ -450,16 +448,6 @@ function formatFtbEntityName(report: ComplianceStatusReport): string {
   return report.identifiers['us-ca']?.ftbEntityName ?? report.entity.legal_name
 }
 
-function formatAgRenewalAccountInstruction(
-  report: ComplianceStatusReport,
-): string {
-  const agCharityNumber = getCaAgCharityNumber(report)
-  if (agCharityNumber !== null) {
-    return `Open the renewal account for AG charity registration number ${agCharityNumber}.`
-  }
-  return `Open the renewal account for exact legal name ${report.entity.legal_name}.`
-}
-
 function formatCdtfaPublicIdentifierInstruction(
   report: ComplianceStatusReport,
 ): string {
@@ -507,12 +495,15 @@ function formatSourceName(sourceId: string): string {
   return SOURCE_DISPLAY_NAMES[sourceId] ?? sourceId
 }
 
-function formatRuns(runs: readonly ComplianceDiscoveryRunRow[]): string[] {
-  if (runs.length === 0) {
+function formatRuns(report: ComplianceStatusReport): string[] {
+  if (report.latestRuns.length === 0) {
     return ['- None recorded.']
   }
-  return runs.map((run) => {
+  return report.latestRuns.map((run) => {
     const label = `${run.jurisdiction_id}/${run.source_id}`
+    if (isOptionalCaAgOnlineRenewalRun(run)) {
+      return `- INFO ${label}: optional dashboard review not required because CA AG public registry status is checked automatically`
+    }
     if (run.status === 'succeeded') {
       return `- OK ${label}: ${run.completed_at}`
     }
@@ -520,7 +511,8 @@ function formatRuns(runs: readonly ComplianceDiscoveryRunRow[]): string[] {
   })
 }
 
-function formatFindings(findings: readonly Finding[]): string[] {
+function formatFindings(report: ComplianceStatusReport): string[] {
+  const findings = report.openFindings.filter(isActionableFinding)
   if (findings.length === 0) {
     return ['- None.']
   }
@@ -528,4 +520,26 @@ function formatFindings(findings: readonly Finding[]): string[] {
     (finding) =>
       `- ${finding.severity.toUpperCase()} ${finding.jurisdiction_id}/${finding.source_id}: ${finding.title}`,
   )
+}
+
+function isActionableRun(run: ComplianceDiscoveryRunRow): boolean {
+  return !isOptionalCaAgOnlineRenewalRun(run)
+}
+
+function isActionableFinding(finding: Finding): boolean {
+  return !isOptionalCaAgOnlineRenewalFinding(finding)
+}
+
+function isOptionalCaAgOnlineRenewalRun(
+  run: ComplianceDiscoveryRunRow,
+): boolean {
+  return (
+    run.source_id === 'ca-ag-online-filing' &&
+    run.status === 'failed' &&
+    run.error_type === 'auth_required'
+  )
+}
+
+function isOptionalCaAgOnlineRenewalFinding(finding: Finding): boolean {
+  return finding.source_id === 'ca-ag-online-filing'
 }

@@ -5,8 +5,9 @@ description: >
   findings. Use this skill when the user asks "are we compliant?", "check our IRS status",
   "verify our tax-exempt status", "run a compliance check", "is our 501(c)(3) still
   active?", or when they want to refresh the compliance picture before a board meeting,
-  audit, or grant application. Phase 3 covers IRS TEOS/BMF, CA AG Registry reports,
-  manual CA SOS/FTB/CDTFA checks, and user-assisted authenticated CA portal checks.
+  audit, or grant application. Phase 3 covers IRS TEOS/BMF, public CA AG Registry
+  Search Tool/detail pages, manual CA SOS/FTB/CDTFA checks, and user-assisted
+  authenticated CA portal checks.
 ---
 
 # Compliance Discovery
@@ -64,8 +65,13 @@ Use `formatDiscoveryReport` from `src/compliance/skills/discover-report.ts`. The
 shows:
 
 - Overall completeness.
-- An `Action Required` section whenever manual-required or auth-required sources remain.
+- An `Action Required` section whenever actionable manual-required or auth-required
+  sources remain.
 - Per-source state: `OK`, `MANUAL`, `BLOCKED`, `AUTH`, or `ERROR`.
+- CA AG status comes from the public Registry Search Tool source. The CA AG Online
+  Renewal System is optional dashboard-only detail and should not be presented as a
+  manual/authenticated status check unless the user explicitly asks for those dashboard
+  details.
 - For `MANUAL` sources: why automation is unavailable, the official URL to open, manual
   steps with the configured values already filled in, and human-readable result labels to
   report back.
@@ -93,11 +99,11 @@ user to fill raw evidence-field keys such as `entity_status`; ask for "entity st
 plain sentence instead. Accept plain sentences or bullets from the user and map them to the
 internal evidence fields yourself.
 
-When a source is not `OK`, do not summarize it as compliant. For manual-required and
-auth-required sources, keep the instructions concise, clear, and written as full
-sentences. If the user returns manual or authenticated evidence, do not claim it was
-persisted unless a dedicated evidence-ingestion path has been implemented and successfully
-run.
+When an actionable source is not `OK`, do not summarize it as compliant. For
+manual-required and auth-required sources, keep the instructions concise, clear, and
+written as full sentences. If the user returns manual or authenticated evidence, do not
+claim it was persisted unless a dedicated evidence-ingestion path has been implemented and
+successfully run.
 
 ## Failure modes
 
@@ -116,7 +122,9 @@ Per-source outcomes include:
 - `auth_required` - source requires a user-assisted authenticated session, credentials,
   MFA, or portal access before it can be treated as checked.
 
-Do not treat a failed, blocked, manual-required, or auth-required source as an all-clear.
+Do not treat a failed, blocked, manual-required, or auth-required source as an all-clear,
+except for `us-ca/ca-ag-online-filing`, which is optional dashboard-only detail because
+CA AG public status is checked by `us-ca/ca-ag-registry`.
 
 ## Source code
 

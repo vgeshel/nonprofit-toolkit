@@ -119,6 +119,9 @@ function deriveRunFindings(
     return [policyBlockedFinding(run, outcome.reason)]
   }
   if (outcome.status === 'auth_required') {
+    if (run.sourceId === 'ca-ag-online-filing') {
+      return []
+    }
     return [authRequiredFinding({ ...run, outcome }, outcome.message)]
   }
   if (outcome.status === 'source_failure') {
@@ -283,9 +286,9 @@ function deriveCaAgFindings(
       jurisdictionId: run.jurisdictionId,
       sourceId: run.sourceId,
       severity: 'warn',
-      title: 'Entity not found in CA AG Registry reports',
+      title: 'Entity not found in CA AG Registry Search Tool',
       detail:
-        'The CA AG Registry report downloads did not contain a matching EIN, charity number, or SOS/FTB number.',
+        'The public CA AG Registry Search Tool did not return a matching EIN, charity number, SOS/FTB number, or legal name.',
       evidence: { code: 'ca.ag_not_found' },
     })
   }
@@ -297,7 +300,7 @@ function deriveCaAgFindings(
       severity: 'error',
       title: 'CA AG Registry status blocks operation or solicitation',
       detail:
-        'The entity appears in the CA AG Registry report for charities that may not operate or solicit.',
+        'The public CA AG Registry Search Tool lists a status that blocks operation or solicitation.',
       evidence: {
         code: 'ca.ag_may_not_operate',
         listCategory: parsed.data.listCategory,
@@ -313,7 +316,7 @@ function deriveCaAgFindings(
       severity: 'warn',
       title: 'CA AG Registry status is undetermined',
       detail:
-        'The entity appears in the CA AG Registry report for charities with undetermined status.',
+        'The public CA AG Registry Search Tool lists an undetermined status.',
       evidence: {
         code: 'ca.ag_status_undetermined',
         listCategory: parsed.data.listCategory,
@@ -327,9 +330,9 @@ function deriveCaAgFindings(
       jurisdictionId: run.jurisdictionId,
       sourceId: run.sourceId,
       severity: 'error',
-      title: 'CA AG Registry reports not operating or dissolving status',
+      title: 'CA AG Registry lists not operating or dissolving status',
       detail:
-        'The entity appears in the CA AG Registry report for charities not operating or in dissolution.',
+        'The public CA AG Registry Search Tool lists the entity as not operating or in dissolution.',
       evidence: {
         code: 'ca.ag_not_operating_or_dissolving',
         listCategory: parsed.data.listCategory,
@@ -348,7 +351,7 @@ function deriveCaAgFindings(
       severity: 'warn',
       title: 'CA AG Registry row has no last-renewal date',
       detail:
-        'The CA AG Registry report matched the entity but did not include a last-renewal date.',
+        'The public CA AG Registry detail page matched the entity but did not include a last-renewal date.',
       evidence: { code: 'ca.ag_last_renewal_missing' },
     })
   }

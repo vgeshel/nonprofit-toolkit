@@ -12,7 +12,7 @@ For every manual-required source, the discovery report must tell the user:
 - the exact manual steps to perform, with configured values already filled in;
 - the human-readable results to report back.
 
-For every auth-required source, the discovery report must tell the user:
+For every actionable auth-required source, the discovery report must tell the user:
 
 - why an authenticated user session is required;
 - which official login URL to use;
@@ -22,13 +22,15 @@ For every auth-required source, the discovery report must tell the user:
 - the human-readable results to report back;
 - forbidden actions that must not be taken in the portal.
 
-Never treat a manual-required, blocked, auth-required, or failed source as an all-clear.
-These outcomes mean the compliance picture is incomplete until the missing evidence or
-source access is resolved.
+Never treat a manual-required, blocked, auth-required, or failed source as an all-clear,
+except for `us-ca/ca-ag-online-filing`: CA AG public status is already checked by the
+public Registry Search Tool, so Online Renewal is optional dashboard-only detail.
+Actionable outcomes mean the compliance picture is incomplete until the missing evidence
+or source access is resolved.
 
-When automatic discovery finishes with manual-required or auth-required sources, the
-skill must actively ask the user to complete the `Action Required` section. A status-only
-summary is not a complete discovery test.
+When automatic discovery finishes with actionable manual-required or auth-required
+sources, the skill must actively ask the user to complete the `Action Required` section. A
+status-only summary is not a complete discovery test.
 
 The user-facing walkthrough must use human source names and ordinary result labels. Do not
 display internal source identifiers such as `us-ca/ca-sos-bizfile` or evidence keys such

@@ -12,7 +12,7 @@ export const caAgOnlineFilingSource: Source = {
   kind: 'playwright',
   authRequired: true,
   description:
-    'User-assisted CA AG Registry Online Renewal System dashboard review.',
+    'Optional CA AG Registry Online Renewal System dashboard review.',
   accessUrl: CA_AG_ONLINE_RENEWAL_LOGIN_URL,
   accessMethod: 'playwright_readonly',
   automationAllowed: true,
@@ -30,8 +30,8 @@ export const caAgOnlineFilingSource: Source = {
     ],
     mfa: 'user_assisted',
     instructions: [
-      `CA AG public charity status is already checked automatically from CA Attorney General Registry Reports. Use the Registry Search Tool at ${CA_AG_REGISTRY_SEARCH_URL} only if you need to confirm online-renewal eligibility.`,
-      'Use the CA AG Registry Online Renewal System only when the Registry Search Tool shows the organization as Current or Current - Awaiting Reporting.',
+      `CA AG public charity status, registration number, renewal due date, and annual renewal details are already checked automatically from the public Registry Search Tool at ${CA_AG_REGISTRY_SEARCH_URL}.`,
+      'Use the CA AG Registry Online Renewal System only for optional dashboard-only details the public Registry Search Tool cannot answer.',
       'Sign in using an authorized account with a User ID and Password, Account Code, or Registration Code.',
       'Open the renewal account for the configured charity registration number.',
       'Review filing status, deficiency messages, renewal status, and correspondence without creating, editing, submitting, or paying for any filing.',
@@ -72,6 +72,6 @@ export const caAgOnlineFilingSource: Source = {
     errAsync({
       type: 'tos',
       message:
-        'CA AG Online Renewal System requires a user-assisted authenticated session before read-only discovery can run.',
+        'CA AG Online Renewal System requires a user-assisted authenticated session for optional dashboard-only review.',
     }),
 }

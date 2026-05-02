@@ -74,7 +74,9 @@ const CA_AG_REGISTRY_RUN: ComplianceDiscoveryRunRow = {
     matchStatus: 'found',
     registryStatus: 'Current',
     stateCharityRegistrationNumber: 'CT1234567',
-    dateStatusSet: '2024/03/20',
+    effectiveDate: '2024/03/20',
+    issueDate: '2024/03/19',
+    renewalDueDate: '2026/05/15',
     lastRenewal: '2025/07/15',
   }),
 }
@@ -164,6 +166,44 @@ describe('getComplianceStatus', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(result.value.overall).toBe('attention_required')
+  })
+
+  it('does not treat optional CA AG Online Renewal auth as attention when public CA AG status is stored', async () => {
+    const result = await getComplianceStatus({
+      entityAccessor: entityAccessor(ENTITY),
+      identifiersAccessor: identifiersAccessor(IDENTIFIERS),
+      runsAccessor: {
+        listLatestRuns: () =>
+          okAsync([
+            CA_AG_REGISTRY_RUN,
+            {
+              ...RUN,
+              source_id: 'ca-ag-online-filing',
+              jurisdiction_id: 'us-ca',
+              status: 'failed',
+              error_type: 'auth_required',
+              error_message: 'Authenticated session required.',
+            },
+          ]),
+      },
+      findingsAccessor: {
+        listOpenFindings: () =>
+          okAsync([
+            {
+              ...FINDING,
+              source_id: 'ca-ag-online-filing',
+              severity: 'warn',
+              title:
+                'Authentication required: User-assisted CA AG Registry Online Renewal System dashboard review.',
+              evidence: { code: 'source.auth_required' },
+            },
+          ]),
+      },
+    })
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value.overall).toBe('clear')
   })
 
   it('uses the current-open-findings accessor result without doing table-history filtering in memory', async () => {
@@ -394,6 +434,11 @@ describe('formatComplianceStatusReport', () => {
     )
     expect(rendered).toContain('- CA AG registry status: Current')
     expect(rendered).toContain('- CA AG registry status date: 2024/03/20')
+    expect(rendered).toContain(
+      '- CA AG renewal due or expiration date: 2026/05/15',
+    )
+    expect(rendered).toContain('- CA AG issue date: 2024/03/19')
+    expect(rendered).toContain('- CA AG effective date: 2024/03/20')
     expect(rendered).toContain('- CA AG last renewal: 2025/07/15')
     expect(rendered).toContain('CA Secretary of State bizfile:')
     expect(rendered).toContain(
@@ -417,20 +462,19 @@ describe('formatComplianceStatusReport', () => {
     expect(rendered).toContain(
       'Open the business account for FTB entity ID FTB-1234567.',
     )
-    expect(rendered).toContain('CA Attorney General Online Renewal System:')
-    expect(rendered).toContain(
-      'Public CA AG charity status is already checked from CA Attorney General Registry Reports.',
+    expect(rendered).not.toContain('CA Attorney General Online Renewal System:')
+    expect(rendered).not.toContain(
+      'Use the Registry Search Tool at https://rct.doj.ca.gov/Verification/Web/Search.aspx?facility=Y',
     )
-    expect(rendered).toContain(
-      'Open https://rct.doj.ca.gov/eGov/Home.aspx only if you need renewal-dashboard details and an authorized agent can sign in.',
-    )
-    expect(rendered).toContain(
-      'Open the renewal account for AG charity registration number CT1234567.',
-    )
-    expect(
-      rendered.match(/CA Attorney General Online Renewal System:/g),
-    ).toHaveLength(1)
+    expect(rendered).not.toContain('https://rct.doj.ca.gov/eGov/Home.aspx')
+    expect(rendered).not.toContain('Open the renewal account for')
     expect(rendered).not.toContain('online_filing_access')
+    expect(rendered).not.toContain(
+      '- WARN us-ca/ca-ag-online-filing: Authentication required',
+    )
+    expect(rendered).toContain(
+      '- INFO us-ca/ca-ag-online-filing: optional dashboard review not required because CA AG public registry status is checked automatically',
+    )
   })
 
   it('falls back to legal names and generic guidance when source identifiers are absent', () => {
@@ -476,9 +520,8 @@ describe('formatComplianceStatusReport', () => {
     expect(rendered).toContain(
       'Open the business account for exact legal name Foo Foundation.',
     )
-    expect(rendered).toContain(
-      'Open the renewal account for exact legal name Foo Foundation.',
-    )
+    expect(rendered).not.toContain('CA Attorney General Online Renewal System:')
+    expect(rendered).not.toContain('Open the renewal account for')
     expect(rendered).toContain(
       'No CDTFA account identifier is configured. If the organization has a seller permit, license, or account number, use that number; otherwise tell me no CDTFA account identifier is available.',
     )
@@ -536,6 +579,9 @@ describe('formatComplianceStatusReport', () => {
     )
     expect(rendered).toContain('- CA AG registry status: Current')
     expect(rendered).toContain('- CA AG registry status date: 2024/03/20')
+    expect(rendered).toContain(
+      '- CA AG renewal due or expiration date: 2026/05/15',
+    )
     expect(rendered).toContain('- CA AG last renewal: 2025/07/15')
   })
 

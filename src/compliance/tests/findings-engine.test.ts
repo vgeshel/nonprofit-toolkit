@@ -34,12 +34,11 @@ const SOURCE: DiscoveryRunSourceSummary = {
   sourceId: 'ca-ag-registry',
   jurisdictionId: 'us-ca',
   description: 'CA AG Registry',
-  accessUrl: 'https://www.oag.ca.gov/charities/reports',
-  accessMethod: 'official_bulk_download',
+  accessUrl: 'https://rct.doj.ca.gov/Verification/Web/Search.aspx?facility=Y',
+  accessMethod: 'official_public_page',
   automationAllowed: true,
   sourceFreshness: {
-    observedAt: '2026-04-28T00:00:00.000Z',
-    upstreamPublishedAt: '2026-04-15',
+    observedAt: '2026-05-02T00:00:00.000Z',
   },
   tosUrl: 'https://www.oag.ca.gov/privacy',
 }
@@ -115,7 +114,7 @@ describe('deriveComplianceFindings', () => {
             status: 'source_failure',
             source_id: 'ca-ag-registry',
             error_type: 'parse',
-            message: 'CSV schema changed',
+            message: 'Registry Search Tool schema changed',
           },
         },
       ],
@@ -126,7 +125,8 @@ describe('deriveComplianceFindings', () => {
     expect(findings[0]).toMatchObject({
       severity: 'error',
       title: 'Source failed: CA AG Registry',
-      detail: 'ca-ag-registry could not be read: CSV schema changed',
+      detail:
+        'ca-ag-registry could not be read: Registry Search Tool schema changed',
       evidence: { code: 'source.failed', errorType: 'parse' },
     })
   })
@@ -271,13 +271,38 @@ describe('deriveComplianceFindings', () => {
       title: 'Authentication required: Legacy auth source',
       evidence: {
         code: 'source.auth_required',
-        accessMethod: 'official_bulk_download',
+        accessMethod: 'official_public_page',
       },
     })
     expect(findings[0]?.evidence).not.toHaveProperty('loginUrl')
     expect(findings[0]?.evidence).not.toHaveProperty('credentialMode')
     expect(findings[0]?.evidence).not.toHaveProperty('requiredFields')
     expect(findings[0]?.evidence).not.toHaveProperty('forbiddenActions')
+  })
+
+  it('does not create an open finding for the optional CA AG Online Renewal dashboard source', () => {
+    const findings = deriveComplianceFindings({
+      entity: ENTITY,
+      identifiers: IDENTIFIERS,
+      runs: [
+        {
+          ...SOURCE,
+          sourceId: 'ca-ag-online-filing',
+          jurisdictionId: 'us-ca',
+          description:
+            'User-assisted CA AG Registry Online Renewal System dashboard review.',
+          outcome: {
+            status: 'auth_required',
+            source_id: 'ca-ag-online-filing',
+            message: 'Authentication is required.',
+            loginUrl: 'https://rct.doj.ca.gov/eGov/Home.aspx',
+          },
+        },
+      ],
+      now: () => new Date('2026-04-28T12:00:00.000Z'),
+    })
+
+    expect(findings).toEqual([])
   })
 
   it('flags IRS EO BMF not-found results', () => {
@@ -427,7 +452,7 @@ describe('deriveComplianceFindings', () => {
     },
   )
 
-  it('flags CA AG not-found results from the official Registry reports', () => {
+  it('flags CA AG not-found results from the public Registry Search Tool', () => {
     const findings = deriveComplianceFindings({
       entity: ENTITY,
       identifiers: IDENTIFIERS,
@@ -446,7 +471,7 @@ describe('deriveComplianceFindings', () => {
     expect(findings).toHaveLength(1)
     expect(findings[0]).toMatchObject({
       severity: 'warn',
-      title: 'Entity not found in CA AG Registry reports',
+      title: 'Entity not found in CA AG Registry Search Tool',
       evidence: { code: 'ca.ag_not_found' },
     })
   })
@@ -559,7 +584,7 @@ describe('deriveComplianceFindings', () => {
 
     expect(findings[0]).toMatchObject({
       severity: 'error',
-      title: 'CA AG Registry reports not operating or dissolving status',
+      title: 'CA AG Registry lists not operating or dissolving status',
       evidence: {
         code: 'ca.ag_not_operating_or_dissolving',
         listCategory: 'not_operating_or_dissolving',

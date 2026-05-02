@@ -45,6 +45,12 @@ markdown report. The report includes:
 - Latest stored discovery run per source.
 - Open findings currently stored in `compliance.findings`.
 
+CA AG public charity status is checked by `us-ca/ca-ag-registry` from the public
+Registry Search Tool. Do not send the user to the CA AG Online Renewal System for normal
+status verification. A stored `us-ca/ca-ag-online-filing` auth-required run is an
+optional dashboard-only supplement and is not an open compliance task unless the user
+explicitly asks for renewal-dashboard-only details.
+
 If the status is `unknown`, tell the user to run `compliance-discover` because no stored
 discovery runs exist yet.
 
@@ -58,9 +64,10 @@ organization-context block before the site steps with every value that may be us
 government form or portal, including legal entity name, FEIN, state of incorporation,
 state registration or formation date, mailing address, California SOS entity number, CA AG
 charity registration number, FTB entity ID/name, CDTFA identifiers, IRS ruling or
-registration date when stored, and CA AG registry dates/status when stored. If a value is
-missing, say that it is not configured or not available in stored status. Do not make the
-user infer identifiers from internal field names.
+registration date when stored, and CA AG registry status, issue/effective dates, renewal
+due date, and last-renewal date when stored. If a value is missing, say that it is not
+configured or not available in stored status. Do not make the user infer identifiers from
+internal field names.
 
 Do not claim manual or authenticated evidence was persisted unless a dedicated ingestion
 path has actually run.

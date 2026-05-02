@@ -15,6 +15,7 @@ import {
   ComplianceFindingRowSchema,
   ComplianceSourceRowSchema,
   buildTableSchema,
+  currentOpenFindingsViewQuery,
   type TableSchemaField,
 } from '../state/bq-rows.ts'
 
@@ -36,6 +37,14 @@ describe('COMPLIANCE_DATASET / COMPLIANCE_TABLES', () => {
     for (const t of COMPLIANCE_TABLES) {
       expect(t.fields.some((f) => f.mode === 'REQUIRED')).toBe(true)
     }
+  })
+})
+
+describe('currentOpenFindingsViewQuery', () => {
+  it('keeps optional CA AG Online Renewal auth findings out of current open findings', () => {
+    const query = currentOpenFindingsViewQuery('project.dataset')
+
+    expect(query).toContain("f.source_id = 'ca-ag-online-filing'")
   })
 })
 

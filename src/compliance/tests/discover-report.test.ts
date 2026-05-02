@@ -123,15 +123,16 @@ function report(findings: readonly Finding[] = []): DiscoveryReport {
         sourceId: 'ca-ag-registry',
         jurisdictionId: 'us-ca',
         description: 'CA AG Registry',
-        accessUrl: 'https://www.oag.ca.gov/charities/reports',
-        accessMethod: 'official_bulk_download',
+        accessUrl:
+          'https://rct.doj.ca.gov/Verification/Web/Search.aspx?facility=Y',
+        accessMethod: 'official_public_page',
         automationAllowed: true,
         tosUrl: 'https://www.oag.ca.gov/privacy',
         outcome: {
           status: 'source_failure',
           source_id: 'ca-ag-registry',
           error_type: 'parse',
-          message: 'CSV schema changed',
+          message: 'Registry Search Tool schema changed',
         },
       },
     ],
@@ -170,7 +171,7 @@ describe('formatDiscoveryReport', () => {
       'Reply in plain sentences or bullets. I will map your answers into structured compliance evidence.',
     )
     expect(rendered).toContain(
-      '- ERROR CA Attorney General Registry Reports: failed (parse) CSV schema changed',
+      '- ERROR CA Attorney General Registry Search Tool: failed (parse) Registry Search Tool schema changed',
     )
     expect(rendered).toContain(
       '- MANUAL CA Secretary of State bizfile: manual verification required',
@@ -283,7 +284,7 @@ describe('formatDiscoveryReport', () => {
     expect(actionSection).not.toContain('verification_status')
   })
 
-  it('uses configured values for authenticated California walkthroughs', () => {
+  it('uses configured values for authenticated California walkthroughs without re-asking for CA AG public status', () => {
     const base = report()
     const rendered = formatDiscoveryReport({
       ...base,
@@ -323,21 +324,11 @@ describe('formatDiscoveryReport', () => {
     })
 
     const actionSection = actionRequiredSection(rendered)
-    expect(actionSection).toContain(
-      'Open CA Attorney General Online Renewal System: https://rct.doj.ca.gov/eGov/Home.aspx',
+    expect(actionSection).not.toContain(
+      'CA Attorney General Online Renewal System',
     )
-    expect(actionSection).toContain(
-      'CA AG public charity status is already checked automatically from CA Attorney General Registry Reports. Use the Registry Search Tool at https://rct.doj.ca.gov/Verification/Web/Search.aspx?facility=Y only if you need to confirm online-renewal eligibility.',
-    )
-    expect(actionSection).toContain(
-      'Use the renewal login only if the Registry Search Tool shows the organization as Current or Current - Awaiting Reporting and an authorized agent has a User ID and Password, Account Code, or Registration Code.',
-    )
-    expect(actionSection).toContain(
-      'Open the renewal account for this AG charity registration number: CT1234567.',
-    )
-    expect(actionSection).toContain(
-      'If there is no login option or the organization is not eligible for online renewal, tell me that Online Renewal System access is unavailable and give the reason shown.',
-    )
+    expect(actionSection).not.toContain('rct.doj.ca.gov/eGov/Home.aspx')
+    expect(actionSection).not.toContain('Open the renewal account')
     expect(actionSection).toContain(
       'Open CA Franchise Tax Board MyFTB: https://www.ftb.ca.gov/myftb/',
     )
@@ -348,6 +339,9 @@ describe('formatDiscoveryReport', () => {
     expect(actionSection).not.toContain('online_filing_access')
     expect(actionSection).not.toContain('ca-ftb-myftb')
     expect(actionSection).not.toContain('business_account_access')
+    expect(rendered).toContain(
+      '- INFO CA Attorney General Online Renewal System: optional dashboard review not required because CA AG public registry status is checked automatically',
+    )
   })
 
   it('falls back to legal names and clear CDTFA guidance when identifiers are absent', () => {
@@ -456,9 +450,10 @@ describe('formatDiscoveryReport', () => {
     expect(actionSection).toContain(
       'Search for this exact legal name: Foo Foundation.',
     )
-    expect(actionSection).toContain(
-      'Open the renewal account for this exact legal name: Foo Foundation.',
+    expect(actionSection).not.toContain(
+      'CA Attorney General Online Renewal System',
     )
+    expect(actionSection).not.toContain('Open the renewal account')
     expect(actionSection).toContain(
       'Open the business account for this exact legal name: Foo Foundation.',
     )
