@@ -585,6 +585,71 @@ describe('formatComplianceStatusReport', () => {
     expect(rendered).toContain('- CA AG last renewal: 2025/07/15')
   })
 
+  it('uses stored manual evidence identifiers when configured identifiers are incomplete', () => {
+    const rendered = formatComplianceStatusReport({
+      entity: ENTITY,
+      identifiers: {
+        'us-federal': { ein: '12-3456789' },
+        'us-ca': { sosEntityNumber: 'C0123456' },
+      },
+      latestRuns: [
+        IRS_BMF_RUN,
+        CA_AG_REGISTRY_RUN,
+        {
+          ...RUN,
+          source_id: 'ca-cdtfa-permit-license-verification',
+          jurisdiction_id: 'us-ca',
+          status: 'succeeded',
+          payload: {
+            account_number: '202-822944',
+            account_type: 'Sellers Permit',
+            verification_status: 'valid',
+          },
+        },
+        {
+          ...RUN,
+          source_id: 'ca-ftb-entity-status-letter',
+          jurisdiction_id: 'us-ca',
+          status: 'succeeded',
+          payload: {
+            entity_id: '6423690',
+            entity_name: 'LELEKA FOUNDATION',
+            ftb_status: 'ACTIVE',
+            exempt_status_verified: 'EXEMPT',
+          },
+        },
+        {
+          ...RUN,
+          source_id: 'ca-cdtfa-online-services',
+          jurisdiction_id: 'us-ca',
+          status: 'failed',
+          error_type: 'auth_required',
+          error_message: 'Authenticated session required.',
+        },
+        {
+          ...RUN,
+          source_id: 'ca-ftb-myftb',
+          jurisdiction_id: 'us-ca',
+          status: 'failed',
+          error_type: 'auth_required',
+          error_message: 'Authenticated session required.',
+        },
+      ],
+      openFindings: [],
+      overall: 'attention_required',
+    })
+
+    expect(rendered).toContain('- FTB entity ID: 6423690')
+    expect(rendered).toContain('- FTB entity name: LELEKA FOUNDATION')
+    expect(rendered).toContain('- CDTFA account identifiers: 202-822944')
+    expect(rendered).toContain(
+      'Use CDTFA account identifier 202-822944 if the portal asks you to choose an account.',
+    )
+    expect(rendered).toContain(
+      'Open the business account for FTB entity ID 6423690.',
+    )
+  })
+
   it('does not ask the user to re-check FTB status letter when stored evidence already shows the issue', () => {
     const rendered = formatComplianceStatusReport({
       entity: ENTITY,

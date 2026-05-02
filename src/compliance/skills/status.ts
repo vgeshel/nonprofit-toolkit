@@ -189,6 +189,8 @@ function formatNextSteps(report: ComplianceStatusReport): string[] {
 function formatOrganizationContext(report: ComplianceStatusReport): string[] {
   const caIdentifiers = report.identifiers['us-ca']
   const caAgCharityNumber = getCaAgCharityNumber(report)
+  const ftbEntityId = getFtbEntityId(report)
+  const ftbEntityName = getConfiguredFtbEntityName(report)
   return [
     `- Legal entity name: ${report.entity.legal_name}`,
     `- FEIN: ${report.identifiers['us-federal']?.ein ?? 'not configured'}`,
@@ -197,8 +199,8 @@ function formatOrganizationContext(report: ComplianceStatusReport): string[] {
     `- Mailing address: ${formatMailingAddress(report.entity)}`,
     `- California SOS entity number: ${caIdentifiers?.sosEntityNumber ?? 'not configured'}`,
     `- California AG charity registration number: ${caAgCharityNumber ?? 'not configured'}`,
-    `- FTB entity ID: ${caIdentifiers?.ftbEntityId ?? 'not configured'}`,
-    `- FTB entity name: ${caIdentifiers?.ftbEntityName ?? 'not configured'}`,
+    `- FTB entity ID: ${ftbEntityId ?? 'not configured'}`,
+    `- FTB entity name: ${ftbEntityName ?? 'not configured'}`,
     `- CDTFA account identifiers: ${formatConfiguredList(
       listCdtfaAccountIdentifiers(report),
     )}`,
@@ -226,6 +228,25 @@ function getCaAgCharityNumber(report: ComplianceStatusReport): string | null {
     readString(
       findPayload(report, 'ca-ag-registry'),
       'stateCharityRegistrationNumber',
+    )
+  )
+}
+
+function getFtbEntityId(report: ComplianceStatusReport): string | null {
+  return (
+    report.identifiers['us-ca']?.ftbEntityId ??
+    readString(findPayload(report, 'ca-ftb-entity-status-letter'), 'entity_id')
+  )
+}
+
+function getConfiguredFtbEntityName(
+  report: ComplianceStatusReport,
+): string | null {
+  return (
+    report.identifiers['us-ca']?.ftbEntityName ??
+    readString(
+      findPayload(report, 'ca-ftb-entity-status-letter'),
+      'entity_name',
     )
   )
 }
@@ -467,17 +488,17 @@ function formatSosSearchInstruction(report: ComplianceStatusReport): string {
 }
 
 function formatFtbSearchInstruction(report: ComplianceStatusReport): string {
-  const caIdentifiers = report.identifiers['us-ca']
-  if (caIdentifiers?.ftbEntityId !== undefined) {
-    return `search FTB entity ID ${caIdentifiers.ftbEntityId}`
+  const ftbEntityId = getFtbEntityId(report)
+  if (ftbEntityId !== null) {
+    return `search FTB entity ID ${ftbEntityId}`
   }
   return `search exact legal name ${formatFtbEntityName(report)}`
 }
 
 function formatFtbAccountInstruction(report: ComplianceStatusReport): string {
-  const caIdentifiers = report.identifiers['us-ca']
-  if (caIdentifiers?.ftbEntityId !== undefined) {
-    return `Open the business account for FTB entity ID ${caIdentifiers.ftbEntityId}.`
+  const ftbEntityId = getFtbEntityId(report)
+  if (ftbEntityId !== null) {
+    return `Open the business account for FTB entity ID ${ftbEntityId}.`
   }
   return `Open the business account for exact legal name ${formatFtbEntityName(
     report,
@@ -485,7 +506,7 @@ function formatFtbAccountInstruction(report: ComplianceStatusReport): string {
 }
 
 function formatFtbEntityName(report: ComplianceStatusReport): string {
-  return report.identifiers['us-ca']?.ftbEntityName ?? report.entity.legal_name
+  return getConfiguredFtbEntityName(report) ?? report.entity.legal_name
 }
 
 function formatCdtfaPublicIdentifierInstruction(
@@ -514,17 +535,23 @@ function listCdtfaAccountIdentifiers(
   report: ComplianceStatusReport,
 ): readonly string[] {
   const caIdentifiers = report.identifiers['us-ca']
-  const identifiers: string[] = []
-  if (caIdentifiers?.cdtfaSellerPermitNumber !== undefined) {
-    identifiers.push(caIdentifiers.cdtfaSellerPermitNumber)
-  }
-  if (caIdentifiers?.cdtfaUseTaxAccountNumber !== undefined) {
-    identifiers.push(caIdentifiers.cdtfaUseTaxAccountNumber)
-  }
-  if (caIdentifiers?.cdtfaSpecialTaxAccountNumber !== undefined) {
-    identifiers.push(caIdentifiers.cdtfaSpecialTaxAccountNumber)
-  }
-  return identifiers
+  return Array.from(
+    new Set(
+      [
+        caIdentifiers?.cdtfaSellerPermitNumber,
+        caIdentifiers?.cdtfaUseTaxAccountNumber,
+        caIdentifiers?.cdtfaSpecialTaxAccountNumber,
+        readString(
+          findPayload(report, 'ca-cdtfa-permit-license-verification'),
+          'account_number',
+        ),
+      ].filter(isPresentString),
+    ),
+  )
+}
+
+function isPresentString(value: string | undefined | null): value is string {
+  return value !== undefined && value !== null
 }
 
 function formatList(values: readonly string[]): string {
