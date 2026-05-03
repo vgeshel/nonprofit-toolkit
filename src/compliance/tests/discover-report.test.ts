@@ -284,6 +284,154 @@ describe('formatDiscoveryReport', () => {
     expect(actionSection).not.toContain('verification_status')
   })
 
+  it('prints complete organization context before manual and authenticated website steps', () => {
+    const rendered = formatDiscoveryReport({
+      ...report(),
+      entity: {
+        ...ENTITY,
+        mailing_address_line2: 'Suite 200',
+      },
+      identifiers: {
+        'us-federal': { ein: '12-3456789' },
+        'us-ca': {
+          sosEntityNumber: 'C0123456',
+          ftbEntityId: 'FTB-1234567',
+          ftbEntityName: 'Foo Foundation',
+          cdtfaSellerPermitNumber: 'SRKH123456789',
+          cdtfaUseTaxAccountNumber: 'UT-123456',
+          cdtfaSpecialTaxAccountNumber: 'ST-123456',
+        },
+      },
+      runs: [
+        {
+          sourceId: 'irs-eo-bmf',
+          jurisdictionId: 'us-federal',
+          description: 'IRS EO BMF',
+          accessUrl: 'https://www.irs.gov/charities-non-profits',
+          accessMethod: 'official_bulk_download',
+          automationAllowed: true,
+          tosUrl: 'https://www.irs.gov/privacy-disclosure/irs-privacy-policy',
+          outcome: {
+            status: 'success',
+            output: {
+              record: {
+                record_id: '550e8400-e29b-41d4-a716-446655440000',
+                source_id: 'irs-eo-bmf',
+                fetched_at: '2026-04-28T12:00:00.000Z',
+                payload: {
+                  row: {
+                    ruling: '201005',
+                  },
+                },
+              },
+              findings: [],
+            },
+          },
+        },
+        {
+          sourceId: 'ca-ag-registry',
+          jurisdictionId: 'us-ca',
+          description: 'CA AG Registry',
+          accessUrl:
+            'https://rct.doj.ca.gov/Verification/Web/Search.aspx?facility=Y',
+          accessMethod: 'official_public_page',
+          automationAllowed: true,
+          tosUrl: 'https://www.oag.ca.gov/privacy',
+          outcome: {
+            status: 'success',
+            output: {
+              record: {
+                record_id: '550e8400-e29b-41d4-a716-446655440002',
+                source_id: 'ca-ag-registry',
+                fetched_at: '2026-04-28T12:00:00.000Z',
+                payload: {
+                  registryStatus: 'Current',
+                  stateCharityRegistrationNumber: 'CT1234567',
+                  effectiveDate: '2024/03/20',
+                  issueDate: '2024/03/19',
+                  renewalDueDate: '2026/05/15',
+                  lastRenewal: '2025/07/15',
+                },
+              },
+              findings: [],
+            },
+          },
+        },
+        {
+          sourceId: 'ca-sos-bizfile',
+          jurisdictionId: 'us-ca',
+          description: 'CA SOS bizfile',
+          accessUrl: 'https://bizfileonline.sos.ca.gov/search/business',
+          accessMethod: 'manual',
+          automationAllowed: false,
+          tosUrl:
+            'https://www.sos.ca.gov/business-programs/bizfile/privacy-warning-terms-and-conditions-use',
+          manualOnlyReason:
+            'CA SOS bizfile terms prohibit automated collection.',
+          outcome: {
+            status: 'manual_required',
+            source_id: 'ca-sos-bizfile',
+            instructions: ['Open bizfile.'],
+            evidenceFields: [
+              { key: 'entity_status', label: 'Entity status', required: true },
+            ],
+          },
+        },
+        {
+          sourceId: 'ca-ftb-myftb',
+          jurisdictionId: 'us-ca',
+          description: 'MyFTB',
+          accessUrl: 'https://www.ftb.ca.gov/myftb/',
+          accessMethod: 'playwright_readonly',
+          automationAllowed: true,
+          tosUrl:
+            'https://www.ftb.ca.gov/myftb/general-terms-and-conditions.html',
+          outcome: {
+            status: 'auth_required',
+            source_id: 'ca-ftb-myftb',
+            message: 'Authentication is required.',
+            loginUrl: 'https://www.ftb.ca.gov/myftb/',
+          },
+        },
+      ],
+    })
+
+    const actionSection = actionRequiredSection(rendered)
+    expect(actionSection).toContain('Use these exact values if a site asks:')
+    expect(actionSection).toContain('- Legal entity name: Foo Foundation')
+    expect(actionSection).toContain('- FEIN: 12-3456789')
+    expect(actionSection).toContain('- State of incorporation: CA')
+    expect(actionSection).toContain(
+      '- State registration or formation date: 2010-01-15',
+    )
+    expect(actionSection).toContain(
+      '- Mailing address: 1 Mission St Suite 200, San Francisco, CA 94105, US',
+    )
+    expect(actionSection).toContain('- California SOS entity number: C0123456')
+    expect(actionSection).toContain(
+      '- California AG charity registration number: CT1234567',
+    )
+    expect(actionSection).toContain('- FTB entity ID: FTB-1234567')
+    expect(actionSection).toContain('- FTB entity name: Foo Foundation')
+    expect(actionSection).toContain(
+      '- CDTFA account identifiers: SRKH123456789, UT-123456, ST-123456',
+    )
+    expect(actionSection).toContain(
+      '- IRS ruling or registration date from IRS EO BMF: 2010-05',
+    )
+    expect(actionSection).toContain('- CA AG registry status: Current')
+    expect(actionSection).toContain('- CA AG registry status date: 2024/03/20')
+    expect(actionSection).toContain(
+      '- CA AG renewal due or expiration date: 2026/05/15',
+    )
+    expect(actionSection).toContain('- CA AG issue date: 2024/03/19')
+    expect(actionSection).toContain('- CA AG effective date: 2024/03/20')
+    expect(actionSection).toContain('- CA AG last renewal: 2025/07/15')
+    expect(actionSection.indexOf('Use these exact values')).toBeLessThan(
+      actionSection.indexOf('Manual checks:'),
+    )
+  })
+
   it('uses configured values for authenticated California walkthroughs without re-asking for CA AG public status', () => {
     const base = report()
     const rendered = formatDiscoveryReport({
@@ -352,7 +500,7 @@ describe('formatDiscoveryReport', () => {
 
     const rendered = formatDiscoveryReport({
       ...base,
-      identifiers: { 'us-federal': { ein: '12-3456789' } },
+      identifiers: {},
       runs: [
         caSosRun,
         {

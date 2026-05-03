@@ -88,6 +88,19 @@ and ask them to complete the listed manual/auth checks. Do not stop at a machine
 of source statuses. The skill is responsible for walking the user through the remaining
 manual work after automatic discovery finishes.
 
+Before replying with a manual or authenticated next step, run discovery or use the freshly
+generated discovery report and treat the `Action Required` section as the source of truth.
+Do not handwrite the step from memory. The reply is incomplete unless it includes:
+
+- The official URL the user must open.
+- The exact action to take on that site.
+- Every relevant identifier or value printed by the report, including legal entity name,
+  FEIN, state registration details, mailing address, CA SOS number, CA AG number, FTB
+  entity ID/name, CDTFA identifiers, IRS ruling date, and CA AG registry dates when
+  available.
+- The exact information the user should report back in plain language.
+- No raw source IDs or evidence-field keys.
+
 Do every check the code can perform before asking the user to do anything. For each
 manual/auth source, give the exact official URL and the exact value the user should enter
 when it is configured, such as the SOS entity number, AG charity number, FTB entity ID, or

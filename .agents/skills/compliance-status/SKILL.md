@@ -90,6 +90,17 @@ If the status is `attention_required`, do not stop after listing open findings. 
 time. Use the exact URLs and configured values printed by the report, and accept plain
 sentences or bullets from the user.
 
+Before replying with a manual or authenticated next step, run the status command or
+production function and use the generated report as the source of truth. Do not handwrite
+the step from memory. The reply is incomplete unless it includes:
+
+- The official URL the user must open.
+- The exact action to take on that site.
+- Every relevant identifier or value printed by the report, including values recovered
+  from stored discovery evidence.
+- The exact information the user should report back in plain language.
+- No raw source IDs or evidence-field keys.
+
 When directing the user to any website, make the task easy: include a complete
 organization-context block before the site steps with every value that may be useful on a
 government form or portal, including legal entity name, FEIN, state of incorporation,

@@ -105,6 +105,8 @@ function formatActionRequired(report: DiscoveryReport): string[] {
     '## Action Required',
     'Discovery is incomplete until these manual or authenticated checks are completed.',
     'I completed every source that can be checked automatically. These remaining sources require a manual website check or a user-owned authenticated session.',
+    'Use these exact values if a site asks:',
+    ...formatOrganizationContext(report),
   ]
   if (manualRuns.length > 0) {
     lines.push(
@@ -281,6 +283,135 @@ function formatFinding(finding: Finding): string {
   return `- ${finding.severity.toUpperCase()} ${formatFindingSourceName(
     finding.source_id,
   )}: ${finding.title} - ${formatFindingDetail(finding.detail)}`
+}
+
+function formatOrganizationContext(report: DiscoveryReport): string[] {
+  const caIdentifiers = report.identifiers['us-ca']
+  return [
+    `- Legal entity name: ${report.entity.legal_name}`,
+    `- FEIN: ${report.identifiers['us-federal']?.ein ?? 'not configured'}`,
+    `- State of incorporation: ${report.entity.state_of_incorporation}`,
+    `- State registration or formation date: ${report.entity.formation_date}`,
+    `- Mailing address: ${formatMailingAddress(report)}`,
+    `- California SOS entity number: ${caIdentifiers?.sosEntityNumber ?? 'not configured'}`,
+    `- California AG charity registration number: ${getCaAgCharityNumber(report) ?? 'not configured'}`,
+    `- FTB entity ID: ${caIdentifiers?.ftbEntityId ?? 'not configured'}`,
+    `- FTB entity name: ${caIdentifiers?.ftbEntityName ?? 'not configured'}`,
+    `- CDTFA account identifiers: ${formatConfiguredList(
+      listCdtfaAccountIdentifiers(report),
+    )}`,
+    `- IRS ruling or registration date from IRS EO BMF: ${extractIrsRulingDate(report) ?? 'not available in this discovery run'}`,
+    `- CA AG registry status: ${extractPayloadString(
+      report,
+      'ca-ag-registry',
+      'registryStatus',
+    )}`,
+    `- CA AG registry status date: ${extractPayloadStringWithFallbacks(report, 'ca-ag-registry', ['dateStatusSet', 'effectiveDate'])}`,
+    `- CA AG renewal due or expiration date: ${extractPayloadString(report, 'ca-ag-registry', 'renewalDueDate')}`,
+    `- CA AG issue date: ${extractPayloadString(report, 'ca-ag-registry', 'issueDate')}`,
+    `- CA AG effective date: ${extractPayloadString(report, 'ca-ag-registry', 'effectiveDate')}`,
+    `- CA AG last renewal: ${extractPayloadString(
+      report,
+      'ca-ag-registry',
+      'lastRenewal',
+    )}`,
+  ]
+}
+
+function formatMailingAddress(report: DiscoveryReport): string {
+  const street =
+    report.entity.mailing_address_line2 === null
+      ? report.entity.mailing_address_line1
+      : `${report.entity.mailing_address_line1} ${report.entity.mailing_address_line2}`
+  return `${street}, ${report.entity.mailing_address_city}, ${report.entity.mailing_address_region} ${report.entity.mailing_address_postal_code}, ${report.entity.mailing_address_country}`
+}
+
+function formatConfiguredList(values: readonly string[]): string {
+  if (values.length === 0) {
+    return 'not configured'
+  }
+  return formatList(values)
+}
+
+function getCaAgCharityNumber(report: DiscoveryReport): string | null {
+  return (
+    report.identifiers['us-ca']?.agCharityNumber ??
+    readString(
+      findSuccessfulPayload(report, 'ca-ag-registry'),
+      'stateCharityRegistrationNumber',
+    )
+  )
+}
+
+function extractIrsRulingDate(report: DiscoveryReport): string | null {
+  const payload = findSuccessfulPayload(report, 'irs-eo-bmf')
+  const row = readRecord(payload, 'row')
+  const ruling = readString(row, 'ruling')
+  if (ruling === null) {
+    return null
+  }
+  return ruling.replace(/^(\d{4})(\d{2})$/, '$1-$2')
+}
+
+function extractPayloadString(
+  report: DiscoveryReport,
+  sourceId: string,
+  key: string,
+): string {
+  return (
+    readString(findSuccessfulPayload(report, sourceId), key) ??
+    'not available in this discovery run'
+  )
+}
+
+function extractPayloadStringWithFallbacks(
+  report: DiscoveryReport,
+  sourceId: string,
+  keys: readonly string[],
+): string {
+  const payload = findSuccessfulPayload(report, sourceId)
+  for (const key of keys) {
+    const value = readString(payload, key)
+    if (value !== null) {
+      return value
+    }
+  }
+  return 'not available in this discovery run'
+}
+
+function findSuccessfulPayload(
+  report: DiscoveryReport,
+  sourceId: string,
+): unknown {
+  const run = report.runs.find(
+    (item) => item.sourceId === sourceId && item.outcome.status === 'success',
+  )
+  if (run?.outcome.status !== 'success') {
+    return null
+  }
+  return run.outcome.output.record.payload
+}
+
+function readRecord(value: unknown, key: string): object | null {
+  const field = readField(value, key)
+  if (field === null || typeof field !== 'object') {
+    return null
+  }
+  return field
+}
+
+function readString(value: unknown, key: string): string | null {
+  const field = readField(value, key)
+  return typeof field === 'string' && field.trim().length > 0
+    ? field.trim()
+    : null
+}
+
+function readField(value: unknown, key: string): unknown {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+  return Reflect.get(value, key)
 }
 
 function formatFindingDetail(detail: string): string {
