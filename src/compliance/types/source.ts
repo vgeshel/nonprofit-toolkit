@@ -218,8 +218,15 @@ export interface BrowserLocator {
   filter(options: { readonly hasText: string | RegExp }): BrowserLocator
   first(): BrowserLocator
   count(): Promise<number>
-  click(): Promise<unknown>
+  click(options?: { readonly force?: boolean }): Promise<unknown>
   innerText(): Promise<string>
+  inputValue(): Promise<string>
+}
+
+export interface BrowserResponse {
+  url(): string
+  status(): number
+  json(): Promise<unknown>
 }
 
 export interface BrowserPage {
@@ -235,12 +242,20 @@ export interface BrowserPage {
     selector: string,
     options?: { readonly timeout?: number },
   ): Promise<unknown>
+  selectOption(
+    selector: string,
+    values: { readonly label: string },
+  ): Promise<unknown>
   fill(selector: string, value: string): Promise<unknown>
   click(selector: string): Promise<unknown>
   waitForLoadState(
     state?: 'load' | 'domcontentloaded' | 'networkidle',
     options?: { readonly timeout?: number },
   ): Promise<unknown>
+  waitForResponse(
+    predicate: (response: BrowserResponse) => boolean,
+    options?: { readonly timeout?: number },
+  ): Promise<BrowserResponse>
   locator(selector: string): BrowserLocator
 }
 

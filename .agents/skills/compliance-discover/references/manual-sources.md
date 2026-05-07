@@ -70,5 +70,7 @@ information requested by the walkthrough.
 
 ## Current manual/auth-required sources
 
-See `california-sources.md` for the current CA SOS, CA FTB, CDTFA, MyFTB, and CA AG
-source-specific steps and evidence fields.
+See `california-sources.md` for the current CA FTB, CDTFA, MyFTB, and CA AG
+source-specific steps and evidence fields. CA SOS bizfile and CDTFA public permit
+verification are automated public-page sources and should not be presented as manual
+evidence tasks.

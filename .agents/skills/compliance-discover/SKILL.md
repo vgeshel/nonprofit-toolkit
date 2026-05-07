@@ -6,8 +6,9 @@ description: >
   "verify our tax-exempt status", "run a compliance check", "is our 501(c)(3) still
   active?", or when they want to refresh the compliance picture before a board meeting,
   audit, or grant application. Phase 3 covers IRS TEOS/BMF, public CA AG Registry
-  Search Tool/detail pages, public CA FTB Entity Status Letter checks, manual
-  CA SOS/CDTFA checks, and user-assisted authenticated CA portal checks.
+  Search Tool/detail pages, public CA SOS bizfile checks, public CA FTB Entity
+  Status Letter checks, public CDTFA permit verification, and user-assisted
+  authenticated CA portal checks.
 ---
 
 # Compliance Discovery

@@ -98,9 +98,9 @@ describe('usCaJurisdiction', () => {
     )
 
     expect(byId.get('ca-sos-bizfile')).toMatchObject({
-      kind: 'manual',
-      accessMethod: 'manual',
-      automationAllowed: false,
+      kind: 'playwright',
+      accessMethod: 'official_public_page',
+      automationAllowed: true,
     })
     expect(byId.get('ca-ftb-entity-status-letter')).toMatchObject({
       kind: 'playwright',
@@ -109,9 +109,10 @@ describe('usCaJurisdiction', () => {
       automationAllowed: true,
     })
     expect(byId.get('ca-cdtfa-permit-license-verification')).toMatchObject({
-      kind: 'manual',
-      accessMethod: 'manual',
-      automationAllowed: false,
+      kind: 'playwright',
+      accessMethod: 'official_public_page',
+      authRequired: false,
+      automationAllowed: true,
     })
     expect(byId.get('ca-ag-registry')).toMatchObject({
       kind: 'api',
@@ -138,14 +139,13 @@ describe('usCaJurisdiction', () => {
     })
   })
 
-  it('keeps SOS manual source run method as an explicit ToS error', async () => {
-    const sosResult = await caSosBizfileSource.run(ENTITY, CONTEXT)
-
-    expect(sosResult.isErr()).toBe(true)
-    if (sosResult.isErr()) {
-      expect(sosResult.error.type).toBe('tos')
-      expect(sosResult.error.message).toContain('manual-only')
-    }
+  it('runs SOS through a public browser-backed source instead of a manual ToS placeholder', () => {
+    expect(caSosBizfileSource).toMatchObject({
+      kind: 'playwright',
+      accessMethod: 'official_public_page',
+      automationAllowed: true,
+      authRequired: false,
+    })
   })
 
   it('declares detailed auth requirements for every authenticated portal source', () => {
@@ -199,27 +199,14 @@ describe('usCaJurisdiction', () => {
     }
   })
 
-  it('keeps CDTFA permit verification as a manual source with exact evidence fields', async () => {
+  it('runs CDTFA permit verification through a public browser-backed source', async () => {
     expect(caCdtfaPermitLicenseVerificationSource).toMatchObject({
       id: 'ca-cdtfa-permit-license-verification',
-      kind: 'manual',
-      accessMethod: 'manual',
-      automationAllowed: false,
+      kind: 'playwright',
+      accessMethod: 'official_public_page',
+      automationAllowed: true,
+      authRequired: false,
     })
-    if (caCdtfaPermitLicenseVerificationSource.automationAllowed) {
-      throw new Error('expected CDTFA verification source to be manual-only')
-    }
-    expect(
-      caCdtfaPermitLicenseVerificationSource.manualEvidenceFields.map(
-        (field) => field.key,
-      ),
-    ).toEqual([
-      'account_type',
-      'account_number',
-      'verification_status',
-      'owner_name',
-      'status_date',
-    ])
 
     const result = await caCdtfaPermitLicenseVerificationSource.run(
       ENTITY,
@@ -228,7 +215,7 @@ describe('usCaJurisdiction', () => {
 
     expect(result.isErr()).toBe(true)
     if (!result.isErr()) return
-    expect(result.error.type).toBe('tos')
-    expect(result.error.message).toContain('manual-only')
+    expect(result.error.type).toBe('validation')
+    expect(result.error.message).toContain('seller permit')
   })
 })

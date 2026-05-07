@@ -34,6 +34,21 @@ const CaFtbEntityStatusLetterPayloadSchema = z.object({
   exempt_status_verified: z.string().optional(),
 })
 
+const CaSosBizfilePayloadSchema = z.object({
+  matchStatus: z.enum(['found', 'not_found']),
+  entity_name: z.string().optional(),
+  entity_status: z.string().optional(),
+})
+
+const CaCdtfaPublicVerificationPayloadSchema = z.object({
+  matchStatus: z.enum(['found']),
+  account_type: z.string().min(1),
+  account_number: z.string().min(1),
+  verification_status: z.string().min(1),
+  is_valid: z.boolean(),
+  owner_name: z.string().nullable().optional(),
+})
+
 export interface DeriveComplianceFindingsArgs {
   readonly entity: Entity
   readonly identifiers: EntityIdentifiers
@@ -144,6 +159,18 @@ function deriveRunFindings(
     run.sourceId === 'ca-ftb-entity-status-letter'
   ) {
     return deriveCaFtbEntityStatusLetterFindings({ ...run, outcome })
+  }
+  if (outcome.status === 'success' && run.sourceId === 'ca-sos-bizfile') {
+    return deriveCaSosBizfileFindings(entity, { ...run, outcome })
+  }
+  if (
+    outcome.status === 'success' &&
+    run.sourceId === 'ca-cdtfa-permit-license-verification'
+  ) {
+    return deriveCaCdtfaPublicVerificationFindings(entity, {
+      ...run,
+      outcome,
+    })
   }
   return []
 }
@@ -432,6 +459,104 @@ function isFtbExemptStatusVerified(value: string): boolean {
     normalized === 'exempt' ||
     normalized === 'exempt status verified'
   )
+}
+
+function deriveCaSosBizfileFindings(
+  entity: Entity,
+  run: SuccessDiscoveryRun,
+): readonly FindingDraft[] {
+  const parsed = CaSosBizfilePayloadSchema.safeParse(
+    run.outcome.output.record.payload,
+  )
+  if (!parsed.success) {
+    return []
+  }
+  if (parsed.data.matchStatus === 'not_found') {
+    return [
+      {
+        code: 'ca.sos.bizfile_not_found',
+        jurisdictionId: run.jurisdictionId,
+        sourceId: run.sourceId,
+        severity: 'warn',
+        title: 'Entity not found in CA SOS bizfile',
+        detail:
+          'The public California Secretary of State bizfile search did not return the configured entity.',
+        evidence: { code: 'ca.sos.bizfile_not_found' },
+      },
+    ]
+  }
+  const findings: FindingDraft[] = []
+  const entityStatus = parsed.data.entity_status
+  if (entityStatus !== undefined && !isCaSosStatusActive(entityStatus)) {
+    findings.push({
+      code: 'ca.sos.bizfile_not_active',
+      jurisdictionId: run.jurisdictionId,
+      sourceId: run.sourceId,
+      severity: 'error',
+      title: 'CA SOS bizfile status is not active',
+      detail: `The public California Secretary of State bizfile search lists entity status "${entityStatus}".`,
+      evidence: {
+        code: 'ca.sos.bizfile_not_active',
+        entityStatus,
+      },
+    })
+  }
+  const sourceName = parsed.data.entity_name
+  if (sourceName !== undefined && !sameName(entity.legal_name, sourceName)) {
+    findings.push(
+      nameMismatchFinding(entity, run, sourceName, 'CA SOS bizfile'),
+    )
+  }
+  return findings
+}
+
+function isCaSosStatusActive(value: string): boolean {
+  return value.trim().toLocaleLowerCase() === 'active'
+}
+
+function deriveCaCdtfaPublicVerificationFindings(
+  entity: Entity,
+  run: SuccessDiscoveryRun,
+): readonly FindingDraft[] {
+  const parsed = CaCdtfaPublicVerificationPayloadSchema.safeParse(
+    run.outcome.output.record.payload,
+  )
+  if (!parsed.success) {
+    return []
+  }
+  const findings: FindingDraft[] = []
+  if (!parsed.data.is_valid) {
+    findings.push({
+      code: 'ca.cdtfa.public_verification_invalid',
+      jurisdictionId: run.jurisdictionId,
+      sourceId: run.sourceId,
+      severity: 'warn',
+      title: 'CA CDTFA public verification says account is invalid',
+      detail: `The public CA CDTFA permit, license, or account verification page says ${parsed.data.account_type} ${parsed.data.account_number} is invalid.`,
+      evidence: {
+        code: 'ca.cdtfa.public_verification_invalid',
+        accountType: parsed.data.account_type,
+        accountNumber: parsed.data.account_number,
+        verificationStatus: parsed.data.verification_status,
+      },
+    })
+  }
+  const ownerName = parsed.data.owner_name
+  if (
+    ownerName !== undefined &&
+    ownerName !== null &&
+    !sameName(entity.legal_name, ownerName)
+  ) {
+    findings.push(
+      nameMismatchFinding(
+        entity,
+        run,
+        ownerName,
+        'CA CDTFA public permit, license, or account verification',
+      ),
+    )
+  }
+  return findings
 }
 
 function nameMismatchFinding(

@@ -350,8 +350,9 @@ describe('formatComplianceStatusReport', () => {
       source_id: 'ca-cdtfa-permit-license-verification',
       jurisdiction_id: 'us-ca',
       status: 'failed',
-      error_type: 'manual_required',
-      error_message: 'Manual CDTFA verification required.',
+      error_type: 'validation',
+      error_message:
+        'CDTFA public permit verification requires a configured seller permit or use-tax account number.',
     }
     const caAgRun: ComplianceDiscoveryRunRow = {
       ...RUN,
@@ -442,13 +443,22 @@ describe('formatComplianceStatusReport', () => {
     expect(rendered).toContain('- CA AG last renewal: 2025/07/15')
     expect(rendered).toContain('CA Secretary of State bizfile:')
     expect(rendered).toContain(
+      'The automated CA SOS bizfile public search did not complete in the latest stored run. Run compliance-discover again to retry the public-page check.',
+    )
+    expect(rendered).not.toContain(
       'Open https://bizfileonline.sos.ca.gov/search/business and search SOS entity number C0123456.',
     )
     expect(rendered).toContain(
       'CA CDTFA Permit, License, or Account Verification:',
     )
     expect(rendered).toContain(
-      'Search CDTFA account identifier 202-822944, UT-123456, ST-123456.',
+      'The automated CA CDTFA public verification did not complete in the latest stored run. Run compliance-discover again to retry the public-page check.',
+    )
+    expect(rendered).toContain(
+      'This is an automation or configuration issue, not a manual evidence request.',
+    )
+    expect(rendered).not.toContain(
+      'Open https://onlineservices.cdtfa.ca.gov/ and choose the option to verify a permit, license, or account.',
     )
     expect(rendered).toContain('CA CDTFA Online Services:')
     expect(rendered).toContain(
@@ -501,7 +511,7 @@ describe('formatComplianceStatusReport', () => {
       latestRuns: [
         failedRun('ca-ag-online-filing', 'auth_required'),
         failedRun('ca-cdtfa-online-services', 'auth_required'),
-        failedRun('ca-cdtfa-permit-license-verification', 'manual_required'),
+        failedRun('ca-cdtfa-permit-license-verification', 'validation'),
         failedRun('ca-ftb-entity-status-letter', 'manual_required'),
         failedRun('ca-ftb-myftb', 'auth_required'),
         failedRun('ca-sos-bizfile', 'manual_required'),
@@ -512,6 +522,9 @@ describe('formatComplianceStatusReport', () => {
     })
 
     expect(rendered).toContain(
+      'The automated CA SOS bizfile public search did not complete in the latest stored run. Run compliance-discover again to retry the public-page check.',
+    )
+    expect(rendered).not.toContain(
       'Open https://bizfileonline.sos.ca.gov/search/business and search exact legal name Foo Foundation.',
     )
     expect(rendered).toContain(
@@ -523,7 +536,10 @@ describe('formatComplianceStatusReport', () => {
     expect(rendered).not.toContain('CA Attorney General Online Renewal System:')
     expect(rendered).not.toContain('Open the renewal account for')
     expect(rendered).toContain(
-      'No CDTFA account identifier is configured. If the organization has a seller permit, license, or account number, use that number; otherwise tell me no CDTFA account identifier is available.',
+      'No CDTFA seller permit or use-tax account number is configured. Store the known CDTFA identifier, then run compliance-discover again.',
+    )
+    expect(rendered).not.toContain(
+      'Open https://onlineservices.cdtfa.ca.gov/ and choose the option to verify a permit, license, or account.',
     )
     expect(rendered).toContain(
       'No CDTFA account identifier is configured. If the portal shows a CDTFA-managed account for this organization, use that account; otherwise tell me no CDTFA-managed account is present.',
@@ -689,6 +705,225 @@ describe('formatComplianceStatusReport', () => {
       'The public Entity Status Letter check is automated; run compliance-discover again whenever you want to refresh this stored status.',
     )
     expect(rendered).not.toContain('Open https://webapp.ftb.ca.gov/eletter/')
+  })
+
+  it('summarizes the latest automated CA SOS bizfile result when it shows the issue', () => {
+    const rendered = formatComplianceStatusReport({
+      entity: ENTITY,
+      identifiers: IDENTIFIERS,
+      latestRuns: [
+        {
+          ...RUN,
+          source_id: 'ca-sos-bizfile',
+          jurisdiction_id: 'us-ca',
+          status: 'succeeded',
+          payload: {
+            matchStatus: 'found',
+            entity_name: 'Foo Foundation',
+            sos_entity_number: 'C0123456',
+            initial_filing_date: '2010-01-15',
+            entity_status: 'Suspended',
+            entity_type: 'Nonprofit Corporation',
+            formed_in: 'CALIFORNIA',
+            agent: 'Example Agent',
+          },
+        },
+      ],
+      openFindings: [
+        {
+          ...FINDING,
+          jurisdiction_id: 'us-ca',
+          source_id: 'ca-sos-bizfile',
+          title: 'CA SOS bizfile status is not active',
+          evidence: {
+            code: 'ca.sos.bizfile_not_active',
+            entityStatus: 'Suspended',
+          },
+        },
+      ],
+      overall: 'attention_required',
+    })
+
+    expect(rendered).toContain(
+      'Latest public CA SOS bizfile search says entity status Suspended, entity name Foo Foundation, SOS entity number C0123456, initial filing date 2010-01-15, entity type Nonprofit Corporation, formed in CALIFORNIA, and agent Example Agent.',
+    )
+    expect(rendered).toContain(
+      'The public bizfile check is automated; run compliance-discover again whenever you want to refresh this stored status.',
+    )
+    expect(rendered).not.toContain(
+      'Open https://bizfileonline.sos.ca.gov/search/business',
+    )
+  })
+
+  it('summarizes an automated CA SOS bizfile not-found result without asking for a manual re-check', () => {
+    const rendered = formatComplianceStatusReport({
+      entity: ENTITY,
+      identifiers: IDENTIFIERS,
+      latestRuns: [
+        {
+          ...RUN,
+          source_id: 'ca-sos-bizfile',
+          jurisdiction_id: 'us-ca',
+          status: 'succeeded',
+          payload: {
+            matchStatus: 'not_found',
+            search: { field: 'SOS Entity Number', value: 'C0123456' },
+          },
+        },
+      ],
+      openFindings: [
+        {
+          ...FINDING,
+          jurisdiction_id: 'us-ca',
+          source_id: 'ca-sos-bizfile',
+          title: 'Entity not found in CA SOS bizfile',
+          evidence: {
+            code: 'ca.sos.bizfile_not_found',
+          },
+        },
+      ],
+      overall: 'attention_required',
+    })
+
+    expect(rendered).toContain(
+      'Latest public CA SOS bizfile search did not return the configured entity.',
+    )
+    expect(rendered).toContain(
+      'confirm the configured SOS entity number and legal name',
+    )
+    expect(rendered).not.toContain(
+      'Open https://bizfileonline.sos.ca.gov/search/business',
+    )
+  })
+
+  it('summarizes the latest automated CDTFA public verification result when it shows the issue', () => {
+    const rendered = formatComplianceStatusReport({
+      entity: ENTITY,
+      identifiers: IDENTIFIERS,
+      latestRuns: [
+        {
+          ...RUN,
+          source_id: 'ca-cdtfa-permit-license-verification',
+          jurisdiction_id: 'us-ca',
+          status: 'succeeded',
+          payload: {
+            matchStatus: 'found',
+            account_type: 'Sellers Permit',
+            account_number: '999-999999',
+            verification_status: 'This Sellers Permit is invalid.',
+            is_valid: false,
+            owner_name: 'LELEKA FOUNDATION',
+            start_date: '01-Sep-2023',
+          },
+        },
+      ],
+      openFindings: [
+        {
+          ...FINDING,
+          jurisdiction_id: 'us-ca',
+          source_id: 'ca-cdtfa-permit-license-verification',
+          title: 'CA CDTFA public verification says account is invalid',
+          evidence: {
+            code: 'ca.cdtfa.public_verification_invalid',
+            accountType: 'Sellers Permit',
+            accountNumber: '999-999999',
+            verificationStatus: 'This Sellers Permit is invalid.',
+          },
+        },
+      ],
+      overall: 'attention_required',
+    })
+
+    expect(rendered).toContain(
+      'Latest public CA CDTFA verification says Sellers Permit 999-999999 status This Sellers Permit is invalid, owner name LELEKA FOUNDATION, start date 01-Sep-2023.',
+    )
+    expect(rendered).toContain(
+      'The public CDTFA verification check is automated; run compliance-discover again whenever you want to refresh this stored status.',
+    )
+    expect(rendered).not.toContain(
+      'Open https://onlineservices.cdtfa.ca.gov/ and choose the option to verify a permit, license, or account.',
+    )
+  })
+
+  it('summarizes CDTFA public verification when optional owner and start date fields are absent', () => {
+    const rendered = formatComplianceStatusReport({
+      entity: ENTITY,
+      identifiers: IDENTIFIERS,
+      latestRuns: [
+        {
+          ...RUN,
+          source_id: 'ca-cdtfa-permit-license-verification',
+          jurisdiction_id: 'us-ca',
+          status: 'succeeded',
+          payload: {
+            matchStatus: 'found',
+            account_type: 'Sellers Permit',
+            account_number: '999-999999',
+            verification_status: 'This Sellers Permit is invalid.',
+            is_valid: false,
+            owner_name: null,
+            start_date: null,
+          },
+        },
+      ],
+      openFindings: [
+        {
+          ...FINDING,
+          jurisdiction_id: 'us-ca',
+          source_id: 'ca-cdtfa-permit-license-verification',
+          title: 'CA CDTFA public verification says account is invalid',
+          evidence: {
+            code: 'ca.cdtfa.public_verification_invalid',
+            accountType: 'Sellers Permit',
+            accountNumber: '999-999999',
+            verificationStatus: 'This Sellers Permit is invalid.',
+          },
+        },
+      ],
+      overall: 'attention_required',
+    })
+
+    expect(rendered).toContain(
+      'Latest public CA CDTFA verification says Sellers Permit 999-999999 status This Sellers Permit is invalid.',
+    )
+    expect(rendered).not.toContain(
+      'status This Sellers Permit is invalid, owner name',
+    )
+    expect(rendered).not.toContain(
+      'status This Sellers Permit is invalid, start date',
+    )
+  })
+
+  it('treats malformed stored CDTFA public verification payloads as an automation retry', () => {
+    const rendered = formatComplianceStatusReport({
+      entity: ENTITY,
+      identifiers: IDENTIFIERS,
+      latestRuns: [
+        {
+          ...RUN,
+          source_id: 'ca-cdtfa-permit-license-verification',
+          jurisdiction_id: 'us-ca',
+          status: 'succeeded',
+          payload: {
+            matchStatus: 'found',
+            account_number: '202-822944',
+          },
+        },
+      ],
+      openFindings: [
+        {
+          ...FINDING,
+          jurisdiction_id: 'us-ca',
+          source_id: 'ca-cdtfa-permit-license-verification',
+          title: 'CDTFA public verification payload needs refresh',
+        },
+      ],
+      overall: 'attention_required',
+    })
+
+    expect(rendered).toContain(
+      'The automated CA CDTFA public verification did not complete in the latest stored run. Run compliance-discover again to retry the public-page check.',
+    )
   })
 
   it('uses normal FTB status-letter instructions when stored evidence verifies exempt status', () => {

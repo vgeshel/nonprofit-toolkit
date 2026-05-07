@@ -100,7 +100,12 @@ async function inspectEntityStatusLetter(
   await page.goto(ACCESS_URL, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('#EntityId')
   await page.fill(query.selector, query.value)
-  await clickAndWait(page, () => page.click('button[type=submit]'))
+  await clickAndWait(page, () =>
+    page
+      .locator('button[title="Search for an Entity."]')
+      .first()
+      .click({ force: true }),
+  )
 
   const resultText = await readBodyTextAfterPageUpdate(
     page,
@@ -133,7 +138,7 @@ async function inspectEntityStatusLetter(
         'CA FTB Entity Status Letter result page did not contain an entity result button.',
     })
   }
-  await clickAndWait(page, () => resultButton.click())
+  await clickAndWait(page, () => resultButton.click({ force: true }))
 
   const summaryText = await readBodyTextAfterPageUpdate(
     page,

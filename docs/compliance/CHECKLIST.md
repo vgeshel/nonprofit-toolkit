@@ -87,8 +87,8 @@ This is the working checklist used by the implementation subagent for each phase
 Phase 2 adds public-source discovery for IRS EO BMF and California, typed source
 outcomes, bounded download evidence/cache support, a findings/gap engine, upgraded
 `compliance-discover` reporting, and a read-only `compliance-status` skill. Source
-review was refreshed on 2026-04-28; CA SOS and CA FTB remain manual-required because
-the current public surfaces do not provide a confidently permitted automated path.
+review was refreshed on 2026-04-28; the Phase 2 CA SOS manual decision was superseded in
+Phase 3 after validating the public bizfile page flow in a browser.
 
 ### Phase 1 follow-ups to pick up
 
@@ -179,13 +179,12 @@ the current public surfaces do not provide a confidently permitted automated pat
 
 - [x] Refresh and document the current CA SOS access policy. Do not implement browser
       automation unless current terms and source review support it.
-- [x] Tests for the default manual-source path, including exact instructions for
+- [x] Tests for the original Phase 2 manual-source path, including exact instructions for
       checking bizfile business status and recording structured evidence.
-- [x] If an authorized bulk/public-data path is available, tests for its parser and
-      status mapping. No permitted bulk/public-data path was identified in Phase 2.
-- [x] Tests for CA SOS statuses that should produce findings: active, suspended,
-      forfeited, dissolved, canceled, surrendered, and not found. Deferred until manual
-      evidence ingestion exists; Phase 2 emits a manual-required finding instead.
+- [x] Add Phase 3 tests for the public bizfile browser flow, response parser, and status
+      mapping.
+- [x] Tests for CA SOS statuses that should produce findings: active, non-active
+      statuses, legal-name mismatch, and not found.
 - [x] Tests that the source preserves entity numbers exactly, including leading zeroes
       or the `B` prefix.
 - [x] Implement CA SOS as manual or authorized bulk/public-data source according to the
@@ -262,8 +261,8 @@ the current public surfaces do not provide a confidently permitted automated pat
   - [x] mailing/principal-address mismatch. Deferred because Phase 2 source payloads do
         not include enough typed address data for a reliable address comparison.
   - [x] missing configured CA identifiers
-  - [x] conflicting good-standing signals. Deferred until remaining manual CA SOS
-        evidence can be ingested as typed source records.
+  - [x] conflicting good-standing signals. Deferred until multiple typed good-standing
+        signals are available for a reliable cross-source comparison.
 - [x] Implement the engine so findings are derived from validated source records, not
       ad hoc string checks spread through individual sources.
 - [x] Move Phase 1 TEOS-derived findings into the engine if that keeps federal logic
@@ -310,7 +309,8 @@ the current public surfaces do not provide a confidently permitted automated pat
       manual evidence, policy-blocked manual requirement, or source failure.
       Live verification result: CA AG Registry = public search/detail-page success; IRS
       EO BMF = public CSV success; IRS TEOS = public bulk-download success; CA FTB =
-      public Entity Status Letter success; CA SOS = manual required by source policy.
+      public Entity Status Letter success; CA SOS was initially manual by source policy
+      and later automated in Phase 3 through the public bizfile page flow.
 - [x] Run `compliance-status` and verify it reads the stored discovery state without
       performing network discovery.
 - [x] Re-run discovery and confirm cache behavior is visible and correct. Local cache
@@ -422,8 +422,8 @@ prints exact evidence instructions instead of guessing or mutating portal state.
   - [x] seller's permit / account number
   - [x] use-tax account number
   - [x] special tax or fee account number
-- [x] Implement CDTFA public permit/license/account verification as manual or
-      policy-blocked according to the refreshed source review.
+- [x] Implement CDTFA public permit/license/account verification as an automated public
+      browser check for configured seller permit and use-tax account identifiers.
 - [x] Implement CDTFA Online Services as user-assisted authenticated read-only
       discovery with explicit forbidden actions.
 - [x] Implement MyFTB as user-assisted authenticated read-only discovery with terms
@@ -456,11 +456,13 @@ prints exact evidence instructions instead of guessing or mutating portal state.
 - [x] Confirm Phase 2 public sources still produce live/cache-backed results.
       Verified `us-federal/irs-teos`, `us-federal/irs-eo-bmf`, and
       `us-ca/ca-ag-registry` returned `success`.
-- [x] Confirm Phase 3 sources persist `AUTH` or `MANUAL` outcomes with detailed
+- [x] Automate CA SOS bizfile public business-status verification so the skill no
+      longer asks the user to manually search the public bizfile page when the page can be
+      checked by the tool itself.
+- [x] Confirm Phase 3 sources persist `AUTH`, source-failure, and automated public outcomes with detailed
       evidence instructions and no credential leakage. Verified
-      `ca-cdtfa-permit-license-verification` and `ca-sos-bizfile` returned
-      `manual_required`; confirmed `ca-ftb-entity-status-letter` returns an automated
-      public status payload; verified
+      `ca-cdtfa-permit-license-verification`, `ca-sos-bizfile`, and
+      `ca-ftb-entity-status-letter` return automated public status payloads; verified
       `ca-cdtfa-online-services` and `ca-ftb-myftb` returned `auth_required`
       with login URLs, field descriptors, evidence fields, and forbidden actions only.
       `ca-ag-online-filing` remains an optional dashboard-only source because public

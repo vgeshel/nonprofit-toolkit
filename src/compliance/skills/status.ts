@@ -356,6 +356,11 @@ function readString(value: unknown, key: string): string | null {
     : null
 }
 
+function readBoolean(value: unknown, key: string): boolean | null {
+  const field = readField(value, key)
+  return typeof field === 'boolean' ? field : null
+}
+
 function readField(value: unknown, key: string): unknown {
   if (value === null || typeof value !== 'object') {
     return null
@@ -405,12 +410,68 @@ function formatSourceAction(
 }
 
 function formatCaSosBizfileAction(report: ComplianceStatusReport): string[] {
+  const storedIssue = formatStoredCaSosBizfileIssue(report)
+  if (storedIssue.length > 0) {
+    return storedIssue
+  }
   return [
     `${formatSourceName('ca-sos-bizfile')}:`,
-    `- Open https://bizfileonline.sos.ca.gov/search/business and ${formatSosSearchInstruction(
-      report,
-    )}.`,
-    '- Tell me the entity status and entity name. Include the jurisdiction and status date if shown.',
+    '- The automated CA SOS bizfile public search did not complete in the latest stored run. Run compliance-discover again to retry the public-page check.',
+    '- This is an automation or source-access issue, not a manual evidence request. Fix the source failure before treating SOS status as checked.',
+  ]
+}
+
+function formatStoredCaSosBizfileIssue(
+  report: ComplianceStatusReport,
+): string[] {
+  const latestRun = report.latestRuns.find(
+    (run) => run.source_id === 'ca-sos-bizfile' && run.status === 'succeeded',
+  )
+  if (latestRun === undefined) {
+    return []
+  }
+  const payload = parsePayload(latestRun.payload)
+  const matchStatus = readString(payload, 'matchStatus')
+  if (matchStatus === 'not_found') {
+    return [
+      `${formatSourceName('ca-sos-bizfile')}:`,
+      '- Latest public CA SOS bizfile search did not return the configured entity.',
+      '- The public bizfile check is automated; run compliance-discover again whenever you want to refresh this stored status.',
+      '- If the entity should exist in California, confirm the configured SOS entity number and legal name, correct the stored identifiers if needed, then rerun compliance-discover.',
+    ]
+  }
+  const entityStatus = extractPayloadString(
+    report,
+    'ca-sos-bizfile',
+    'entity_status',
+  )
+  const entityName = extractPayloadString(
+    report,
+    'ca-sos-bizfile',
+    'entity_name',
+  )
+  const sosEntityNumber = extractPayloadString(
+    report,
+    'ca-sos-bizfile',
+    'sos_entity_number',
+  )
+  const initialFilingDate = extractPayloadString(
+    report,
+    'ca-sos-bizfile',
+    'initial_filing_date',
+  )
+  const entityType = extractPayloadString(
+    report,
+    'ca-sos-bizfile',
+    'entity_type',
+  )
+  const formedIn = extractPayloadString(report, 'ca-sos-bizfile', 'formed_in')
+  const agent = extractPayloadString(report, 'ca-sos-bizfile', 'agent')
+  return [
+    `${formatSourceName('ca-sos-bizfile')}:`,
+    `- Latest public CA SOS bizfile search says entity status ${entityStatus}, entity name ${entityName}, SOS entity number ${sosEntityNumber}, initial filing date ${initialFilingDate}, entity type ${entityType}, formed in ${formedIn}, and agent ${agent}.`,
+    '- The public bizfile check is automated; run compliance-discover again whenever you want to refresh this stored status.',
+    '- If the stored status is not Active or the displayed name or number is wrong, correct the record with CA SOS or the registered agent, then rerun compliance-discover.',
   ]
 }
 
@@ -469,12 +530,76 @@ function isFtbExemptStatusVerified(value: string): boolean {
 function formatCaCdtfaPermitVerificationAction(
   report: ComplianceStatusReport,
 ): string[] {
+  const storedIssue = formatStoredCdtfaPublicVerificationIssue(report)
+  if (storedIssue.length > 0) {
+    return storedIssue
+  }
+  const identifiers = listCdtfaConfiguredPublicIdentifiers(report)
+  const retryInstruction =
+    identifiers.length === 0
+      ? '- No CDTFA seller permit or use-tax account number is configured. Store the known CDTFA identifier, then run compliance-discover again.'
+      : '- The automated CA CDTFA public verification did not complete in the latest stored run. Run compliance-discover again to retry the public-page check.'
   return [
     `${formatSourceName('ca-cdtfa-permit-license-verification')}:`,
-    '- Open https://onlineservices.cdtfa.ca.gov/ and choose the option to verify a permit, license, or account.',
-    `- ${formatCdtfaPublicIdentifierInstruction(report)}`,
-    '- Tell me the account type, account number, verification status, owner name if shown, and start or status date if shown.',
+    retryInstruction,
+    '- This is an automation or configuration issue, not a manual evidence request.',
   ]
+}
+
+function formatStoredCdtfaPublicVerificationIssue(
+  report: ComplianceStatusReport,
+): string[] {
+  const latestRun = report.latestRuns.find(
+    (run) =>
+      run.source_id === 'ca-cdtfa-permit-license-verification' &&
+      run.status === 'succeeded',
+  )
+  if (latestRun === undefined) {
+    return []
+  }
+  const payload = parsePayload(latestRun.payload)
+  if (readBoolean(payload, 'is_valid') === null) {
+    return []
+  }
+  const accountType = extractPayloadString(
+    report,
+    'ca-cdtfa-permit-license-verification',
+    'account_type',
+  )
+  const accountNumber = extractPayloadString(
+    report,
+    'ca-cdtfa-permit-license-verification',
+    'account_number',
+  )
+  const verificationStatus = extractPayloadString(
+    report,
+    'ca-cdtfa-permit-license-verification',
+    'verification_status',
+  )
+  const ownerName = extractPayloadString(
+    report,
+    'ca-cdtfa-permit-license-verification',
+    'owner_name',
+  )
+  const startDate = extractPayloadString(
+    report,
+    'ca-cdtfa-permit-license-verification',
+    'start_date',
+  )
+  return [
+    `${formatSourceName('ca-cdtfa-permit-license-verification')}:`,
+    `- Latest public CA CDTFA verification says ${accountType} ${accountNumber} status ${formatCdtfaVerificationStatus(verificationStatus)}${formatOptionalCdtfaContext('owner name', ownerName)}${formatOptionalCdtfaContext('start date', startDate)}.`,
+    '- The public CDTFA verification check is automated; run compliance-discover again whenever you want to refresh this stored status.',
+    '- If the stored status, owner name, or account number is wrong, correct the CDTFA identifier or account record, then rerun compliance-discover.',
+  ]
+}
+
+function formatOptionalCdtfaContext(label: string, value: string): string {
+  return value === 'not available in stored status' ? '' : `, ${label} ${value}`
+}
+
+function formatCdtfaVerificationStatus(value: string): string {
+  return value.replace(/\.$/, '')
 }
 
 function formatCaCdtfaOnlineServicesAction(
@@ -497,14 +622,6 @@ function formatCaFtbMyFtbAction(report: ComplianceStatusReport): string[] {
   ]
 }
 
-function formatSosSearchInstruction(report: ComplianceStatusReport): string {
-  const sosEntityNumber = report.identifiers['us-ca']?.sosEntityNumber
-  if (sosEntityNumber !== undefined) {
-    return `search SOS entity number ${sosEntityNumber}`
-  }
-  return `search exact legal name ${report.entity.legal_name}`
-}
-
 function formatFtbSearchInstruction(report: ComplianceStatusReport): string {
   const ftbEntityId = getFtbEntityId(report)
   if (ftbEntityId !== null) {
@@ -525,16 +642,6 @@ function formatFtbAccountInstruction(report: ComplianceStatusReport): string {
 
 function formatFtbEntityName(report: ComplianceStatusReport): string {
   return getConfiguredFtbEntityName(report) ?? report.entity.legal_name
-}
-
-function formatCdtfaPublicIdentifierInstruction(
-  report: ComplianceStatusReport,
-): string {
-  const identifiers = listCdtfaAccountIdentifiers(report)
-  if (identifiers.length > 0) {
-    return `Search CDTFA account identifier ${formatList(identifiers)}.`
-  }
-  return 'No CDTFA account identifier is configured. If the organization has a seller permit, license, or account number, use that number; otherwise tell me no CDTFA account identifier is available.'
 }
 
 function formatCdtfaAuthenticatedIdentifierInstruction(
@@ -566,6 +673,16 @@ function listCdtfaAccountIdentifiers(
       ].filter(isPresentString),
     ),
   )
+}
+
+function listCdtfaConfiguredPublicIdentifiers(
+  report: ComplianceStatusReport,
+): readonly string[] {
+  const caIdentifiers = report.identifiers['us-ca']
+  return [
+    caIdentifiers?.cdtfaSellerPermitNumber,
+    caIdentifiers?.cdtfaUseTaxAccountNumber,
+  ].filter(isPresentString)
 }
 
 function isPresentString(value: string | undefined | null): value is string {

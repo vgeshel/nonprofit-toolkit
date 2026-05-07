@@ -4,6 +4,10 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { BrowserPageSession } from '../types/index.ts'
 import type { SourceError } from './errors.ts'
 
+let sharedVirtualDisplay: Promise<void> | null = null
+let sharedVirtualDisplayChild: ChildProcessWithoutNullStreams | null = null
+let previousDisplay: string | undefined
+
 export function openDefaultBrowserPage(): ResultAsync<
   BrowserPageSession,
   SourceError
@@ -46,6 +50,15 @@ async function startVirtualDisplayIfNeeded(): Promise<VirtualDisplay> {
     return { close: () => Promise.resolve() }
   }
 
+  await ensureSharedVirtualDisplay()
+  return { close: () => Promise.resolve() }
+}
+
+async function ensureSharedVirtualDisplay(): Promise<void> {
+  if (sharedVirtualDisplay !== null) {
+    return sharedVirtualDisplay
+  }
+
   const displayNumber = 90 + Math.floor(Math.random() * 900)
   const display = `:${String(displayNumber)}`
   const child = spawn('Xvfb', [
@@ -56,20 +69,22 @@ async function startVirtualDisplayIfNeeded(): Promise<VirtualDisplay> {
     '-nolisten',
     'tcp',
   ])
-  await waitForXvfb(child, display)
-  const previousDisplay = process.env.DISPLAY
+  previousDisplay = process.env.DISPLAY
   process.env.DISPLAY = display
-  return {
-    close: async () => {
-      if (previousDisplay === undefined) {
-        delete process.env.DISPLAY
-      } else {
-        process.env.DISPLAY = previousDisplay
-      }
-      child.kill()
-      await Promise.resolve()
-    },
+  sharedVirtualDisplayChild = child
+  sharedVirtualDisplay = waitForXvfb(child, display)
+  process.once('exit', closeSharedVirtualDisplay)
+  return sharedVirtualDisplay
+}
+
+function closeSharedVirtualDisplay(): void {
+  if (previousDisplay === undefined) {
+    delete process.env.DISPLAY
+  } else {
+    process.env.DISPLAY = previousDisplay
   }
+  sharedVirtualDisplayChild?.kill()
+  sharedVirtualDisplayChild = null
 }
 
 function waitForXvfb(

@@ -1,7 +1,7 @@
 # California Compliance Sources
 
 Load this file when discussing California compliance discovery, interpreting California
-source results, or explaining why a California source is manual.
+source results, or explaining why a California source is manual or automated.
 
 ## CA AG Registry Search Tool
 
@@ -73,30 +73,31 @@ type the field keys above.
 
 Source id: `us-ca/ca-sos-bizfile`
 
-- Access method: manual.
-- Why manual: current source-policy review treats bizfile as manual-only because the
-  CA SOS bizfile terms prohibit page-scrape, robot, spider, or similar automated
-  collection methods.
+- Access method: automated public browser check. No authentication is required.
 - Official URL: `https://bizfileonline.sos.ca.gov/search/business`
 - Terms URL:
   `https://www.sos.ca.gov/business-programs/bizfile/privacy-warning-terms-and-conditions-use`
 
-Manual steps:
+Automated behavior:
 
-1. Open the California Secretary of State bizfile business search.
-2. Search for the exact SOS entity number configured for this nonprofit; the report must
-   print the actual number.
-3. Record the displayed entity status, entity name, jurisdiction, and status date if shown.
+1. Open the public California Secretary of State bizfile business search in Chromium.
+2. Search by configured SOS entity number, removing a legacy leading `C` when needed
+   because bizfile tells users to search corporation numbers without that prefix.
+3. If no SOS number is configured, search by exact legal entity name.
+4. Record entity name, SOS entity number, initial filing date, status, entity type,
+   formed-in jurisdiction, agent, standing when shown, and structured public-row evidence.
 
-Evidence fields:
+Finding behavior:
 
-- `entity_status` (required): Entity status
-- `entity_name` (required): Entity name
-- `jurisdiction` (optional): Jurisdiction
-- `status_date` (optional): Status date
+- If the source returns no matching row, treat that as an open CA SOS issue.
+- If the source returns a status other than `Active`, treat that as an open CA SOS issue.
+- If the source legal name differs from the onboarded legal name, treat that as a
+  cross-source legal-name mismatch.
 
-User-facing walkthrough: give the official URL and the actual SOS entity number. Ask for
-plain-language status details; do not ask the user to type the field keys above.
+User-facing guidance: do not ask the user to re-check this page manually. Run
+`compliance-discover` to refresh it. If the latest result is missing, non-active, or has
+the wrong name/number, guide the user to correct the record with CA SOS or the registered
+agent, then rerun discovery.
 
 ## CA FTB Entity Status Letter
 
@@ -159,33 +160,21 @@ above.
 
 Source id: `us-ca/ca-cdtfa-permit-license-verification`
 
-- Access method: manual.
-- Why manual: CDTFA documents a verification webpage, but Phase 3 did not identify a
-  documented automated read-only request shape for that form.
+- Access method: automated public browser check.
+- Public flow: open CDTFA Online Services, choose "Verify a Permit, License or
+  Account," select the configured account type, enter the normalized identifier, and read
+  the public result.
+- Supported automated identifiers: seller permit number and use-tax account number.
+  Special tax/fee identifiers remain configuration-blocked until the specific taxable
+  activity type is known.
 - Official URL: `https://onlineservices.cdtfa.ca.gov/`
 - Terms URL: `https://www.cdtfa.ca.gov/use.htm`
 
-Manual steps:
-
-1. Open CDTFA Online Services.
-2. Choose the option to verify a permit, license, or account.
-3. Search any configured seller permit, use-tax, special tax/fee, cigarette/tobacco, or
-   eWaste account number. The report must print each configured CDTFA identifier.
-4. Record the account type, account number, verification result, displayed owner name,
-   and status date if shown.
-
-Evidence fields:
-
-- `account_type` (required): Account type
-- `account_number` (required): Account number
-- `verification_status` (required): Verification status
-- `owner_name` (optional): Owner name
-- `status_date` (optional): Status date
-
-User-facing walkthrough: give the official URL and every configured CDTFA account
-identifier. If no CDTFA identifier is configured, say that clearly and ask the user to
-confirm whether they know of one. Ask for plain-language status details; do not ask the
-user to type the field keys above.
+Stored payload includes account type, account number, verification status, validity,
+owner name, start date, end date, DBA, address, suspension dates, city, zip code, and
+structured evidence. If this source fails because no seller permit or use-tax identifier
+is configured, store the known identifier and rerun discovery; do not ask the user to
+perform the public search manually.
 
 ## CDTFA Online Services
 

@@ -41,6 +41,7 @@ export {
   type BrowserPage,
   type BrowserPageFactory,
   type BrowserPageSession,
+  type BrowserResponse,
   type FetchImpl,
   type Source,
   type SourceAccessMethod,

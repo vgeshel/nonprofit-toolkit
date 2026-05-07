@@ -1,7 +1,12 @@
 import { okAsync } from 'neverthrow'
 import { describe, expect, it, vi } from 'vitest'
 import { caFtbEntityStatusLetterSource } from '../jurisdictions/us-ca/sources/ca-ftb.ts'
-import type { Entity, FetchImpl, SourceContext } from '../types/index.ts'
+import type {
+  BrowserResponse,
+  Entity,
+  FetchImpl,
+  SourceContext,
+} from '../types/index.ts'
 
 const ACCESS_URL = 'https://webapp.ftb.ca.gov/eletter/'
 
@@ -66,19 +71,29 @@ class FakeLocator {
     return Promise.resolve(1)
   }
 
-  click(): Promise<void> {
+  click(options?: { readonly force?: boolean }): Promise<void> {
+    const prefix =
+      options?.force === true ? 'locator-click-force' : 'locator-click'
     this.page.actions.push(
       this.textFilter === null
-        ? `locator-click ${this.selector}`
-        : `locator-click ${String(this.textFilter)}`,
+        ? `${prefix} ${this.selector}`
+        : `${prefix} ${String(this.textFilter)}`,
     )
-    this.page.stage = 'summary'
+    this.page.stage =
+      this.selector === 'button[title="Search for an Entity."]'
+        ? 'result'
+        : 'summary'
     return Promise.resolve()
   }
 
   innerText(): Promise<string> {
     this.page.actions.push(`innerText ${this.selector}`)
     return Promise.resolve(this.page.innerText())
+  }
+
+  inputValue(): Promise<string> {
+    this.page.actions.push(`inputValue ${this.selector}`)
+    return Promise.resolve('')
   }
 }
 
@@ -114,6 +129,14 @@ class FakePage {
     return Promise.resolve()
   }
 
+  selectOption(
+    selector: string,
+    option: { readonly label: string },
+  ): Promise<void> {
+    this.actions.push(`select ${selector}=${option.label}`)
+    return Promise.resolve()
+  }
+
   fill(selector: string, value: string): Promise<void> {
     this.actions.push(`fill ${selector}=${value}`)
     return Promise.resolve()
@@ -135,6 +158,10 @@ class FakePage {
       return Promise.reject(new Error(message))
     }
     return Promise.resolve()
+  }
+
+  waitForResponse(): Promise<BrowserResponse> {
+    return Promise.reject(new Error('FTB test page has no API response'))
   }
 
   locator(selector: string): FakeLocator {
@@ -220,7 +247,10 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     if (!result.isOk()) return
     expect(page.actions).toContain(`goto ${ACCESS_URL}`)
     expect(page.actions).toContain('fill #EntityId=6423690')
-    expect(page.actions).toContain('locator-click 6423690')
+    expect(page.actions).toContain(
+      'locator-click-force button[title="Search for an Entity."]',
+    )
+    expect(page.actions).toContain('locator-click-force 6423690')
     expect(result.value.record).toMatchObject({
       source_id: 'ca-ftb-entity-status-letter',
       fetched_at: '2026-05-03T12:00:00.000Z',
@@ -259,7 +289,7 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(page.actions).toContain('fill #EntityId=6423690')
-    expect(page.actions).toContain('locator-click 6423690')
+    expect(page.actions).toContain('locator-click-force 6423690')
     expect(result.value.record.payload).toMatchObject({
       search: { field: 'Entity ID', value: '6423690' },
       entity_id: '6423690',
@@ -279,7 +309,7 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(page.actions).toContain('fill #EntityName=Leleka Foundation')
-    expect(page.actions).toContain('locator-click table button')
+    expect(page.actions).toContain('locator-click-force table button')
     expect(result.value.record.payload).toMatchObject({
       search: { field: 'Entity Name', value: 'Leleka Foundation' },
       entity_id: '6423690',

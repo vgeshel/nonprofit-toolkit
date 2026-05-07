@@ -30,6 +30,11 @@ export interface OnboardingAnswers {
   readonly stateOfIncorporation: string
   readonly caSosEntityNumber: string
   readonly caAgCharityNumber: string | null
+  readonly caFtbEntityId?: string | null
+  readonly caFtbEntityName?: string | null
+  readonly cdtfaSellerPermitNumber?: string | null
+  readonly cdtfaUseTaxAccountNumber?: string | null
+  readonly cdtfaSpecialTaxAccountNumber?: string | null
   readonly fiscalYearEndMonth: number
   readonly fiscalYearEndDay: number
   readonly formationDate: string
@@ -82,6 +87,36 @@ export const ONBOARD_INTERVIEW_QUESTIONS: readonly InterviewQuestion[] = [
     field: 'caAgCharityNumber',
     prompt:
       'California AG Registry of Charitable Trusts charity number (optional)',
+    kind: 'string',
+    optional: true,
+  },
+  {
+    field: 'caFtbEntityId',
+    prompt: 'California Franchise Tax Board entity ID (optional)',
+    kind: 'string',
+    optional: true,
+  },
+  {
+    field: 'caFtbEntityName',
+    prompt: 'California Franchise Tax Board entity name (optional)',
+    kind: 'string',
+    optional: true,
+  },
+  {
+    field: 'cdtfaSellerPermitNumber',
+    prompt: 'California CDTFA seller permit number (optional)',
+    kind: 'string',
+    optional: true,
+  },
+  {
+    field: 'cdtfaUseTaxAccountNumber',
+    prompt: 'California CDTFA use-tax account number (optional)',
+    kind: 'string',
+    optional: true,
+  },
+  {
+    field: 'cdtfaSpecialTaxAccountNumber',
+    prompt: 'California CDTFA special tax or fee account number (optional)',
     kind: 'string',
     optional: true,
   },
@@ -189,6 +224,31 @@ const OnboardingAnswersSchema = z.object({
     .min(1)
     .regex(/^[A-Za-z0-9-]+$/)
     .nullable(),
+  caFtbEntityId: z
+    .string()
+    .min(1)
+    .regex(/^[A-Za-z0-9-]+$/)
+    .nullable()
+    .optional(),
+  caFtbEntityName: z.string().min(1).nullable().optional(),
+  cdtfaSellerPermitNumber: z
+    .string()
+    .min(1)
+    .regex(/^[A-Za-z0-9-]+$/)
+    .nullable()
+    .optional(),
+  cdtfaUseTaxAccountNumber: z
+    .string()
+    .min(1)
+    .regex(/^[A-Za-z0-9-]+$/)
+    .nullable()
+    .optional(),
+  cdtfaSpecialTaxAccountNumber: z
+    .string()
+    .min(1)
+    .regex(/^[A-Za-z0-9-]+$/)
+    .nullable()
+    .optional(),
   fiscalYearEndMonth: z.number().int().min(1).max(12),
   fiscalYearEndDay: z.number().int().min(1).max(31),
   formationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -203,11 +263,46 @@ const OnboardingAnswersSchema = z.object({
 function buildIdentifiers(
   answers: z.infer<typeof OnboardingAnswersSchema>,
 ): Result<EntityIdentifiers, OnboardingError> {
-  const caInner: { sosEntityNumber: string; agCharityNumber?: string } = {
+  const caInner: {
+    sosEntityNumber: string
+    agCharityNumber?: string
+    ftbEntityId?: string
+    ftbEntityName?: string
+    cdtfaSellerPermitNumber?: string
+    cdtfaUseTaxAccountNumber?: string
+    cdtfaSpecialTaxAccountNumber?: string
+  } = {
     sosEntityNumber: answers.caSosEntityNumber,
   }
   if (answers.caAgCharityNumber !== null) {
     caInner.agCharityNumber = answers.caAgCharityNumber
+  }
+  if (answers.caFtbEntityId !== undefined && answers.caFtbEntityId !== null) {
+    caInner.ftbEntityId = answers.caFtbEntityId
+  }
+  if (
+    answers.caFtbEntityName !== undefined &&
+    answers.caFtbEntityName !== null
+  ) {
+    caInner.ftbEntityName = answers.caFtbEntityName
+  }
+  if (
+    answers.cdtfaSellerPermitNumber !== undefined &&
+    answers.cdtfaSellerPermitNumber !== null
+  ) {
+    caInner.cdtfaSellerPermitNumber = answers.cdtfaSellerPermitNumber
+  }
+  if (
+    answers.cdtfaUseTaxAccountNumber !== undefined &&
+    answers.cdtfaUseTaxAccountNumber !== null
+  ) {
+    caInner.cdtfaUseTaxAccountNumber = answers.cdtfaUseTaxAccountNumber
+  }
+  if (
+    answers.cdtfaSpecialTaxAccountNumber !== undefined &&
+    answers.cdtfaSpecialTaxAccountNumber !== null
+  ) {
+    caInner.cdtfaSpecialTaxAccountNumber = answers.cdtfaSpecialTaxAccountNumber
   }
   const parsed = EntityIdentifiersSchema.safeParse({
     'us-federal': { ein: answers.ein },

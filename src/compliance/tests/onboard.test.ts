@@ -106,7 +106,12 @@ describe('ONBOARD_INTERVIEW_QUESTIONS', () => {
     expect(ONBOARD_INTERVIEW_QUESTIONS.map((q) => q.field).sort()).toEqual(
       [
         'caAgCharityNumber',
+        'caFtbEntityId',
+        'caFtbEntityName',
         'caSosEntityNumber',
+        'cdtfaSellerPermitNumber',
+        'cdtfaSpecialTaxAccountNumber',
+        'cdtfaUseTaxAccountNumber',
         'ein',
         'fiscalYearEndDay',
         'fiscalYearEndMonth',
@@ -131,11 +136,16 @@ describe('ONBOARD_INTERVIEW_QUESTIONS', () => {
     expect(map.get('fiscalYearEndDay')?.kind).toBe('number')
   })
 
-  it('flags caAgCharityNumber and mailingAddressLine2 as optional', () => {
+  it('flags California secondary identifiers and mailingAddressLine2 as optional', () => {
     const map = new Map(
       ONBOARD_INTERVIEW_QUESTIONS.map((q) => [q.field, q] as const),
     )
     expect(map.get('caAgCharityNumber')?.optional).toBe(true)
+    expect(map.get('caFtbEntityId')?.optional).toBe(true)
+    expect(map.get('caFtbEntityName')?.optional).toBe(true)
+    expect(map.get('cdtfaSellerPermitNumber')?.optional).toBe(true)
+    expect(map.get('cdtfaUseTaxAccountNumber')?.optional).toBe(true)
+    expect(map.get('cdtfaSpecialTaxAccountNumber')?.optional).toBe(true)
     expect(map.get('mailingAddressLine2')?.optional).toBe(true)
   })
 })
@@ -190,6 +200,39 @@ describe('runOnboarding', () => {
     expect(ids.writeMock.mock.calls[0]?.[0]).toEqual({
       'us-federal': { ein: '12-3456789' },
       'us-ca': { sosEntityNumber: 'C0123456' },
+    })
+  })
+
+  it('persists optional California FTB and CDTFA identifiers when provided', async () => {
+    const ids = fakeIds()
+    const bq = fakeBq()
+    const answers: OnboardingAnswers = {
+      ...ANSWERS,
+      caFtbEntityId: '6423690',
+      caFtbEntityName: 'LELEKA FOUNDATION',
+      cdtfaSellerPermitNumber: '202-822944',
+      cdtfaUseTaxAccountNumber: 'UT-00123456',
+      cdtfaSpecialTaxAccountNumber: 'STF-000123',
+    }
+
+    const result = await runOnboarding({
+      answers,
+      identifiersAccessor: ids,
+      entityAccessor: bq,
+      migrationPort: fakeMigrationPort(),
+    })
+    expect(result.isOk()).toBe(true)
+
+    expect(ids.writeMock.mock.calls[0]?.[0]).toMatchObject({
+      'us-ca': {
+        sosEntityNumber: 'C0123456',
+        agCharityNumber: 'CT0123456',
+        ftbEntityId: '6423690',
+        ftbEntityName: 'LELEKA FOUNDATION',
+        cdtfaSellerPermitNumber: '202-822944',
+        cdtfaUseTaxAccountNumber: 'UT-00123456',
+        cdtfaSpecialTaxAccountNumber: 'STF-000123',
+      },
     })
   })
 
