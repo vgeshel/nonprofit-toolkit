@@ -273,6 +273,14 @@ After provisioning completes:
    bun etl:run --sources check_deposits --skip-merge
    ```
 
+### Step 10: MCP Server Deployment (Optional)
+
+Ask: "Do you want to deploy the MCP server? This lets AI assistants (Claude.ai, Claude Code, ChatGPT) query your donation data and generate donor letters via MCP."
+
+If yes: invoke the `/mcp-server` skill to handle the full deployment — it covers architecture choice, authentication, Cloud Run deployment, and client configuration.
+
+If no: skip. The MCP server can be deployed later by running `/mcp-server`.
+
 ## Troubleshooting
 
 ### "Permission denied" errors

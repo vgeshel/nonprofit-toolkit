@@ -32,7 +32,7 @@ After completing this checklist and before your visible output, include the lite
 
 ## Project Overview
 
-A toolkit for nonprofit donation management: ETL from multiple payment platforms (Mercury, PayPal, Wise, Givebutter, Venmo, Funraise, Google Sheets) into BigQuery, plus donor confirmation letters and Slack-published reports. Built with Bun and TypeScript. Designed to be forked and customized via AI assistant conversation.
+A toolkit for nonprofit donation management: ETL from multiple payment platforms (Mercury, PayPal, Wise, Givebutter, Venmo, Funraise, Patreon, Google Sheets) into BigQuery, plus donor confirmation letters, Slack-published reports, and an MCP server for querying donations and generating letters through AI assistants. Built with Bun and TypeScript. Designed to be forked and customized via AI assistant conversation.
 
 See files in [docs/](docs/) for product specs and requirements.
 
