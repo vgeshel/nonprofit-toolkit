@@ -14,7 +14,6 @@ const config: Config = {
   LOG_LEVEL: 'info',
   PROJECT_ID: 'test-project',
   DATASET_CANON: 'donations',
-  SERVICE_API_KEY: 'test-api-key',
   SLACK_BOT_TOKEN: 'xoxb-valid-token',
   SLACK_SIGNING_SECRET: 'test-signing-secret',
   ORG_NAME: 'Leleka Foundation',

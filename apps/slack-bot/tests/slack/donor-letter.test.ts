@@ -12,7 +12,6 @@ const config: Config = {
   LOG_LEVEL: 'info',
   PROJECT_ID: 'test-project',
   DATASET_CANON: 'donations',
-  SERVICE_API_KEY: 'test-key',
   SLACK_BOT_TOKEN: 'xoxb-test',
   SLACK_SIGNING_SECRET: 'test-secret',
   ORG_NAME: 'Test Organization',

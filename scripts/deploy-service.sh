@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy the service to GCP Cloud Run with Slack app provisioning
+# Deploy the Slack bot to GCP Cloud Run with Slack app provisioning
 #
 # Usage: ./scripts/deploy-service.sh [--dry-run] [--skip-secrets] [--skip-build] [--skip-slack] [--skip-monitoring]
 #
@@ -8,7 +8,7 @@
 # 2. Installs the app to your workspace and retrieves the bot token
 # 3. Creates GCP secrets in Secret Manager
 # 4. Builds the Docker image via Cloud Build
-# 5. Deploys the Cloud Run Service
+# 5. Deploys the Cloud Run service
 # 6. Updates the Slack app manifest with the final Cloud Run URL
 # 7. Validates and monitors Slack auth health
 #
@@ -27,18 +27,18 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-log()   { echo -e "${GREEN}[service]${NC} $1"; }
-warn()  { echo -e "${YELLOW}[service]${NC} $1"; }
-error() { echo -e "${RED}[service]${NC} $1" >&2; }
-info()  { echo -e "${CYAN}[service]${NC} $1"; }
+log()   { echo -e "${GREEN}[slack-bot]${NC} $1"; }
+warn()  { echo -e "${YELLOW}[slack-bot]${NC} $1"; }
+error() { echo -e "${RED}[slack-bot]${NC} $1" >&2; }
+info()  { echo -e "${CYAN}[slack-bot]${NC} $1"; }
 
 # Re-invoke with dotenvx if not already running under it
-if [[ -z "${__LETTER_DEPLOY_LOADED:-}" ]]; then
+if [[ -z "${__SLACK_BOT_DEPLOY_LOADED:-}" ]]; then
   if [[ ! -f .env ]]; then
     error ".env file not found. Copy from .env.example and configure."
     exit 1
   fi
-  export __LETTER_DEPLOY_LOADED=1
+  export __SLACK_BOT_DEPLOY_LOADED=1
   exec dotenvx run -- bash "$0" "$@"
 fi
 
@@ -67,7 +67,7 @@ DATASET_CANON="${DATASET_CANON:-donations}"
 RUNTIME_SA="${RUNTIME_SA:-donations-etl-sa}"
 RUNTIME_SA_EMAIL="${RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 
-SERVICE_NAME="letter-service"  # Cloud Run service name (kept for backward compatibility)
+SERVICE_NAME="${SERVICE_NAME:-letter-service}"  # Existing Cloud Run service name used by Slack.
 IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:latest"
 
 # Slack app state (may be set in .env from a previous run)
@@ -119,7 +119,7 @@ else
     echo "  Run this in another terminal:  slack auth token"
     echo "  (It will ask you to paste a command into Slack, then give you a token)"
     echo ""
-    echo -n "  Paste the service token (xoxp-...): "
+    echo -n "  Paste the configuration token (xoxp-... or xoxe-...): "
     read -r SLACK_CONFIG_TOKEN
     if [[ -z "$SLACK_CONFIG_TOKEN" || ! "$SLACK_CONFIG_TOKEN" == xox* ]]; then
       error "Invalid token. Must start with xoxp- or xoxe-"
@@ -197,7 +197,7 @@ MANIFEST_EOF
     # Save app ID to .env for future runs
     if ! grep -q "^SLACK_APP_ID=" .env 2>/dev/null; then
       echo "" >> .env
-      echo "# Letter Service Slack App (auto-generated)" >> .env
+      echo "# Donor Letter Slack Bot (auto-generated)" >> .env
       echo "SLACK_APP_ID=${SLACK_APP_ID}" >> .env
       log "  Saved SLACK_APP_ID to .env"
     fi
@@ -303,19 +303,6 @@ else
     log "  ${name} — set"
   }
 
-  # Generate API key if not already in Secret Manager
-  SERVICE_API_KEY="${SERVICE_API_KEY:-}"
-  if [[ -z "$SERVICE_API_KEY" ]]; then
-    SERVICE_API_KEY=$(gcloud secrets versions access latest \
-      --secret=SERVICE_API_KEY \
-      --project="${PROJECT_ID}" 2>/dev/null || echo "")
-  fi
-  if [[ -z "$SERVICE_API_KEY" ]]; then
-    SERVICE_API_KEY=$(openssl rand -hex 32)
-    log "  SERVICE_API_KEY — generated"
-  fi
-
-  ensure_secret "LETTER_SERVICE_API_KEY" "$SERVICE_API_KEY"
   ensure_secret "SLACK_BOT_TOKEN" "${SLACK_BOT_TOKEN:-placeholder}"
   ensure_secret "SLACK_SIGNING_SECRET" "${SLACK_SIGNING_SECRET:-placeholder}"
   ensure_secret "GOOGLE_GENERATIVE_AI_API_KEY" "${GOOGLE_GENERATIVE_AI_API_KEY:-placeholder}"
@@ -329,7 +316,7 @@ else
   # Grant SA access to secrets
   if [[ "$DRY_RUN" != "true" ]]; then
     log "Granting ${RUNTIME_SA} access to secrets..."
-    for SECRET_NAME in LETTER_SERVICE_API_KEY SLACK_BOT_TOKEN SLACK_SIGNING_SECRET GOOGLE_GENERATIVE_AI_API_KEY ORG_NAME ORG_ADDRESS ORG_MISSION ORG_TAX_STATUS DEFAULT_SIGNER_NAME DEFAULT_SIGNER_TITLE; do
+    for SECRET_NAME in SLACK_BOT_TOKEN SLACK_SIGNING_SECRET GOOGLE_GENERATIVE_AI_API_KEY ORG_NAME ORG_ADDRESS ORG_MISSION ORG_TAX_STATUS DEFAULT_SIGNER_NAME DEFAULT_SIGNER_TITLE; do
       gcloud secrets add-iam-policy-binding "${SECRET_NAME}" \
         --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
         --role="roles/secretmanager.secretAccessor" \
@@ -357,11 +344,11 @@ if [[ "$SKIP_BUILD" == "true" ]]; then
 else
   log "Building Docker image via Cloud Build..."
   if [[ "$DRY_RUN" == "true" ]]; then
-    log "  Would run: gcloud builds submit --tag ${IMAGE_URI} --dockerfile apps/service/Dockerfile"
+    log "  Would run: gcloud builds submit --tag ${IMAGE_URI} --dockerfile apps/slack-bot/Dockerfile"
   else
     gcloud builds submit \
       --project "${PROJECT_ID}" \
-      --config apps/service/cloudbuild.yaml \
+      --config apps/slack-bot/cloudbuild.yaml \
       --substitutions "_IMAGE_URI=${IMAGE_URI}" \
       --quiet \
       .
@@ -373,7 +360,7 @@ echo ""
 
 # ── Deploy ────────────────────────────────────────────────────────
 
-log "Deploying Cloud Run Service..."
+log "Deploying Cloud Run service..."
 if [[ "$DRY_RUN" == "true" ]]; then
   log "  Would deploy ${SERVICE_NAME} to Cloud Run"
 else
@@ -384,7 +371,6 @@ else
     --service-account "${RUNTIME_SA_EMAIL}" \
     --set-env-vars "PROJECT_ID=${PROJECT_ID},DATASET_CANON=${DATASET_CANON}" \
     --set-secrets "\
-SERVICE_API_KEY=LETTER_SERVICE_API_KEY:latest,\
 SLACK_BOT_TOKEN=SLACK_BOT_TOKEN:latest,\
 SLACK_SIGNING_SECRET=SLACK_SIGNING_SECRET:latest,\
 GOOGLE_GENERATIVE_AI_API_KEY=GOOGLE_GENERATIVE_AI_API_KEY:latest,\
@@ -507,21 +493,12 @@ MANIFEST_EOF
 
   # ── Summary ───────────────────────────────────────────────────
 
-  API_KEY=$(gcloud secrets versions access latest \
-    --secret=SERVICE_API_KEY \
-    --project="${PROJECT_ID}" 2>/dev/null || echo "<could not read>")
-
   echo ""
   log "Done!"
   echo ""
-  info "Service URL:  ${SERVICE_URL}"
-  info "Health check: curl ${SERVICE_URL}/health"
-  echo ""
-  info "Test the API:"
-  echo "  curl -X POST ${SERVICE_URL}/api/generate-letter \\"
-  echo "    -H 'Authorization: Bearer ${API_KEY}' \\"
-  echo "    -H 'Content-Type: application/json' \\"
-  echo "    -d '{\"emails\": [\"donor@example.com\"], \"format\": \"html\"}'"
+  info "Slack bot URL: ${SERVICE_URL}"
+  info "Health check:  curl ${SERVICE_URL}/health"
+  info "Slack auth:    curl ${SERVICE_URL}/health/slack"
   echo ""
   if [[ -n "$SLACK_APP_ID" ]]; then
     info "Slack app:    https://api.slack.com/apps/${SLACK_APP_ID}"

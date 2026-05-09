@@ -1,5 +1,5 @@
 /**
- * Test utilities for the service.
+ * Test utilities for the Slack bot.
  */
 import pino from 'pino'
 import { z } from 'zod'

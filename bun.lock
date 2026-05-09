@@ -110,8 +110,8 @@
         "zod": "^4.0.0",
       },
     },
-    "apps/service": {
-      "name": "@donations-etl/service",
+    "apps/slack-bot": {
+      "name": "@donations-etl/slack-bot",
       "version": "1.0.0",
       "dependencies": {
         "@donations-etl/bq": "workspace:*",
@@ -241,7 +241,7 @@
 
     "@donations-etl/runner": ["@donations-etl/runner@workspace:apps/runner"],
 
-    "@donations-etl/service": ["@donations-etl/service@workspace:apps/service"],
+    "@donations-etl/slack-bot": ["@donations-etl/slack-bot@workspace:apps/slack-bot"],
 
     "@donations-etl/types": ["@donations-etl/types@workspace:packages/types"],
 

@@ -1,5 +1,5 @@
 /**
- * Slack token validation, rotation, monitoring, and smoke-check utilities.
+ * Slack token validation, replacement, monitoring, and smoke-check utilities.
  */
 import { Command } from 'commander'
 import { z } from 'zod'
@@ -431,7 +431,7 @@ export function parseArgs(args: string[]): CliOptions {
 
   const program = new Command()
     .name('slack-token-ops')
-    .description('Validate, rotate, monitor, and smoke-test Slack bot tokens')
+    .description('Validate, promote, monitor, and smoke-test Slack bot tokens')
     .exitOverride()
 
   let parsed: CliOptions | undefined

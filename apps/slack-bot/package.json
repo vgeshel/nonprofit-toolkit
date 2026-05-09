@@ -1,5 +1,5 @@
 {
-  "name": "@donations-etl/service",
+  "name": "@donations-etl/slack-bot",
   "version": "1.0.0",
   "type": "module",
   "main": "./src/main.ts",

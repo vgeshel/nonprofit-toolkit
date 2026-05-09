@@ -1,12 +1,12 @@
 /**
- * Configuration for the service.
+ * Configuration for the Slack bot.
  *
  * Loads and validates environment variables using Zod.
  */
 import { z } from 'zod'
 
 /**
- * Configuration schema for the service.
+ * Configuration schema for the Slack bot.
  */
 export const ConfigSchema = z.object({
   // Server
@@ -16,9 +16,6 @@ export const ConfigSchema = z.object({
   // GCP / BigQuery
   PROJECT_ID: z.string(),
   DATASET_CANON: z.string().default('donations'),
-
-  // Auth
-  SERVICE_API_KEY: z.string(),
 
   // AI
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),

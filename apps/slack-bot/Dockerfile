@@ -1,7 +1,7 @@
 FROM oven/bun:1 AS builder
 WORKDIR /app
 COPY package.json bun.lock ./
-COPY apps/service/package.json apps/service/
+COPY apps/slack-bot/package.json apps/slack-bot/
 COPY apps/runner/package.json apps/runner/
 COPY packages/letter/package.json packages/letter/
 COPY packages/types/package.json packages/types/
@@ -9,8 +9,8 @@ COPY packages/bq/package.json packages/bq/
 COPY packages/connectors/package.json packages/connectors/
 RUN bun install --frozen-lockfile
 COPY packages/ packages/
-COPY apps/service/ apps/service/
-RUN bun build apps/service/src/main.ts --outdir dist --target bun \
+COPY apps/slack-bot/ apps/slack-bot/
+RUN bun build apps/slack-bot/src/main.ts --outdir dist --target bun \
     --external playwright --external playwright-core --external @slack/bolt --external @slack/web-api
 
 FROM oven/bun:1

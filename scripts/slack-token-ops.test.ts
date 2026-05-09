@@ -1,5 +1,5 @@
 /**
- * Tests for Slack token validation, rotation, monitoring, and smoke utilities.
+ * Tests for Slack token validation, replacement, monitoring, and smoke utilities.
  */
 import { describe, expect, it, vi } from 'vitest'
 import {

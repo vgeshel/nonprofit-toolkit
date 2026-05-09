@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY apps/mcp/package.json apps/mcp/
 COPY apps/runner/package.json apps/runner/
-COPY apps/service/package.json apps/service/
+COPY apps/slack-bot/package.json apps/slack-bot/
 COPY packages/letter/package.json packages/letter/
 COPY packages/types/package.json packages/types/
 COPY packages/bq/package.json packages/bq/
