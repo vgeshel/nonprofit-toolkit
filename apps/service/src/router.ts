@@ -7,6 +7,7 @@ import type { Logger } from 'pino'
 import type { Config } from './config'
 import { handleGenerateLetter } from './handlers/generate-letter'
 import { handleHealth } from './handlers/health'
+import { handleSlackHealth } from './handlers/slack-health'
 import { validateBearerToken } from './middleware/auth'
 
 /**
@@ -24,6 +25,10 @@ export async function route(
   // Health check (no auth required)
   if (method === 'GET' && pathname === '/health') {
     return handleHealth()
+  }
+
+  if (method === 'GET' && pathname === '/health/slack') {
+    return handleSlackHealth(config, logger)
   }
 
   // Generate letter API (Bearer token auth)

@@ -7,11 +7,16 @@ import { createTestLogger, parseJsonResponse } from './test-utils'
 
 // Mock handlers
 const mockHandleHealth = vi.fn<() => Response>()
+const mockHandleSlackHealth = vi.fn<() => Promise<Response>>()
 const mockHandleGenerateLetter =
   vi.fn<(req: Request, config: Config, logger: unknown) => Promise<Response>>()
 
 vi.mock('../src/handlers/health', () => ({
   handleHealth: () => mockHandleHealth(),
+}))
+
+vi.mock('../src/handlers/slack-health', () => ({
+  handleSlackHealth: () => mockHandleSlackHealth(),
 }))
 
 vi.mock('../src/handlers/generate-letter', () => ({
@@ -57,6 +62,22 @@ describe('route', () => {
 
       expect(response).toBe(healthResponse)
       expect(mockHandleHealth).toHaveBeenCalled()
+    })
+  })
+
+  describe('GET /health/slack', () => {
+    it('calls handleSlackHealth', async () => {
+      const healthResponse = Response.json({ service: 'slack', status: 'ok' })
+      mockHandleSlackHealth.mockResolvedValue(healthResponse)
+
+      const request = new Request('http://localhost:8080/health/slack', {
+        method: 'GET',
+      })
+
+      const response = await route(request, config, logger)
+
+      expect(response).toBe(healthResponse)
+      expect(mockHandleSlackHealth).toHaveBeenCalled()
     })
   })
 

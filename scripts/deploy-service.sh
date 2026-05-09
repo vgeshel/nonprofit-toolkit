@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deploy the service to GCP Cloud Run with Slack app provisioning
 #
-# Usage: ./scripts/deploy-service.sh [--dry-run] [--skip-secrets] [--skip-build] [--skip-slack]
+# Usage: ./scripts/deploy-service.sh [--dry-run] [--skip-secrets] [--skip-build] [--skip-slack] [--skip-monitoring]
 #
 # This script:
 # 1. Creates a Slack app via the Slack API (idempotent — skips if app ID in .env)
@@ -10,6 +10,7 @@
 # 4. Builds the Docker image via Cloud Build
 # 5. Deploys the Cloud Run Service
 # 6. Updates the Slack app manifest with the final Cloud Run URL
+# 7. Validates and monitors Slack auth health
 #
 # Prerequisites:
 # - gcloud CLI authenticated
@@ -46,12 +47,14 @@ DRY_RUN=false
 SKIP_SECRETS=false
 SKIP_BUILD=false
 SKIP_SLACK=false
+SKIP_MONITORING=false
 while [[ $# -gt 0 ]]; do
   case $1 in
     --dry-run)       DRY_RUN=true;      shift ;;
     --skip-secrets)  SKIP_SECRETS=true;  shift ;;
     --skip-build)    SKIP_BUILD=true;    shift ;;
     --skip-slack)    SKIP_SLACK=true;    shift ;;
+    --skip-monitoring) SKIP_MONITORING=true; shift ;;
     *)               error "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -252,6 +255,24 @@ fi
 
 echo ""
 
+# ── Slack token validation ───────────────────────────────────────
+
+if [[ "$DRY_RUN" == "true" ]]; then
+  log "Would validate Slack bot token before deployment"
+elif [[ -n "${SLACK_BOT_TOKEN:-}" && "$SLACK_BOT_TOKEN" != "placeholder" ]]; then
+  log "Validating Slack bot token before writing Secret Manager..."
+  SLACK_BOT_TOKEN="$SLACK_BOT_TOKEN" bun scripts/slack-token-ops.ts validate \
+    --token-env SLACK_BOT_TOKEN
+else
+  log "Validating latest Slack bot token from Secret Manager..."
+  bun scripts/slack-token-ops.ts validate \
+    --project "${PROJECT_ID}" \
+    --secret SLACK_BOT_TOKEN \
+    --version latest
+fi
+
+echo ""
+
 # ── GCP Secrets ───────────────────────────────────────────────────
 
 if [[ "$SKIP_SECRETS" == "true" ]]; then
@@ -317,6 +338,14 @@ else
     done
     log "  Access granted"
   fi
+fi
+
+if [[ "$DRY_RUN" == "false" ]]; then
+  log "Validating latest Slack bot token in Secret Manager..."
+  bun scripts/slack-token-ops.ts validate \
+    --project "${PROJECT_ID}" \
+    --secret SLACK_BOT_TOKEN \
+    --version latest
 fi
 
 echo ""
@@ -444,6 +473,36 @@ MANIFEST_EOF
       warn "  Failed to update manifest: ${UPDATE_ERROR}"
       warn "  You may need to update URLs manually at https://api.slack.com/apps/${SLACK_APP_ID}"
     fi
+  fi
+
+  # ── Slack runtime smoke and monitoring ─────────────────────────
+
+  log "Smoke-checking deployed Slack auth..."
+  bun scripts/slack-token-ops.ts smoke --service-url "${SERVICE_URL}"
+
+  if [[ "$SKIP_MONITORING" == "true" ]]; then
+    warn "Skipping Slack auth monitoring (--skip-monitoring)"
+  else
+    log "Ensuring Slack auth monitoring..."
+    MONITORING_ARGS=(
+      ensure-monitoring
+      --project "${PROJECT_ID}"
+      --region "${REGION}"
+      --service-name "${SERVICE_NAME}"
+      --service-url "${SERVICE_URL}"
+      --schedule "${SLACK_HEALTH_CHECK_SCHEDULE:-*/10 * * * *}"
+      --time-zone "${SLACK_HEALTH_CHECK_TIME_ZONE:-Etc/UTC}"
+    )
+
+    if [[ -n "${SLACK_MONITORING_NOTIFICATION_CHANNEL:-}" ]]; then
+      MONITORING_ARGS+=(--notification-channel)
+      IFS=',' read -r -a CHANNELS <<< "${SLACK_MONITORING_NOTIFICATION_CHANNEL}"
+      for CHANNEL in "${CHANNELS[@]}"; do
+        MONITORING_ARGS+=("${CHANNEL}")
+      done
+    fi
+
+    bun scripts/slack-token-ops.ts "${MONITORING_ARGS[@]}"
   fi
 
   # ── Summary ───────────────────────────────────────────────────
