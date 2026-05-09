@@ -30,6 +30,11 @@ FROM oven/bun:1-slim AS runtime
 
 WORKDIR /app
 
+# Public compliance checks include read-only browser flows.
+RUN apt-get update && apt-get install -y \
+    chromium fonts-liberation libgbm1 libnss3 libxss1 libasound2 xvfb \
+    --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user for security (use IDs that don't conflict with base image)
 RUN groupadd --gid 10001 etl && \
     useradd --uid 10001 --gid etl --shell /bin/bash --create-home etl
@@ -42,6 +47,7 @@ COPY --from=builder /app/node_modules ./node_modules
 
 # Set environment
 ENV NODE_ENV=production
+ENV CHROMIUM_PATH=/usr/bin/chromium
 
 # Switch to non-root user
 USER etl

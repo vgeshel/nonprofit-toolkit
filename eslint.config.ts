@@ -235,6 +235,7 @@ export default defineConfig(
       'apps/mcp/tests/logger.test.ts',
       'packages/letter/src/html.ts',
       'packages/letter/src/pdf.ts',
+      'src/compliance/sources/browser-page.ts',
       'scripts/**/*.ts',
       'playwright/playwright.config.ts',
     ],

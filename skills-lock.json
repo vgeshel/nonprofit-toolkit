@@ -11,10 +11,45 @@
       "sourceType": "github",
       "computedHash": "d31e234f0c90694a670222cdd1dafa853e051d7066beda389f1097c22dadd461"
     },
+    "parallel-data-enrichment": {
+      "source": "parallel-web/parallel-agent-skills",
+      "sourceType": "github",
+      "computedHash": "8351319f1e3aadf5383dd793878cc8b74cf414273e7385357beff3051c7139e7"
+    },
+    "parallel-deep-research": {
+      "source": "parallel-web/parallel-agent-skills",
+      "sourceType": "github",
+      "computedHash": "ad05532ff0d92fed7ec3aa99a99b9f9d3523282b627c0a256497d4de64b0c8e3"
+    },
+    "parallel-web-extract": {
+      "source": "parallel-web/parallel-agent-skills",
+      "sourceType": "github",
+      "computedHash": "ad7a847bbea775bffffb232b04e9a80fa2d594634bf79265af3f708d85bff009"
+    },
+    "parallel-web-search": {
+      "source": "parallel-web/parallel-agent-skills",
+      "sourceType": "github",
+      "computedHash": "038c1a6139f43021021e4714403a5f8c7f1b60755c1c98aa32abcd77ac92d114"
+    },
+    "result": {
+      "source": "parallel-web/parallel-agent-skills",
+      "sourceType": "github",
+      "computedHash": "dae5dd6cedf659597df6ff44b3097b4acafc3e063cd355d6a2ccd8dcbdf11725"
+    },
+    "setup": {
+      "source": "parallel-web/parallel-agent-skills",
+      "sourceType": "github",
+      "computedHash": "cf8d7c5be34ad5143714d6a809a7b5e654e06a7c0fea21b07dbcc996997c2fd1"
+    },
     "skill-creator": {
       "source": "anthropics/skills",
       "sourceType": "github",
       "computedHash": "b122f4d1e91aa1d83027e050b5b37c3156203ee85458d7b1360bc48167c9e02a"
+    },
+    "status": {
+      "source": "parallel-web/parallel-agent-skills",
+      "sourceType": "github",
+      "computedHash": "644dbe8c896f0d3de91a08cd29ac5457c3bf97ca815682b32815f3d4186f1f34"
     }
   }
 }
