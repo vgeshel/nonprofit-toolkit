@@ -13,6 +13,7 @@ COPY packages/types/package.json packages/types/
 COPY packages/connectors/package.json packages/connectors/
 COPY packages/bq/package.json packages/bq/
 COPY packages/letter/package.json packages/letter/
+COPY apps/mcp/package.json apps/mcp/
 COPY apps/runner/package.json apps/runner/
 COPY apps/slack-bot/package.json apps/slack-bot/
 
