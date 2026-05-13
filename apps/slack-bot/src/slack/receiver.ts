@@ -3,7 +3,7 @@
  *
  * Instead of using Bolt's built-in HTTP server, we handle Slack requests
  * through Bun.serve() and forward them to Bolt's request handler.
- * This allows a single HTTP server to handle both REST API and Slack routes.
+ * This allows the Bun HTTP server to forward Slack routes to Bolt.
  */
 import type { Receiver, ReceiverEvent } from '@slack/bolt'
 import { z } from 'zod'

@@ -1,5 +1,5 @@
 /**
- * Tests for the service logger.
+ * Tests for the Slack bot logger.
  */
 import { describe, expect, it } from 'vitest'
 import { createLogger } from '../src/logger'

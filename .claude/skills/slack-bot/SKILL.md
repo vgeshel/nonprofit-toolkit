@@ -11,7 +11,7 @@ This skill guides you through building Slack bot features using the Bolt framewo
 
 This project has two apps that interact with Slack. Choosing the right one is critical:
 
-|                  | `apps/service/`                                                                  | `apps/runner/`                                                |
+|                  | `apps/slack-bot/`                                                                | `apps/runner/`                                                |
 | ---------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | **What it is**   | Long-running HTTP server (Cloud Run Service)                                     | One-shot CLI (Cloud Run Job)                                  |
 | **Use for**      | Real-time Slack interactions: commands, events, modals, Assistant API, @mentions | Scheduled/proactive messages: reports, digests, notifications |
@@ -19,11 +19,11 @@ This project has two apps that interact with Slack. Choosing the right one is cr
 | **Pattern**      | Event handler calls `ack()`, does work, posts response                           | CLI command runs, queries data, posts to Slack, exits         |
 | **Examples**     | `/donor-letter`, `app_mention`, `reaction_added`, Assistant DMs                  | Weekly reports, monthly reports, new-donor digests            |
 
-**Rule of thumb**: If the feature responds to a user action in Slack, it goes in `apps/service/`.
+**Rule of thumb**: If the feature responds to a user action in Slack, it goes in `apps/slack-bot/`.
 If it runs on a schedule and posts proactively, it goes in `apps/runner/` with a Cloud Scheduler
 job (see `apps/runner/src/report.ts` and `infra/provision.sh` for the pattern).
 
-## Real-Time Handlers (apps/service/)
+## Real-Time Handlers (apps/slack-bot/)
 
 ### Request Routing
 
@@ -32,11 +32,11 @@ Bun.serve() → routes requests:
   /slack/commands      → Bolt receiver → command handlers
   /slack/interactivity → Bolt receiver → modal/action handlers
   /slack/events        → Bolt receiver → event handlers (app_mention, reaction_added, assistant)
-  /api/*               → REST handlers
   /health              → health check
+  /health/slack        → Slack auth health check
 ```
 
-See `apps/service/src/main.ts` for the server setup and `apps/service/src/slack/receiver.ts`
+See `apps/slack-bot/src/main.ts` for the server setup and `apps/slack-bot/src/slack/receiver.ts`
 for the custom BunReceiver.
 
 ### Async Ack Pattern
@@ -58,7 +58,7 @@ if (request.headers.get('x-slack-retry-num')) {
 For commands that show status/info to the requesting user, use `respond()` for an ephemeral
 message (only visible to that user) rather than `say()` which posts to the whole channel.
 
-See `apps/service/src/slack/commands/donor-letter.ts` for the command handler pattern.
+See `apps/slack-bot/src/slack/commands/donor-letter.ts` for the command handler pattern.
 
 ### Event Handlers
 
@@ -84,7 +84,7 @@ app.assistant(assistant)
 ```
 
 The Assistant API is DM-only. For channel visibility, also register an `app_mention` handler.
-See `apps/service/src/slack/app.ts` for both patterns side by side.
+See `apps/slack-bot/src/slack/app.ts` for both patterns side by side.
 
 ### Conversation History in Threads
 
@@ -157,18 +157,18 @@ if (url.pathname === '/slack/events') {
 
 ## File References
 
-| File                                  | Purpose                                          |
-| ------------------------------------- | ------------------------------------------------ |
-| `apps/service/src/slack/app.ts`       | App setup, Assistant + @mention + event handlers |
-| `apps/service/src/slack/receiver.ts`  | Custom BunReceiver with async ack                |
-| `apps/service/src/main.ts`            | HTTP server, retry filter, url_verification      |
-| `apps/service/src/slack/commands/`    | Slash command handlers                           |
-| `apps/service/src/slack/views/`       | Modal handlers                                   |
-| `apps/service/src/slack/formatters/`  | Message formatting utilities                     |
-| `apps/service/src/config.ts`          | Config with Slack env vars                       |
-| `apps/runner/src/report.ts`           | Scheduled report pattern (proactive messages)    |
-| `apps/runner/src/report-formatter.ts` | Block Kit formatting for reports                 |
-| `infra/provision.sh`                  | Cloud Scheduler jobs for proactive messages      |
+| File                                   | Purpose                                          |
+| -------------------------------------- | ------------------------------------------------ |
+| `apps/slack-bot/src/slack/app.ts`      | App setup, Assistant + @mention + event handlers |
+| `apps/slack-bot/src/slack/receiver.ts` | Custom BunReceiver with async ack                |
+| `apps/slack-bot/src/main.ts`           | HTTP server, retry filter, url_verification      |
+| `apps/slack-bot/src/slack/commands/`   | Slash command handlers                           |
+| `apps/slack-bot/src/slack/views/`      | Modal handlers                                   |
+| `apps/slack-bot/src/slack/formatters/` | Message formatting utilities                     |
+| `apps/slack-bot/src/config.ts`         | Config with Slack env vars                       |
+| `apps/runner/src/report.ts`            | Scheduled report pattern (proactive messages)    |
+| `apps/runner/src/report-formatter.ts`  | Block Kit formatting for reports                 |
+| `infra/provision.sh`                   | Cloud Scheduler jobs for proactive messages      |
 
 ## Common Gotchas
 

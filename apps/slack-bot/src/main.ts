@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * Main entry point for the service.
+ * Main entry point for the Slack bot.
  *
  * Starts a Bun HTTP server that handles:
  * - GET /health — health check
- * - POST /api/generate-letter — REST API for letter generation
  * - POST /slack/commands — Slack slash command handler
  * - POST /slack/interactivity — Slack modal submissions
+ * - POST /slack/events — Slack event subscriptions
  */
 import { closeBrowser, launchBrowser } from '@donations-etl/letter'
 import { z } from 'zod'
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
     },
   })
 
-  logger.info({ port: server.port }, 'Letter service started')
+  logger.info({ port: server.port }, 'Slack bot started')
 
   // Graceful shutdown
   const shutdown = async () => {

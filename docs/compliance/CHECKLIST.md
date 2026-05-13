@@ -55,7 +55,7 @@ This is the working checklist used by the implementation subagent for each phase
 ### Acceptance gates — all green
 
 - [x] `bun typecheck` — zero errors
-- [x] `bun lint` — zero errors. The five pre-existing warnings on `main` (in `apps/service/tests/config.test.ts` and `packages/bq/tests/donation-agent.test.ts`) are out of scope for this phase per the spawn instructions.
+- [x] `bun lint` — zero errors. The five pre-existing warnings on `main` (in `apps/slack-bot/tests/config.test.ts` and `packages/bq/tests/donation-agent.test.ts`) are out of scope for this phase per the spawn instructions.
 - [x] `bun test:run` — all 2028 pass
 - [x] `bun test:coverage` — **100%** statements / branches / functions / lines on every new file
 - [x] No `any` types

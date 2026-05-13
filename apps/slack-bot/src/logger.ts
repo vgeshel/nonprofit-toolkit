@@ -1,5 +1,5 @@
 /**
- * Logger for the service.
+ * Logger for the Slack bot.
  */
 import pino from 'pino'
 import type { Config } from './config'

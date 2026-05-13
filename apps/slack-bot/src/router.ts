@@ -5,9 +5,8 @@
  */
 import type { Logger } from 'pino'
 import type { Config } from './config'
-import { handleGenerateLetter } from './handlers/generate-letter'
 import { handleHealth } from './handlers/health'
-import { validateBearerToken } from './middleware/auth'
+import { handleSlackHealth } from './handlers/slack-health'
 
 /**
  * Route an incoming HTTP request.
@@ -26,21 +25,8 @@ export async function route(
     return handleHealth()
   }
 
-  // Generate letter API (Bearer token auth)
-  if (method === 'POST' && pathname === '/api/generate-letter') {
-    if (
-      !validateBearerToken(
-        request.headers.get('Authorization'),
-        config.SERVICE_API_KEY,
-      )
-    ) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
-
-    return handleGenerateLetter(request, config, logger)
+  if (method === 'GET' && pathname === '/health/slack') {
+    return handleSlackHealth(config, logger)
   }
 
   // 404 for everything else

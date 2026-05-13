@@ -7,16 +7,14 @@ import { createTestLogger, parseJsonResponse } from './test-utils'
 
 // Mock handlers
 const mockHandleHealth = vi.fn<() => Response>()
-const mockHandleGenerateLetter =
-  vi.fn<(req: Request, config: Config, logger: unknown) => Promise<Response>>()
+const mockHandleSlackHealth = vi.fn<() => Promise<Response>>()
 
 vi.mock('../src/handlers/health', () => ({
   handleHealth: () => mockHandleHealth(),
 }))
 
-vi.mock('../src/handlers/generate-letter', () => ({
-  handleGenerateLetter: (req: Request, cfg: Config, log: unknown) =>
-    mockHandleGenerateLetter(req, cfg, log),
+vi.mock('../src/handlers/slack-health', () => ({
+  handleSlackHealth: () => mockHandleSlackHealth(),
 }))
 
 import { route } from '../src/router'
@@ -26,7 +24,6 @@ const config: Config = {
   LOG_LEVEL: 'info',
   PROJECT_ID: 'test-project',
   DATASET_CANON: 'donations',
-  SERVICE_API_KEY: 'test-api-key',
   SLACK_BOT_TOKEN: 'xoxb-test',
   SLACK_SIGNING_SECRET: 'test-secret',
   ORG_NAME: 'Test Organization',
@@ -60,15 +57,28 @@ describe('route', () => {
     })
   })
 
-  describe('POST /api/generate-letter', () => {
-    it('calls handleGenerateLetter with valid auth', async () => {
-      const letterResponse = new Response('pdf data')
-      mockHandleGenerateLetter.mockResolvedValue(letterResponse)
+  describe('GET /health/slack', () => {
+    it('calls handleSlackHealth', async () => {
+      const healthResponse = Response.json({ service: 'slack', status: 'ok' })
+      mockHandleSlackHealth.mockResolvedValue(healthResponse)
 
+      const request = new Request('http://localhost:8080/health/slack', {
+        method: 'GET',
+      })
+
+      const response = await route(request, config, logger)
+
+      expect(response).toBe(healthResponse)
+      expect(mockHandleSlackHealth).toHaveBeenCalled()
+    })
+  })
+
+  describe('removed REST letter API', () => {
+    it('returns 404 for POST /api/generate-letter', async () => {
       const request = new Request('http://localhost:8080/api/generate-letter', {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer test-api-key',
+          Authorization: 'Bearer obsolete-api-key',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ emails: ['test@example.com'] }),
@@ -76,37 +86,9 @@ describe('route', () => {
 
       const response = await route(request, config, logger)
 
-      expect(response).toBe(letterResponse)
-      expect(mockHandleGenerateLetter).toHaveBeenCalled()
-    })
-
-    it('returns 401 without auth header', async () => {
-      const request = new Request('http://localhost:8080/api/generate-letter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails: ['test@example.com'] }),
-      })
-
-      const response = await route(request, config, logger)
-
-      expect(response.status).toBe(401)
+      expect(response.status).toBe(404)
       const body = await parseJsonResponse(response)
-      expect(body).toEqual({ error: 'Unauthorized' })
-    })
-
-    it('returns 401 with wrong token', async () => {
-      const request = new Request('http://localhost:8080/api/generate-letter', {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer wrong-key',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ emails: ['test@example.com'] }),
-      })
-
-      const response = await route(request, config, logger)
-
-      expect(response.status).toBe(401)
+      expect(body).toEqual({ error: 'Not found' })
     })
   })
 
