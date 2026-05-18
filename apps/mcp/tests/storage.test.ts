@@ -2,7 +2,7 @@
  * Tests for Firestore OAuth storage.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { generateToken } from '../src/auth/storage'
+import { generateToken, tokenFingerprint } from '../src/auth/storage'
 
 // Mock Firestore
 const mockGet = vi.fn<() => Promise<{ exists: boolean; data: () => unknown }>>()
@@ -371,5 +371,29 @@ describe('generateToken', () => {
   it('generates unique tokens', () => {
     const tokens = new Set(Array.from({ length: 10 }, () => generateToken()))
     expect(tokens.size).toBe(10)
+  })
+})
+
+describe('tokenFingerprint', () => {
+  // The fingerprint must match the first 12 hex chars of SHA256(token),
+  // which is the same prefix used as the Firestore document ID for the
+  // collections under apps/mcp. This lets log entries be cross-referenced
+  // with Firestore documents without exposing the full token.
+  it('returns the first 12 hex chars of SHA256(token)', () => {
+    // SHA256('hello') = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+    expect(tokenFingerprint('hello')).toBe('2cf24dba5fb0')
+  })
+
+  it('returns 12-char hex prefix for any input', () => {
+    const fp = tokenFingerprint('any-string')
+    expect(fp).toMatch(/^[0-9a-f]{12}$/)
+  })
+
+  it('is deterministic', () => {
+    expect(tokenFingerprint('abc')).toBe(tokenFingerprint('abc'))
+  })
+
+  it('returns different prefixes for different tokens', () => {
+    expect(tokenFingerprint('a')).not.toBe(tokenFingerprint('b'))
   })
 })

@@ -18,6 +18,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import express from 'express'
 import { z } from 'zod'
+import { tokenAuditLogger } from './auth/audit-log'
 import { GoogleOAuthProvider } from './auth/provider'
 import { FirestoreOAuthStorage } from './auth/storage'
 import { loadConfig } from './config'
@@ -226,6 +227,19 @@ async function main(): Promise<void> {
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' })
   })
+
+  // Diagnostic audit logging for /token requests. Mounted BEFORE the
+  // SDK auth router so we capture the request shape (redacted) even
+  // when the SDK rejects it in middleware (e.g. invalid client_secret).
+  // The SDK's tokenHandler runs urlencoded() itself; running it here
+  // first is idempotent — once req.body is set, the second parser
+  // no-ops. This is how we see what claude.ai actually sent when a
+  // refresh fails.
+  app.use(
+    '/token',
+    express.urlencoded({ extended: false }),
+    tokenAuditLogger(logger),
+  )
 
   // Mount OAuth auth router (DCR, authorize, token, metadata)
   app.use(

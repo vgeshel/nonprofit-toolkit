@@ -79,6 +79,16 @@ function hashToken(token: string): string {
 }
 
 /**
+ * Return a short, log-safe fingerprint of a token: the first 12 hex
+ * chars of its SHA256 hash. This matches the prefix used by Firestore
+ * document IDs in the OAuth collections, so log entries can be
+ * cross-referenced with stored docs without exposing the full token.
+ */
+export function tokenFingerprint(token: string): string {
+  return hashToken(token).slice(0, 12)
+}
+
+/**
  * Generate a cryptographically random token.
  */
 export function generateToken(): string {
