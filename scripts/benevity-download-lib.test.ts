@@ -8,8 +8,10 @@ import {
   downloadReports,
   errorMessage,
   existingDisbursementIds,
+  formatIssue,
   harvestLinks,
   parseArgs,
+  parseArgsOrExit,
   reportFilename,
   reportsPageUrl,
   selectPending,
@@ -50,7 +52,7 @@ function fakeDriver(pages: unknown[][], overrides: Partial<PortalDriver> = {}) {
   let index = 0
   const driver: PortalDriver = {
     isSignedIn: () => Promise.resolve(true),
-    openReportsPage: vi.fn(() => Promise.resolve()),
+    openReportsPage: vi.fn(() => Promise.resolve(true)),
     currentPageLinks: () => Promise.resolve(pages[index] ?? []),
     nextPage: () => {
       if (index >= pages.length - 1) return Promise.resolve(false)
@@ -188,17 +190,115 @@ describe('parseArgs', () => {
   })
 })
 
+describe('formatIssue', () => {
+  it('prefixes a field issue with its path', () => {
+    expect(formatIssue({ path: ['concurrency'], message: 'too small' })).toBe(
+      'concurrency: too small',
+    )
+  })
+
+  it('joins a nested path', () => {
+    expect(formatIssue({ path: ['a', 'b'], message: 'bad' })).toBe('a.b: bad')
+  })
+
+  it('shows a root issue as the bare message', () => {
+    expect(formatIssue({ path: [], message: 'bad combination' })).toBe(
+      'bad combination',
+    )
+  })
+})
+
+describe('parseArgsOrExit', () => {
+  it('returns options when the command line is valid', () => {
+    const outcome = parseArgsOrExit(['--cause', CAUSE_ID])
+    expect(outcome.kind).toBe('options')
+    if (outcome.kind !== 'options') throw new Error('expected options')
+    expect(outcome.options.causeId).toBe(CAUSE_ID)
+  })
+
+  it('exits zero for --help, which commander has already printed', () => {
+    // Without this the CLI prints its help and then a stack trace.
+    expect(parseArgsOrExit(['--help'])).toEqual({
+      kind: 'exit',
+      code: 0,
+      messages: [],
+    })
+  })
+
+  it('exits non-zero with a readable message for a missing cause id', () => {
+    // A raw ZodError issue tree is unreadable in a terminal.
+    expect(parseArgsOrExit([])).toEqual({
+      kind: 'exit',
+      code: 1,
+      messages: ['causeId: A Benevity cause ID is required'],
+    })
+  })
+
+  it('reports an unknown option through commander', () => {
+    const outcome = parseArgsOrExit(['--cause', CAUSE_ID, '--nope'])
+    expect(outcome.kind).toBe('exit')
+    if (outcome.kind !== 'exit') throw new Error('expected exit')
+    expect(outcome.code).not.toBe(0)
+  })
+
+  it('reports every invalid value', () => {
+    const outcome = parseArgsOrExit([
+      '--cause',
+      CAUSE_ID,
+      '--concurrency',
+      '0',
+      '--max-pages',
+      '0',
+    ])
+    expect(outcome.kind).toBe('exit')
+    if (outcome.kind !== 'exit') throw new Error('expected exit')
+    expect(outcome.messages).toHaveLength(2)
+    expect(outcome.messages.join(' ')).toContain('concurrency')
+    expect(outcome.messages.join(' ')).toContain('maxPages')
+  })
+})
+
 describe('harvestLinks', () => {
   it('collects links across every page', async () => {
     const driver = fakeDriver([[link('A'), link('B')], [link('C')]])
 
-    const links = await harvestLinks(driver, CAUSE_ID, DEFAULT_MAX_PAGES)
-    expect(links.map((item) => item.disbursementId)).toEqual(['A', 'B', 'C'])
+    const result = await harvestLinks(driver, CAUSE_ID, DEFAULT_MAX_PAGES)
+    expect(result.opened).toBe(true)
+    expect(result.links.map((item) => item.disbursementId)).toEqual([
+      'A',
+      'B',
+      'C',
+    ])
     expect(driver.openReportsPage).toHaveBeenCalledWith(CAUSE_ID)
   })
 
+  it('retries the verification interstitial the portal serves first', async () => {
+    // A fresh session gets /verification-completed/ before the real table.
+    let calls = 0
+    const driver = fakeDriver([[link('A')]], {
+      openReportsPage: () => {
+        calls++
+        return Promise.resolve(calls > 1)
+      },
+    })
+
+    const result = await harvestLinks(driver, CAUSE_ID, DEFAULT_MAX_PAGES)
+    expect(calls).toBe(2)
+    expect(result.opened).toBe(true)
+    expect(result.links.map((item) => item.disbursementId)).toEqual(['A'])
+  })
+
+  it('reports failure when the table never renders', async () => {
+    const driver = fakeDriver([[link('A')]], {
+      openReportsPage: () => Promise.resolve(false),
+    })
+
+    const result = await harvestLinks(driver, CAUSE_ID, DEFAULT_MAX_PAGES)
+    expect(result).toEqual({ opened: false, links: [] })
+  })
+
   it('deduplicates ids repeated across pages', async () => {
-    const links = await harvestLinks(
+    const { links } = await harvestLinks(
       fakeDriver([[link('A')], [link('A'), link('B')]]),
       CAUSE_ID,
       DEFAULT_MAX_PAGES,
@@ -209,7 +309,7 @@ describe('harvestLinks', () => {
   it('stops when a later page adds nothing new', async () => {
     // A table that silently stops advancing repeats the same rows forever.
     const repeated = [[link('A')], [link('A')], [link('A')], [link('B')]]
-    const links = await harvestLinks(
+    const { links } = await harvestLinks(
       fakeDriver(repeated),
       CAUSE_ID,
       DEFAULT_MAX_PAGES,
@@ -219,12 +319,12 @@ describe('harvestLinks', () => {
 
   it('respects the page bound', async () => {
     const pages = Array.from({ length: 10 }, (_, i) => [link(`D${String(i)}`)])
-    const links = await harvestLinks(fakeDriver(pages), CAUSE_ID, 3)
+    const { links } = await harvestLinks(fakeDriver(pages), CAUSE_ID, 3)
     expect(links).toHaveLength(3)
   })
 
   it('ignores rows that are not valid links', async () => {
-    const links = await harvestLinks(
+    const { links } = await harvestLinks(
       fakeDriver([[link('A'), { disbursementId: '', href: '' }, null]]),
       CAUSE_ID,
       DEFAULT_MAX_PAGES,
@@ -235,7 +335,7 @@ describe('harvestLinks', () => {
   it('returns nothing when the first page is empty', async () => {
     expect(
       await harvestLinks(fakeDriver([[]]), CAUSE_ID, DEFAULT_MAX_PAGES),
-    ).toEqual([])
+    ).toEqual({ opened: true, links: [] })
   })
 })
 

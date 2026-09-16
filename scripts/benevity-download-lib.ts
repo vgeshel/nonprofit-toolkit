@@ -10,7 +10,7 @@
  * and the download loop are testable without a browser; `benevity-download.ts`
  * supplies the Playwright implementation.
  */
-import { Command } from 'commander'
+import { Command, CommanderError } from 'commander'
 import { z } from 'zod'
 
 /**
@@ -49,8 +49,13 @@ export type DisbursementLink = z.infer<typeof DisbursementLinkSchema>
 export interface PortalDriver {
   /** True when the portal shows a signed-in session. */
   isSignedIn(): Promise<boolean>
-  /** Navigate to the legacy disbursement reports table. */
-  openReportsPage(causeId: string): Promise<void>
+  /**
+   * Navigate to the legacy disbursement reports table, resolving to whether
+   * the table is actually showing. The portal answers the first request of a
+   * session with a `/verification-completed/` interstitial instead, so this
+   * can legitimately be false and is retried.
+   */
+  openReportsPage(causeId: string): Promise<boolean>
   /** Report links listed on the page currently displayed. */
   currentPageLinks(): Promise<unknown[]>
   /** Advance one page; false when already on the last page. */
@@ -98,6 +103,13 @@ const RawOptsSchema = z.object({
 })
 
 /**
+ * How many times to ask for the reports page before giving up. The portal
+ * serves a `/verification-completed/` interstitial on the first request of a
+ * fresh session and the table on the next one.
+ */
+export const OPEN_PAGE_ATTEMPTS = 3
+
+/**
  * A page count high enough to cover the full history with room to grow. The
  * walk stops as soon as the portal says there is no next page; this only bounds
  * a pagination control that never reports the end.
@@ -135,6 +147,57 @@ export function parseArgs(
       raw.maxPages === undefined ? DEFAULT_MAX_PAGES : Number(raw.maxPages),
     concurrency: raw.concurrency === undefined ? 8 : Number(raw.concurrency),
   })
+}
+
+/**
+ * Render one Zod issue as a terminal-readable line. Root-level issues carry an
+ * empty path and are shown as the bare message.
+ */
+export function formatIssue(issue: {
+  path: PropertyKey[]
+  message: string
+}): string {
+  const path = issue.path.join('.')
+  return path === '' ? issue.message : `${path}: ${issue.message}`
+}
+
+/**
+ * The result of reading the command line: either usable options, or a reason to
+ * stop with a particular exit code.
+ */
+export type ParseOutcome =
+  | { kind: 'options'; options: DownloadOptions }
+  | { kind: 'exit'; code: number; messages: string[] }
+
+/**
+ * Read the command line, turning the two ways `parseArgs` can throw into
+ * outcomes a CLI can present.
+ *
+ * Commander throws on `--help` after it has already written the help text, and
+ * Zod throws a nested issue tree that is unreadable in a terminal.
+ */
+export function parseArgsOrExit(
+  args: string[],
+  env: Record<string, string | undefined> = {},
+): ParseOutcome {
+  try {
+    return { kind: 'options', options: parseArgs(args, env) }
+  } catch (error) {
+    if (error instanceof CommanderError) {
+      // Commander has already written help, a version, or its own error.
+      return { kind: 'exit', code: error.exitCode, messages: [] }
+    }
+    /* istanbul ignore else -- @preserve parseArgs only throws CommanderError or ZodError */
+    if (error instanceof z.ZodError) {
+      return {
+        kind: 'exit',
+        code: 1,
+        messages: error.issues.map(formatIssue),
+      }
+    }
+    /* istanbul ignore next -- @preserve unreachable: see the else guard above */
+    throw error
+  }
 }
 
 /**
@@ -178,8 +241,17 @@ export async function harvestLinks(
   driver: PortalDriver,
   causeId: string,
   maxPages: number,
-): Promise<DisbursementLink[]> {
-  await driver.openReportsPage(causeId)
+): Promise<HarvestResult> {
+  let opened = false
+  for (let attempt = 0; attempt < OPEN_PAGE_ATTEMPTS; attempt++) {
+    if (await driver.openReportsPage(causeId)) {
+      opened = true
+      break
+    }
+  }
+  if (!opened) {
+    return { opened: false, links: [] }
+  }
 
   const byId = new Map<string, DisbursementLink>()
 
@@ -201,7 +273,13 @@ export async function harvestLinks(
     if (!(await driver.nextPage())) break
   }
 
-  return [...byId.values()]
+  return { opened: true, links: [...byId.values()] }
+}
+
+export interface HarvestResult {
+  /** False when the reports table never rendered. */
+  opened: boolean
+  links: DisbursementLink[]
 }
 
 export interface DownloadSummary {

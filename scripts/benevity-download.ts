@@ -25,7 +25,7 @@ import {
   buildManifest,
   downloadReports,
   harvestLinks,
-  parseArgs,
+  parseArgsOrExit,
   reportsPageUrl,
   type DisbursementLink,
   type DownloadFs,
@@ -42,7 +42,15 @@ const DOWNLOAD_LINK = 'a[href*="donations_report_download"]'
 const PAGE_RENDER_WAIT_MS = 700
 
 async function main(): Promise<void> {
-  const options = parseArgs(process.argv.slice(2), process.env)
+  const parsed = parseArgsOrExit(process.argv.slice(2), process.env)
+  if (parsed.kind === 'exit') {
+    for (const message of parsed.messages) {
+      logger.error(message)
+    }
+    process.exitCode = parsed.code
+    return
+  }
+  const options = parsed.options
 
   const { chromium } = await import('playwright')
   const browser = await chromium.launch({ headless: !options.login })
@@ -80,11 +88,16 @@ async function main(): Promise<void> {
     const driver: PortalDriver = {
       isSignedIn: async () => (await page.locator(DASHBOARD_LINK).count()) > 0,
 
+      // The portal answers the first request of a session with a
+      // `/verification-completed/` interstitial and serves the table on the
+      // next one, so this reports whether the table arrived and the caller
+      // retries rather than waiting out a selector timeout.
       openReportsPage: async (causeId) => {
         await page.goto(reportsPageUrl(causeId), {
           waitUntil: 'domcontentloaded',
         })
-        await page.waitForSelector(DOWNLOAD_LINK)
+        await page.waitForTimeout(PAGE_RENDER_WAIT_MS)
+        return (await page.locator(DOWNLOAD_LINK).count()) > 0
       },
 
       currentPageLinks: async () => {
@@ -113,7 +126,9 @@ async function main(): Promise<void> {
       },
 
       nextPage: async () => {
-        const next = page.getByRole('link', { name: 'Next', exact: true })
+        // The pagination anchors carry no href, so they have no implicit link
+        // role and `getByRole('link')` does not see them.
+        const next = page.locator('a').filter({ hasText: /^Next$/ })
         if ((await next.count()) === 0) return false
 
         const before = await firstRowText()
@@ -125,15 +140,19 @@ async function main(): Promise<void> {
         return (await firstRowText()) !== before
       },
 
-      // The context's request client shares the browser's cookie jar, so the
-      // download is authenticated without going through the page.
-      fetchReport: async (href) => {
-        const response = await context.request.get(`${PORTAL_ORIGIN}${href}`)
-        if (!response.ok()) {
-          throw new Error(`HTTP ${String(response.status())} fetching ${href}`)
-        }
-        return response.text()
-      },
+      // The report has to be fetched from inside the page. Benevity hangs on
+      // the same URL when it is requested through Playwright's API client or
+      // clicked as a download, even with the session cookies and a Referer.
+      fetchReport: (href) =>
+        page.evaluate(async (path: string) => {
+          const response = await globalThis.fetch(path, {
+            credentials: 'include',
+          })
+          if (!response.ok) {
+            throw new Error(`HTTP ${String(response.status)} fetching ${path}`)
+          }
+          return response.text()
+        }, href),
     }
 
     if (!(await driver.isSignedIn())) {
@@ -147,7 +166,20 @@ async function main(): Promise<void> {
       return
     }
 
-    const links = await harvestLinks(driver, options.causeId, options.maxPages)
+    const harvest = await harvestLinks(
+      driver,
+      options.causeId,
+      options.maxPages,
+    )
+    if (!harvest.opened) {
+      logger.error(
+        { causeId: options.causeId },
+        'Reports table never rendered. Re-run with --login to refresh the session.',
+      )
+      process.exitCode = 1
+      return
+    }
+    const links = harvest.links
     logger.info({ count: links.length }, 'Harvested disbursement reports')
 
     await mkdir(options.outDir, { recursive: true })
