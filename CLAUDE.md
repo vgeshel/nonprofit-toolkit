@@ -10,25 +10,13 @@ This is a toolkit for AI coding assistants to set up and manage donation ETL for
 
 **Verify your own work.** Re-read your output before moving on. Run checks after every file, not just at the end. Do not rely on the user or pre-commit hooks to catch your mistakes.
 
-**Fix all problems.** Every review finding, every lint warning, every test gap. "Low priority", "pre-existing", "minor" are not reasons to skip. If it's a real problem, fix it.
+**Fix all problems in scope.** Every review finding, lint warning, and test gap in the code you touched — "low priority", "pre-existing", and "minor" are not reasons to skip those. Report problems outside that scope instead of silently widening the change.
 
 **Answer questions before acting.** If the user asks a question, answer it — thoroughly, honestly, and completely. Double-check your answer. Do not jump to making changes, writing code, or doing other work until you have answered the question. Questions and tasks are different things: a question needs an answer, a task needs action. Do not confuse them.
 
 **Automate everything you can do yourself.** This is an automation toolkit. Never tell the user "first run X", "make sure Y is configured", or "run this command before invoking the skill" if you could do it yourself. Skills must verify and execute their own prerequisites — create datasets, run migrations, provision buckets, fetch credentials from configured sources, idempotently. The only acceptable thing to ask the user for is information _only they have_ (their EIN, a project ID not in env, a credential they hold, a decision about their data). Anything mechanical, you do. Setup CLIs may exist for human convenience, but every skill must reach the same setup logic programmatically — the CLI is not a prerequisite for the skill.
 
-## Before Every Response
-
-Work through these in your thinking before producing any output:
-
-1. **What is being asked?** Restate the goal in your own words — not the literal request, but what outcome the user needs. If you are not sure, ask.
-2. **What does a complete solution require?** List the parts. If you cannot list them, you do not understand the problem yet — stop and ask.
-3. **What do you not know?** Identify unknowns. Ask about them instead of guessing or building around them.
-4. **Does this conflict with anything?** Check against established project decisions, CLAUDE.md constraints, and prior conversation context.
-5. **How will you verify this works?** Plan verification before writing code. What tests, checks, or validations will prove the change is correct? If you are changing skills, code, or scripts, you must run the relevant tests before committing.
-
-Do not skip this. Do not compress it into "the user wants X, let me do X." If your thinking does not contain answers to these five questions, you are about to produce sloppy work.
-
-After completing this checklist and before your visible output, include the literal text "_I THOUGHT_" as proof that you worked through it.
+**Ask when the request is genuinely ambiguous.** If two readings of the request would lead to materially different work, ask before building. Routine judgment calls are yours to make.
 
 ## Project Overview
 

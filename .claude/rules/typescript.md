@@ -41,11 +41,7 @@ Do not use `as` to cast types. Instead:
 - Use Zod `parse()` for runtime validation and type narrowing
 - Use `satisfies` operator when you need to check a type without widening
 
-**If you see `as` in code, you MUST:**
-
-1. Flag it to the user immediately
-2. Propose a fix using proper types, type guards, or Zod validation
-3. Never silently accept or write code with `as` casts
+ESLint enforces this (`@typescript-eslint/consistent-type-assertions` with `assertionStyle: 'never'`), and `scripts/check-lint-exceptions.ts` blocks the suppression comments that would bypass it. When a case seems to need `as`, the fix is a type guard or a Zod `parse()` — raise it rather than reaching for a suppression.
 
 **The ONLY exception**: Reading JSONB from database (e.g., `row.data as Record<string, unknown>`)
 

@@ -105,10 +105,20 @@ async function main(): Promise<void> {
       'query-bigquery',
       {
         title: 'Query BigQuery',
-        description:
-          'Execute a read-only BigQuery SQL query against the donations table. Write SQL using the schema from the donations-schema prompt. Returns result rows or an error.',
+        description: [
+          'Execute a read-only SELECT query against the donations events table.',
+          'Write SQL using the schema from the donations-schema prompt.',
+          'Only SELECT is accepted; DDL and DML are rejected before execution.',
+          'A LIMIT is appended automatically if the query omits one.',
+          'At most 50 rows come back, but the reply states the true matched row count —',
+          'when that count exceeds 50, aggregate in SQL rather than totalling the rows you received.',
+        ].join(' '),
         inputSchema: {
-          sql: z.string().describe('BigQuery SQL SELECT query to execute'),
+          sql: z
+            .string()
+            .describe(
+              'A single BigQuery SQL SELECT statement, in BigQuery standard SQL (not MySQL or PostgreSQL).',
+            ),
         },
       },
       async ({ sql }) => {
@@ -136,25 +146,38 @@ async function main(): Promise<void> {
       'generate-letter',
       {
         title: 'Generate Donor Letter',
-        description:
-          'Generate a donor confirmation letter (PDF or HTML) for one or more email addresses. Returns the letter content.',
+        description: [
+          "Generate a donation confirmation letter covering one donor's giving history, for tax receipts and acknowledgments.",
+          'Passing several email addresses produces ONE merged letter, not one per address —',
+          'use it to combine the addresses a single donor gave over time, not to batch unrelated donors.',
+          "Only 'succeeded' donations are included.",
+          'Returns HTML as text, or PDF as a base64 string.',
+          'If no succeeded donations match, this returns an error rather than an empty letter.',
+          'For ad-hoc totals or analysis, use query-bigquery instead.',
+        ].join(' '),
         inputSchema: {
           emails: z
-            .array(z.string().email())
+            .array(z.email())
             .min(1)
-            .describe('Donor email addresses'),
+            .describe(
+              'Email addresses belonging to one donor; their donations are merged into a single letter.',
+            ),
           from: z
             .string()
             .optional()
-            .describe('Start date filter (ISO format, e.g. 2025-01-01)'),
+            .describe(
+              'Inclusive start of the donation date range, filtering on event_ts (ISO format, e.g. 2025-01-01). Omit for all time.',
+            ),
           to: z
             .string()
             .optional()
-            .describe('End date filter (ISO format, e.g. 2025-12-31)'),
+            .describe(
+              'Exclusive end of the donation date range, filtering on event_ts (ISO format, e.g. 2026-01-01). Omit for all time.',
+            ),
           format: z
             .enum(['pdf', 'html'])
             .optional()
-            .describe('Output format (default: pdf)'),
+            .describe('Output format (default: pdf; PDF is base64-encoded)'),
           signerName: z.string().optional().describe('Letter signer name'),
           signerTitle: z.string().optional().describe('Letter signer title'),
         },

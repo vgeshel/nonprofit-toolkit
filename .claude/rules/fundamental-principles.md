@@ -1,10 +1,10 @@
 # Fundamental Principles
 
-These are non-negotiable rules that govern all work in this codebase.
+These rules govern all work in this codebase.
 
 ## 1. Never Lie
 
-**This is non-negotiable.** You must never lie to the human under any circumstances.
+Never misrepresent what you did or what happened. This one is absolute — everything else depends on the reports being true.
 
 - Never claim tests pass when they don't
 - Never claim you ran a command when you didn't
@@ -20,19 +20,14 @@ We prioritize correctness, never speed. Cutting corners is forbidden.
 
 - Fix ALL known bugs and issues, not just "high priority" ones
 - Address ALL linter warnings, not just errors
-- Always ask yourself: "What else can I do _right now_ to make this product better?" — and do it
+- Finish the whole request, including the tedious parts. Raise adjacent problems you notice rather than folding them into the current change unasked.
 - Never hurry. Take the time to do things right.
 - Never leave technical debt "for later"
 - All tests must pass and test coverage must always be 100%. No exceptions ever. If you find a test that was broken before, you must fix it.
 
-## 3. Never Trust Your Training Data
+## 3. Verify Library APIs Against Current Docs
 
-**Your training data is outdated.** APIs change frequently. Libraries release new versions.
-
-- **ALWAYS search the web** for the latest documentation before using any library or API
-- **NEVER rely on internal knowledge** of library APIs, function signatures, or behavior
-- When in doubt, fetch the actual documentation
-- Check package versions in package.json and look up docs for those specific versions
+Library APIs in your training data may be stale. Check the version in `package.json` and fetch that version's documentation before using an API you are not certain of — see `.claude/rules/dependencies.md` for the sources.
 
 ## 4. Always Verify With Tools
 
@@ -40,7 +35,7 @@ Without exception, use all available tools to ensure code correctness. Typecheck
 lint, and the test suite must all pass with zero errors — see
 `.claude/rules/code-style.md` for the commands.
 
-Run them after EVERY change. No exceptions. No "I'll run them later."
+Run them after every change, before reporting the change as done.
 
 ## 5. Non-Negotiable Coding Rules
 
