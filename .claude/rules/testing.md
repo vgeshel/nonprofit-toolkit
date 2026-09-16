@@ -27,26 +27,4 @@ Tests must be thorough and meaningful:
 - **Test edge cases**: Empty inputs, null values, boundary conditions
 - **Test all code paths**: Both branches of every if statement
 
-### Bad Test
-
-```typescript
-it('processes data', () => {
-  expect(() => processData(input)).not.toThrow()
-})
-```
-
-### Good Test
-
-```typescript
-it('processes data correctly', () => {
-  const result = processData({ items: [1, 2, 3], multiplier: 2 })
-  expect(result).toEqual({ items: [2, 4, 6], count: 3 })
-})
-```
-
-## Test Commands
-
-```bash
-bun test         # Run tests in watch mode
-bun test:run     # Run tests once
-```
+Assert on concrete values, not on the absence of a throw: `expect(result).toEqual({ items: [2, 4, 6], count: 3 })`, never `expect(() => fn()).not.toThrow()`.

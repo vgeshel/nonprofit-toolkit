@@ -13,9 +13,9 @@ This applies to:
 
 ### Forbidden Patterns
 
-1. **No `actions/github-script`** - All GitHub Action logic must be in TypeScript actions under `actions/`. The `github-script` action embeds untestable JavaScript in YAML. Instead, create a proper TypeScript action with tests. See `actions/pr-details/` for an example.
+1. **No `actions/github-script`** - The `github-script` action embeds untestable JavaScript in YAML. Put workflow logic in a TypeScript script under `scripts/` with tests, and invoke it from the workflow.
 
-2. **No shell scripts** - Do not create `.sh` files with logic. Write TypeScript scripts in `scripts/` instead. The only exception is thin wrapper scripts that simply invoke TypeScript (e.g., `scripts/install.sh` which just runs `bun scripts/install.ts`).
+2. **No shell scripts** - Do not create `.sh` files with logic. Write TypeScript scripts in `scripts/` instead. The only exception is thin wrapper scripts that simply invoke TypeScript.
 
 3. **No inline bash logic** - Keep `run:` steps in workflows minimal. Complex logic belongs in TypeScript actions or scripts.
 
@@ -26,7 +26,7 @@ This applies to:
 - **Consistency**: One language, one pattern across the codebase
 - **Maintainability**: Easier to refactor and understand
 
-A pre-commit hook blocks introduction of `actions/github-script` in workflow files.
+`.husky/pre-commit` runs `scripts/check-github-script.ts`, which blocks introduction of `actions/github-script` in workflow files.
 
 ## Type Safety
 
