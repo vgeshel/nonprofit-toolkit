@@ -5,7 +5,11 @@ export default defineConfig({
     noExternal: ['zod'],
   },
   test: {
-    exclude: ['*-workspace/**', '**/node_modules/**'],
+    // `.claude/worktrees/**` holds git worktrees: checkouts of this same repo
+    // at other commits. Collecting their tests double-runs the suite and fails
+    // whenever a worktree is on a different commit than the packages it
+    // resolves from the root `node_modules`.
+    exclude: ['*-workspace/**', '**/node_modules/**', '.claude/worktrees/**'],
     coverage: {
       provider: 'istanbul',
       reporter: ['text', 'html'],
@@ -15,6 +19,7 @@ export default defineConfig({
         '**/*.test.ts',
         '**/tests/**',
         '*-workspace/**',
+        '.claude/worktrees/**',
       ],
       thresholds: {
         statements: 100,
