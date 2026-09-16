@@ -14,6 +14,12 @@ import type { BigQueryConfig } from './types'
  *
  * Applies source-specific filtering:
  * - Mercury: Only external incoming donations (excludes internal transfers and debits)
+ *
+ * Disbursement deduplication matches a Mercury description against
+ * `source_coverage.description_pattern`, falling back to the source name. A
+ * platform does not necessarily reach the bank under its own name — Benevity
+ * disbursements arrive as "AMER ONLINE GIV1" or "THE UK ONLINE GIVING
+ * FOUNDATION" — so the alias has to be registered explicitly.
  */
 export function generateMergeSql(config: BigQueryConfig): string {
   const { datasetRaw, datasetCanon } = config
@@ -28,7 +34,7 @@ USING (
     LEFT JOIN \`${datasetRaw}.source_coverage\` AS sc
       ON stg.source = 'mercury'
       AND sc.source != 'mercury'
-      AND LOWER(stg.description) LIKE CONCAT(LOWER(sc.source), ';%')
+      AND LOWER(stg.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')
       AND stg.event_ts >= sc.covers_from
     WHERE stg.run_id = @run_id
       -- Mercury-specific filtering: only external incoming donations

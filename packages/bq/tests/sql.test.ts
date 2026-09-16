@@ -205,10 +205,14 @@ describe('SQL generation', () => {
       expect(sql).toContain('sc.covers_from')
     })
 
-    it('matches Mercury description against source names in JOIN', () => {
+    it('matches Mercury description against the coverage pattern in JOIN', () => {
+      // A platform can reach the bank under a name that is not its own: a
+      // Benevity disbursement arrives as "AMER ONLINE GIV1", never
+      // "benevity". description_pattern carries that alias, falling back to
+      // the source name when there is none.
       const sql = generateMergeSql(config)
       expect(sql).toContain(
-        "LOWER(stg.description) LIKE CONCAT(LOWER(sc.source), ';%')",
+        "LOWER(stg.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')",
       )
     })
 
@@ -222,6 +226,21 @@ describe('SQL generation', () => {
       expect(sql).toContain('AS stg')
       expect(sql).toContain('stg.run_id')
       expect(sql).toContain('stg.source')
+    })
+  })
+
+  describe('generateUpdateSourceCoverageSql - alias rows', () => {
+    it('keys the upsert on source so every alias row tracks the same start', () => {
+      // benevity has one row per bank alias; all of them move together with
+      // the source's earliest event.
+      const sql = generateUpdateSourceCoverageSql(config)
+      expect(sql).toContain('ON target.source = src.source')
+    })
+
+    it('leaves description_pattern untouched when refreshing coverage', () => {
+      // The auto-refresh must never clear a manually registered alias.
+      const sql = generateUpdateSourceCoverageSql(config)
+      expect(sql).not.toContain('description_pattern = ')
     })
   })
 
