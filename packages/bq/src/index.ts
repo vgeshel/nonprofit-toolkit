@@ -54,6 +54,9 @@ export { generateReportSql } from './report-sql'
 // SQL safety
 export { ensureLimit, validateReadOnlySql } from './sql-safety'
 
+// Shared donations schema + SQL rules prompt
+export { buildDonationsSchemaPrompt } from './donations-schema-prompt'
+
 // Donation agent
 export {
   buildQueryFn,
