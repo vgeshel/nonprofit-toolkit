@@ -59,6 +59,7 @@ export const DailyOptionsSchema = z
     mergeOnly: z.boolean().optional(),
     funraiseCsv: z.string().optional(),
     venmoDir: z.string().optional(),
+    benevityDir: z.string().optional(),
   })
   .refine((data) => !(data.skipMerge && data.mergeOnly), {
     message: 'Cannot use --skip-merge and --merge-only together',
@@ -88,6 +89,7 @@ export const BackfillOptionsSchema = z
     mergeOnly: z.boolean().optional(),
     funraiseCsv: z.string().optional(),
     venmoDir: z.string().optional(),
+    benevityDir: z.string().optional(),
   })
   .refine((data) => !(data.skipMerge && data.mergeOnly), {
     message: 'Cannot use --skip-merge and --merge-only together',
@@ -145,7 +147,7 @@ export function createCli(): Command {
     .description('Run daily ETL')
     .option(
       '--sources <sources>',
-      'Comma-separated sources (mercury,paypal,givebutter,check_deposits,funraise,venmo,wise)',
+      'Comma-separated sources (mercury,paypal,givebutter,check_deposits,funraise,venmo,wise,patreon,benevity)',
     )
     .option('--skip-merge', 'Extract and load to staging, skip merge to final')
     .option('--merge-only', 'Only run merge from staging to final table')
@@ -153,6 +155,10 @@ export function createCli(): Command {
     .option(
       '--venmo-dir <path>',
       'Path to directory containing Venmo CSV exports',
+    )
+    .option(
+      '--benevity-dir <path>',
+      'Path to directory containing Benevity Donations Report CSVs',
     )
     .action(noop)
 
@@ -169,6 +175,10 @@ export function createCli(): Command {
     .option(
       '--venmo-dir <path>',
       'Path to directory containing Venmo CSV exports',
+    )
+    .option(
+      '--benevity-dir <path>',
+      'Path to directory containing Benevity Donations Report CSVs',
     )
     .action(noop)
 
@@ -196,6 +206,7 @@ const RawDailyOptsSchema = z.object({
   mergeOnly: z.boolean().optional(),
   funraiseCsv: z.string().optional(),
   venmoDir: z.string().optional(),
+  benevityDir: z.string().optional(),
 })
 
 /**
@@ -217,6 +228,7 @@ const RawBackfillOptsSchema = z.object({
   mergeOnly: z.boolean().optional(),
   funraiseCsv: z.string().optional(),
   venmoDir: z.string().optional(),
+  benevityDir: z.string().optional(),
 })
 
 /**
@@ -274,6 +286,7 @@ export function parseCli(args: string[]): Result<CliCommand, CliError> {
         mergeOnly: opts.mergeOnly,
         funraiseCsv: opts.funraiseCsv,
         venmoDir: opts.venmoDir,
+        benevityDir: opts.benevityDir,
       })
       if (!parseResult.success) {
         return err(createError('validation', parseResult.error.message))
@@ -304,6 +317,7 @@ export function parseCli(args: string[]): Result<CliCommand, CliError> {
         mergeOnly: opts.mergeOnly,
         funraiseCsv: opts.funraiseCsv,
         venmoDir: opts.venmoDir,
+        benevityDir: opts.benevityDir,
       })
       if (!parseResult.success) {
         return err(createError('validation', parseResult.error.message))

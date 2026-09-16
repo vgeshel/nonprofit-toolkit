@@ -1064,6 +1064,60 @@ describe('BigQueryClient', () => {
     })
   })
 
+  describe('deleteSupersededEvents', () => {
+    it('counts the rows first, then deletes them', async () => {
+      // The count is what gets logged: a delete against the canonical table
+      // should never be silent about how much it removed.
+      mockQuery
+        .mockResolvedValueOnce([[{ n: 128 }], null])
+        .mockResolvedValueOnce([[], null])
+
+      const result = await client.deleteSupersededEvents()
+
+      expect(result.isOk()).toBe(true)
+      expect(result._unsafeUnwrap()).toBe(128)
+      expect(mockQuery).toHaveBeenCalledTimes(2)
+    })
+
+    it('skips the delete entirely when nothing is superseded', async () => {
+      mockQuery.mockResolvedValueOnce([[{ n: 0 }], null])
+
+      const result = await client.deleteSupersededEvents()
+
+      expect(result._unsafeUnwrap()).toBe(0)
+      expect(mockQuery).toHaveBeenCalledTimes(1)
+    })
+
+    it('treats a missing count as nothing to do', async () => {
+      mockQuery.mockResolvedValueOnce([[], null])
+
+      const result = await client.deleteSupersededEvents()
+
+      expect(result._unsafeUnwrap()).toBe(0)
+      expect(mockQuery).toHaveBeenCalledTimes(1)
+    })
+
+    it('returns an error when counting fails', async () => {
+      mockQuery.mockRejectedValue(new Error('count boom'))
+
+      const result = await client.deleteSupersededEvents()
+
+      expect(result.isErr()).toBe(true)
+      expect(result._unsafeUnwrapErr().message).toContain('superseded')
+    })
+
+    it('returns an error when the delete fails', async () => {
+      mockQuery
+        .mockResolvedValueOnce([[{ n: 5 }], null])
+        .mockRejectedValueOnce(new Error('delete boom'))
+
+      const result = await client.deleteSupersededEvents()
+
+      expect(result.isErr()).toBe(true)
+      expect(result._unsafeUnwrapErr().type).toBe('query')
+    })
+  })
+
   describe('updateSourceCoverage', () => {
     it('executes source coverage update query', async () => {
       mockQuery.mockResolvedValue([[], null])

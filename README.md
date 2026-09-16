@@ -18,6 +18,7 @@ graph TD
         Venmo
         Funraise
         Patreon
+        Benevity
         Sheets[Google Sheets<br/>check deposits]
     end
 
@@ -31,7 +32,7 @@ graph TD
         MCP[MCP Server<br/>Claude.ai / ChatGPT / Claude Code]
     end
 
-    Mercury & PayPal & Wise & Givebutter & Venmo & Funraise & Patreon & Sheets --> Extract
+    Mercury & PayPal & Wise & Givebutter & Venmo & Funraise & Patreon & Benevity & Sheets --> Extract
     Load --> BQ[(BigQuery)]
     BQ --> Slack
     BQ --> Letters
@@ -41,7 +42,7 @@ graph TD
 ## What you can do
 
 - **Set up from scratch** -- fork, clone, tell your assistant to run `/setup` or `/bootstrap`
-- **Add data sources** -- connectors exist for Mercury, PayPal, Wise, Givebutter, Venmo, Funraise, Patreon, and Google Sheets (checks). Add more with `/create-connector`
+- **Add data sources** -- connectors exist for Mercury, PayPal, Wise, Givebutter, Venmo, Funraise, Patreon, Benevity, and Google Sheets (checks). Add more with `/create-connector`
 - **Query donations** -- ask natural language questions about your data via the MCP server, Slack bot, or `/donations-query`
 - **Generate donor letters** -- produce tax-receipt-ready confirmation letters on demand
 - **Get reports in Slack** -- automated weekly and monthly donation summaries
