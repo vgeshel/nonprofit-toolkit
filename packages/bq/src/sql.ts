@@ -161,6 +161,51 @@ LIMIT 1`.trim()
 }
 
 /**
+ * Generate SQL to remove canonical Mercury rows that a platform source now
+ * covers.
+ *
+ * The merge filter refuses to insert a bank lump sum once the platform's own
+ * donor-level data covers that period, but it only applies to rows arriving in
+ * staging. A row merged *before* its coverage existed — because the source was
+ * added later, or backfilled further back — stays in the canonical table and
+ * double-counts. This removes those, using the same condition as the filter so
+ * the two can never disagree.
+ */
+export function generateCountSupersededSql(config: BigQueryConfig): string {
+  const { datasetRaw, datasetCanon } = config
+
+  return `
+SELECT COUNT(*) AS n
+FROM \`${datasetCanon}.events\` AS e
+JOIN \`${datasetRaw}.source_coverage\` AS sc
+  ON LOWER(e.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')
+ AND e.event_ts >= sc.covers_from
+WHERE e.source = 'mercury'
+  AND sc.source != 'mercury'`.trim()
+}
+
+export function generateDeleteSupersededSql(config: BigQueryConfig): string {
+  const { datasetRaw, datasetCanon } = config
+
+  // BigQuery rejects EXISTS whose only predicates are non-equalities: it plans
+  // a LEFT SEMI JOIN and demands an equality between the two sides. Matching
+  // by external_id supplies that equality, and the inner join carries the
+  // description and date conditions.
+  return `
+DELETE FROM \`${datasetCanon}.events\`
+WHERE source = 'mercury'
+  AND external_id IN (
+    SELECT e.external_id
+    FROM \`${datasetCanon}.events\` AS e
+    JOIN \`${datasetRaw}.source_coverage\` AS sc
+      ON LOWER(e.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')
+     AND e.event_ts >= sc.covers_from
+    WHERE e.source = 'mercury'
+      AND sc.source != 'mercury'
+  )`.trim()
+}
+
+/**
  * Generate SQL to update source coverage from canonical data.
  *
  * Computes MIN(event_ts) per non-mercury source and upserts into

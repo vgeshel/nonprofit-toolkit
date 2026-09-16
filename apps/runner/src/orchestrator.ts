@@ -623,6 +623,23 @@ export class Orchestrator {
         return this.bq
           .updateSourceCoverage()
           .mapErr((e) => createError('bigquery', e.message, e))
+          .andThen(() =>
+            // Coverage can start covering rows that were merged before it
+            // existed — a source added later, or backfilled further back.
+            // The merge filter only stops new ones arriving, so the stale
+            // ones are cleared out here.
+            this.bq
+              .deleteSupersededEvents()
+              .mapErr((e) => createError('bigquery', e.message, e)),
+          )
+          .map((deleted) => {
+            if (deleted > 0) {
+              this.logger.info(
+                { runId, deleted },
+                'Removed bank rows superseded by platform data',
+              )
+            }
+          })
       })
   }
 

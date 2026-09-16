@@ -65,6 +65,7 @@ const mockBqClient = {
   loadFromGcs: vi.fn<LoadFromGcsFn>(),
   merge: vi.fn<MergeFn>(),
   updateSourceCoverage: vi.fn<() => ResultAsync<void, BigQueryError>>(),
+  deleteSupersededEvents: vi.fn<() => ResultAsync<number, BigQueryError>>(),
   healthCheck: vi.fn<HealthCheckFn>(),
 }
 
@@ -119,6 +120,7 @@ vi.mock('@donations-etl/bq', () => ({
     loadFromGcs = mockBqClient.loadFromGcs
     merge = mockBqClient.merge
     updateSourceCoverage = mockBqClient.updateSourceCoverage
+    deleteSupersededEvents = mockBqClient.deleteSupersededEvents
     healthCheck = mockBqClient.healthCheck
   },
 }))
@@ -162,6 +164,7 @@ describe('Orchestrator', () => {
       okAsync({ rowsInserted: 10, rowsUpdated: 5 }),
     )
     mockBqClient.updateSourceCoverage.mockReturnValue(okAsync(undefined))
+    mockBqClient.deleteSupersededEvents.mockReturnValue(okAsync(0))
     mockBqClient.healthCheck.mockReturnValue(okAsync(undefined))
 
     mockMercuryConnector.fetchAll.mockReturnValue(okAsync([]))
@@ -495,6 +498,83 @@ describe('Orchestrator', () => {
 
       expect(result.isOk()).toBe(true)
       expect(mockBqClient.updateSourceCoverage).toHaveBeenCalled()
+    })
+
+    it('clears bank rows superseded by platform data after merge', async () => {
+      mockMercuryConnector.fetchAll.mockReturnValue(
+        okAsync([
+          {
+            source: 'mercury',
+            external_id: 'txn-cleanup',
+            event_ts: '2024-01-15T10:00:00Z',
+            created_at: '2024-01-15T10:00:00Z',
+            ingested_at: '2024-01-15T10:05:00Z',
+            amount_cents: 10000,
+            fee_cents: 0,
+            net_amount_cents: 10000,
+            currency: 'USD',
+            donor_name: 'John Doe',
+            payer_name: null,
+            donor_email: 'john@example.com',
+            donor_phone: null,
+            donor_address: null,
+            status: 'succeeded',
+            payment_method: 'ach',
+            description: 'Test donation',
+            attribution: null,
+            attribution_human: null,
+            source_metadata: {},
+            run_id: '00000000-0000-0000-0000-000000000001',
+          },
+        ]),
+      )
+      mockBqClient.deleteSupersededEvents.mockReturnValue(okAsync(128))
+
+      const orchestrator = new Orchestrator(config, logger)
+      const result = await orchestrator.runDaily({ sources: ['mercury'] })
+
+      expect(result.isOk()).toBe(true)
+      expect(mockBqClient.deleteSupersededEvents).toHaveBeenCalled()
+    })
+
+    it('fails the run when the superseded cleanup fails', async () => {
+      mockMercuryConnector.fetchAll.mockReturnValue(
+        okAsync([
+          {
+            source: 'mercury',
+            external_id: 'txn-cleanup',
+            event_ts: '2024-01-15T10:00:00Z',
+            created_at: '2024-01-15T10:00:00Z',
+            ingested_at: '2024-01-15T10:05:00Z',
+            amount_cents: 10000,
+            fee_cents: 0,
+            net_amount_cents: 10000,
+            currency: 'USD',
+            donor_name: 'John Doe',
+            payer_name: null,
+            donor_email: 'john@example.com',
+            donor_phone: null,
+            donor_address: null,
+            status: 'succeeded',
+            payment_method: 'ach',
+            description: 'Test donation',
+            attribution: null,
+            attribution_human: null,
+            source_metadata: {},
+            run_id: '00000000-0000-0000-0000-000000000001',
+          },
+        ]),
+      )
+      mockBqClient.deleteSupersededEvents.mockReturnValue(
+        errAsync({ type: 'query', message: 'cleanup failed' }),
+      )
+
+      const orchestrator = new Orchestrator(config, logger)
+      const result = await orchestrator.runDaily({ sources: ['mercury'] })
+
+      expect(result.isErr()).toBe(true)
+      expect(result._unsafeUnwrapErr().type).toBe('bigquery')
+      expect(result._unsafeUnwrapErr().message).toContain('cleanup failed')
     })
 
     it('returns error when source coverage update fails', async () => {
