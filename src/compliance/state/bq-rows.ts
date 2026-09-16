@@ -150,6 +150,23 @@ export const COMPLIANCE_TABLES: readonly ComplianceTableDefinition[] = [
       { name: 'error_type', type: 'STRING', mode: 'NULLABLE' },
       { name: 'error_message', type: 'STRING', mode: 'NULLABLE' },
       { name: 'payload', type: 'JSON', mode: 'NULLABLE' },
+      { name: 'job_id', type: 'STRING', mode: 'NULLABLE' },
+    ],
+  },
+  {
+    name: 'discovery_jobs',
+    description:
+      'One row per async compliance-discover job (parent of the per-source discovery_runs rows). Tracks lifecycle status, the filter the caller requested, and (on completion) the assembled DiscoveryReport.',
+    fields: [
+      { name: 'job_id', type: 'STRING', mode: 'REQUIRED' },
+      { name: 'started_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
+      { name: 'finished_at', type: 'TIMESTAMP', mode: 'NULLABLE' },
+      { name: 'status', type: 'STRING', mode: 'REQUIRED' },
+      { name: 'requested_sources', type: 'JSON', mode: 'NULLABLE' },
+      { name: 'requested_jurisdiction', type: 'STRING', mode: 'NULLABLE' },
+      { name: 'error_type', type: 'STRING', mode: 'NULLABLE' },
+      { name: 'error_message', type: 'STRING', mode: 'NULLABLE' },
+      { name: 'result', type: 'JSON', mode: 'NULLABLE' },
     ],
   },
   {
@@ -295,6 +312,29 @@ export const ComplianceEntityRowSchema = EntitySchema
 export type ComplianceEntityRow = z.infer<typeof ComplianceEntityRowSchema>
 
 /**
+ * BigQuery returns JSON columns as JSON-encoded strings, not parsed
+ * objects. Preprocess: if we see a string, parse it; otherwise pass
+ * through. Strings that fail to parse are returned as-is so the
+ * downstream Zod check produces a clear "expected X, received
+ * string" error rather than a silent corruption.
+ *
+ * Used on:
+ *   - ComplianceDiscoveryRunRowSchema.payload
+ *   - ComplianceDiscoveryJobRowSchema.requested_sources
+ *   - ComplianceDiscoveryJobRowSchema.result
+ */
+const parseJsonColumn = (val: unknown): unknown => {
+  if (typeof val !== 'string') {
+    return val
+  }
+  try {
+    return JSON.parse(val)
+  } catch {
+    return val
+  }
+}
+
+/**
  * Row schema for the `discovery_runs` table.
  *
  * `payload` is `unknown` — sources can persist any JSON shape — but it must
@@ -312,7 +352,15 @@ export const ComplianceDiscoveryRunRowSchema = z.object({
   duration_ms: z.coerce.number().int().nonnegative(),
   error_type: z.string().nullable(),
   error_message: z.string().nullable(),
-  payload: z.unknown().nullable(),
+  // Stored as a BigQuery JSON column; BQ returns it as a JSON-encoded
+  // string. parseJsonColumn (defined above) parses it back into a JS
+  // value so callers like compliance-status / discover-result get an
+  // object rather than a "{...stringified blob...}" they can't index.
+  payload: z.preprocess(parseJsonColumn, z.unknown().nullable()),
+  // Async-job parent linkage. Null for runs that were not part of an
+  // async compliance-discover job (legacy rows, or future synchronous
+  // callers). Set to the discovery_jobs.job_id otherwise.
+  job_id: z.string().uuid().nullable(),
 })
 
 export type ComplianceDiscoveryRunRow = z.infer<
@@ -355,3 +403,40 @@ export const ComplianceSourceRowSchema = z
   })
 
 export type ComplianceSourceRow = z.infer<typeof ComplianceSourceRowSchema>
+
+/**
+ * Row schema for the `discovery_jobs` table.
+ *
+ * A job represents one async invocation of compliance-discover. Children
+ * (`discovery_runs` rows) link back via `job_id`. The accessor enforces the
+ * `running → completed` and `running → failed` transitions; this schema
+ * just validates the wire format.
+ *
+ * `requested_sources` is an optional filter (subset of source ids). Null
+ * means "every source registered for the active jurisdictions".
+ * `requested_jurisdiction` is an optional single-jurisdiction filter.
+ */
+
+export const ComplianceDiscoveryJobRowSchema = z.object({
+  job_id: z.string().uuid(),
+  started_at: z.preprocess(extractTimestampValue, z.string().min(1)),
+  finished_at: z
+    .preprocess(extractTimestampValue, z.string().min(1))
+    .nullable(),
+  status: z.enum(['running', 'completed', 'failed']),
+  requested_sources: z.preprocess(
+    parseJsonColumn,
+    z.array(z.string().min(1)).readonly().nullable(),
+  ),
+  requested_jurisdiction: z.string().min(1).nullable(),
+  error_type: z.string().nullable(),
+  error_message: z.string().nullable(),
+  // Serialised DiscoveryReport when the job is completed. Null while
+  // running and on failure. Stored as a BQ JSON column; BQ returns it
+  // as a JSON-encoded string so we parse it here.
+  result: z.preprocess(parseJsonColumn, z.unknown().nullable()),
+})
+
+export type ComplianceDiscoveryJobRow = z.infer<
+  typeof ComplianceDiscoveryJobRowSchema
+>

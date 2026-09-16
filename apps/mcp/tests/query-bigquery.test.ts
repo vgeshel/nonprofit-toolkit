@@ -35,6 +35,8 @@ const testConfig = {
   LOG_LEVEL: 'info' as const,
   PROJECT_ID: 'test-project',
   DATASET_CANON: 'donations',
+  REGION: 'us-central1',
+  COMPLIANCE_DISCOVER_JOB_NAME: 'compliance-discover',
   GOOGLE_CLIENT_ID: 'test-client-id',
   BASE_URL: 'https://mcp.example.com',
   GOOGLE_CLIENT_SECRET: 'test-secret',

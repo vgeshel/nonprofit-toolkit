@@ -128,12 +128,13 @@ describe('runMigration', () => {
 
     expect(port.createDataset).toHaveBeenCalledTimes(1)
     expect(port.createDataset).toHaveBeenCalledWith('compliance')
-    expect(port.createTable).toHaveBeenCalledTimes(4)
+    expect(port.createTable).toHaveBeenCalledTimes(5)
     expect(port.createOrReplaceView).toHaveBeenCalledTimes(1)
     expect(port.addTableColumn).not.toHaveBeenCalled()
 
     expect(result.value.createdDataset).toBe(true)
     expect([...result.value.createdTables].sort()).toEqual([
+      'discovery_jobs',
       'discovery_runs',
       'entity',
       'findings',
@@ -176,9 +177,10 @@ describe('runMigration', () => {
     expect(port.createTable).not.toHaveBeenCalled()
     expect(port.createOrReplaceView).toHaveBeenCalledTimes(1)
     expect(result.value.createdTables).toEqual([])
-    expect(result.value.addedColumns).toEqual([
-      'sources.access_url',
+    expect([...result.value.addedColumns].sort()).toEqual([
+      'discovery_runs.job_id',
       'sources.access_method',
+      'sources.access_url',
       'sources.automation_allowed',
       'sources.manual_only_reason',
       'sources.source_freshness',
@@ -200,12 +202,12 @@ describe('runMigration', () => {
     expect(port.addTableColumn).not.toHaveBeenCalled()
     // Plan still records what would have happened.
     expect(result.value.createdDataset).toBe(true)
-    expect(result.value.createdTables.length).toBe(4)
+    expect(result.value.createdTables.length).toBe(5)
     expect(result.value.addedColumns).toEqual([])
     expect(result.value.updatedViews).toEqual(['current_open_findings'])
   })
 
-  it('plans Phase 2 column upgrades on dry-run when sources table already exists', async () => {
+  it('plans column upgrades on dry-run when existing tables are present', async () => {
     const port = fakePort({
       datasetExists: vi.fn<ComplianceMigrationPort['datasetExists']>(() =>
         okAsync(true),
@@ -222,9 +224,10 @@ describe('runMigration', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(port.addTableColumn).not.toHaveBeenCalled()
-    expect(result.value.addedColumns).toEqual([
-      'sources.access_url',
+    expect([...result.value.addedColumns].sort()).toEqual([
+      'discovery_runs.job_id',
       'sources.access_method',
+      'sources.access_url',
       'sources.automation_allowed',
       'sources.manual_only_reason',
       'sources.source_freshness',
@@ -367,13 +370,19 @@ describe('runMigration', () => {
 
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
-    expect(port.addTableColumn).toHaveBeenCalledTimes(5)
+    expect(port.addTableColumn).toHaveBeenCalledTimes(6)
     expect(port.addTableColumn).toHaveBeenCalledWith({
       dataset: 'compliance',
       tableId: 'sources',
       field: { name: 'access_url', type: 'STRING', mode: 'NULLABLE' },
     })
+    expect(port.addTableColumn).toHaveBeenCalledWith({
+      dataset: 'compliance',
+      tableId: 'discovery_runs',
+      field: { name: 'job_id', type: 'STRING', mode: 'NULLABLE' },
+    })
     expect(result.value.addedColumns).toContain('sources.access_url')
+    expect(result.value.addedColumns).toContain('discovery_runs.job_id')
   })
 
   it('does not report Phase 2 columns as added when they already exist', async () => {

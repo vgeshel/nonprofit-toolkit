@@ -10,6 +10,7 @@ import type { Source } from '../types/index.ts'
 const SOURCE_A: Source = {
   id: 'irs-teos',
   jurisdiction: 'us-federal',
+  agency: 'Test Agency',
   kind: 'api',
   authRequired: false,
   description: 'IRS Pub. 78 + Auto Revocation lookup by EIN.',
@@ -77,6 +78,7 @@ describe('createSourcesAccessor.upsertSources', () => {
     const manualSource: Source = {
       id: 'ca-sos-bizfile',
       jurisdiction: 'us-ca',
+      agency: 'Test Agency',
       kind: 'manual',
       authRequired: false,
       description: 'Manual CA SOS bizfile business status check.',

@@ -127,10 +127,16 @@ async function inspectBizfileSearch(
   const responsePromise = page.waitForResponse(isBusinessSearchResponse, {
     timeout: SEARCH_RESPONSE_TIMEOUT_MS,
   })
+  // Click WITHOUT `force: true` so Playwright's auto-wait holds until
+  // the button is enabled. bizfile disables the search button until
+  // React has processed the typed query; a forced click before that
+  // landed on a disabled element and never triggered the handler, so
+  // no /api/Records/businesssearch request was ever issued and our
+  // waitForResponse below timed out at 45s.
   await page
     .locator('button[aria-label="Execute search"], button.search-button')
     .first()
-    .click({ force: true })
+    .click()
   const response = await responsePromise
   return readBusinessSearchResponse(response).andThen((searchResponse) =>
     buildSearchOutput(entity, ctx, query, searchResponse),
@@ -414,6 +420,7 @@ function resultToAsync<T>(
 export const caSosBizfileSource: Source = {
   id: 'ca-sos-bizfile',
   jurisdiction: 'us-ca',
+  agency: 'California Secretary of State',
   kind: 'playwright',
   authRequired: false,
   description:

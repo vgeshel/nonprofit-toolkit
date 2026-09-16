@@ -438,6 +438,7 @@ function resultToAsync<T>(
 export const caFtbEntityStatusLetterSource: Source = {
   id: 'ca-ftb-entity-status-letter',
   jurisdiction: 'us-ca',
+  agency: 'California Franchise Tax Board',
   kind: 'playwright',
   authRequired: false,
   description:

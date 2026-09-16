@@ -1,0 +1,9 @@
+{
+  "name": "nonprofit-toolkit-core",
+  "displayName": "Nonprofit Toolkit (core)",
+  "version": "0.1.0",
+  "description": "Skills for the nonprofit toolkit: payment-platform sync, donor letters, BigQuery analytics, deploys, and bootstrap. Registers the nonprofit-toolkit remote MCP server via .mcp.json.",
+  "license": "MIT",
+  "repository": "https://github.com/vgeshel/nonprofit-toolkit",
+  "keywords": ["nonprofit", "donations", "etl", "bigquery", "mcp"]
+}

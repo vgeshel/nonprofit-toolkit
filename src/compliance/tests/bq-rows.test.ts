@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 import {
   COMPLIANCE_DATASET,
   COMPLIANCE_TABLES,
+  ComplianceDiscoveryJobRowSchema,
   ComplianceDiscoveryRunRowSchema,
   ComplianceEntityRowSchema,
   ComplianceFindingRowSchema,
@@ -24,13 +25,36 @@ describe('COMPLIANCE_DATASET / COMPLIANCE_TABLES', () => {
     expect(COMPLIANCE_DATASET).toBe('compliance')
   })
 
-  it('lists the four Phase 1 tables', () => {
+  it('lists every compliance table', () => {
     expect(COMPLIANCE_TABLES.map((t) => t.name).sort()).toEqual([
+      'discovery_jobs',
       'discovery_runs',
       'entity',
       'findings',
       'sources',
     ])
+  })
+
+  it('declares job_id on discovery_runs for async-job linkage', () => {
+    const runs = COMPLIANCE_TABLES.find((t) => t.name === 'discovery_runs')
+    expect(runs).toBeDefined()
+    const jobId = runs?.fields.find((f) => f.name === 'job_id')
+    expect(jobId).toEqual({
+      name: 'job_id',
+      type: 'STRING',
+      mode: 'NULLABLE',
+    })
+  })
+
+  it('declares a status column on discovery_jobs', () => {
+    const jobs = COMPLIANCE_TABLES.find((t) => t.name === 'discovery_jobs')
+    expect(jobs).toBeDefined()
+    const status = jobs?.fields.find((f) => f.name === 'status')
+    expect(status).toEqual({
+      name: 'status',
+      type: 'STRING',
+      mode: 'REQUIRED',
+    })
   })
 
   it('each table has at least one REQUIRED field', () => {
@@ -146,6 +170,7 @@ describe('ComplianceDiscoveryRunRowSchema', () => {
     error_type: null,
     error_message: null,
     payload: { kind: 'pub78-hit', deductibilityCode: 'PC' },
+    job_id: null,
   }
 
   it('parses a succeeded run', () => {
@@ -194,9 +219,187 @@ describe('ComplianceDiscoveryRunRowSchema', () => {
     expect(parsed.started_at).toBe('2024-01-01T00:00:00.000Z')
   })
 
+  it('parses payload when BigQuery returns it as a JSON-encoded string', () => {
+    // BQ's JSON column type round-trips as a string in the nodejs SDK
+    // — discovery_runs.payload is JSON, so the schema's preprocess
+    // parses it before downstream consumers (compliance-status,
+    // discover-result, source-specific finding derivation) try to
+    // index into it.
+    const parsed = ComplianceDiscoveryRunRowSchema.parse({
+      ...valid,
+      payload:
+        '{"matchStatus":"found","detailUrl":"https://example.gov/detail/abc"}',
+    })
+    expect(parsed.payload).toEqual({
+      matchStatus: 'found',
+      detailUrl: 'https://example.gov/detail/abc',
+    })
+  })
+
+  it('passes a payload object through unchanged when it is already parsed', () => {
+    const parsed = ComplianceDiscoveryRunRowSchema.parse({
+      ...valid,
+      payload: { matchStatus: 'found' },
+    })
+    expect(parsed.payload).toEqual({ matchStatus: 'found' })
+  })
+
   it('rejects an empty source_id', () => {
     expect(() =>
       ComplianceDiscoveryRunRowSchema.parse({ ...valid, source_id: '' }),
+    ).toThrow()
+  })
+
+  it('accepts a null job_id (rows without an async-job parent)', () => {
+    const parsed = ComplianceDiscoveryRunRowSchema.parse({
+      ...valid,
+      job_id: null,
+    })
+    expect(parsed.job_id).toBeNull()
+  })
+
+  it('accepts a UUID job_id', () => {
+    const parsed = ComplianceDiscoveryRunRowSchema.parse({
+      ...valid,
+      job_id: '11111111-1111-4111-8111-111111111111',
+    })
+    expect(parsed.job_id).toBe('11111111-1111-4111-8111-111111111111')
+  })
+
+  it('rejects a non-UUID job_id', () => {
+    expect(() =>
+      ComplianceDiscoveryRunRowSchema.parse({
+        ...valid,
+        job_id: 'not-a-uuid',
+      }),
+    ).toThrow()
+  })
+})
+
+describe('ComplianceDiscoveryJobRowSchema', () => {
+  const valid = {
+    job_id: '11111111-1111-4111-8111-111111111111',
+    started_at: '2024-01-01T00:00:00Z',
+    finished_at: null,
+    status: 'running',
+    requested_sources: null,
+    requested_jurisdiction: null,
+    error_type: null,
+    error_message: null,
+    result: null,
+  }
+
+  it('parses a fresh running job', () => {
+    const parsed = ComplianceDiscoveryJobRowSchema.parse(valid)
+    expect(parsed.status).toBe('running')
+    expect(parsed.finished_at).toBeNull()
+  })
+
+  it('parses a completed job', () => {
+    const parsed = ComplianceDiscoveryJobRowSchema.parse({
+      ...valid,
+      status: 'completed',
+      finished_at: '2024-01-01T00:00:30Z',
+    })
+    expect(parsed.status).toBe('completed')
+    expect(parsed.finished_at).toBe('2024-01-01T00:00:30Z')
+  })
+
+  it('parses a failed job with error fields', () => {
+    const parsed = ComplianceDiscoveryJobRowSchema.parse({
+      ...valid,
+      status: 'failed',
+      finished_at: '2024-01-01T00:00:05Z',
+      error_type: 'spawn',
+      error_message: 'fetch unavailable',
+    })
+    expect(parsed.error_type).toBe('spawn')
+    expect(parsed.error_message).toContain('fetch')
+  })
+
+  it('parses a job with a sources filter', () => {
+    const parsed = ComplianceDiscoveryJobRowSchema.parse({
+      ...valid,
+      requested_sources: ['irs-teos', 'ca-sos-bizfile'],
+    })
+    expect(parsed.requested_sources).toEqual(['irs-teos', 'ca-sos-bizfile'])
+  })
+
+  it('parses a job with a jurisdiction filter', () => {
+    const parsed = ComplianceDiscoveryJobRowSchema.parse({
+      ...valid,
+      requested_jurisdiction: 'us-ca',
+    })
+    expect(parsed.requested_jurisdiction).toBe('us-ca')
+  })
+
+  it('rejects an unknown status', () => {
+    expect(() =>
+      ComplianceDiscoveryJobRowSchema.parse({ ...valid, status: 'aborted' }),
+    ).toThrow()
+  })
+
+  it('rejects a non-UUID job_id', () => {
+    expect(() =>
+      ComplianceDiscoveryJobRowSchema.parse({ ...valid, job_id: 'bad' }),
+    ).toThrow()
+  })
+
+  it('extracts BigQueryTimestamp .value for started_at and finished_at', () => {
+    const parsed = ComplianceDiscoveryJobRowSchema.parse({
+      ...valid,
+      status: 'completed',
+      started_at: { value: '2024-01-01T00:00:00.000Z' },
+      finished_at: { value: '2024-01-01T00:00:30.000Z' },
+    })
+    expect(parsed.started_at).toBe('2024-01-01T00:00:00.000Z')
+    expect(parsed.finished_at).toBe('2024-01-01T00:00:30.000Z')
+  })
+
+  it('accepts a null result (rows without a stored report yet)', () => {
+    const parsed = ComplianceDiscoveryJobRowSchema.parse(valid)
+    expect(parsed.result).toBeNull()
+  })
+
+  it('preserves a completed job result payload', () => {
+    const parsed = ComplianceDiscoveryJobRowSchema.parse({
+      ...valid,
+      status: 'completed',
+      finished_at: '2024-01-01T00:00:30Z',
+      result: { runs: [], findings: [] },
+    })
+    expect(parsed.result).toEqual({ runs: [], findings: [] })
+  })
+
+  it('parses requested_sources when BigQuery returns it as a JSON-encoded string', () => {
+    // BQ returns JSON columns as JSON-encoded strings, not as parsed
+    // arrays. The schema's preprocess handles that transparently.
+    const parsed = ComplianceDiscoveryJobRowSchema.parse({
+      ...valid,
+      requested_sources: '["ca-sos-bizfile","ca-ftb-entity-status-letter"]',
+    })
+    expect(parsed.requested_sources).toEqual([
+      'ca-sos-bizfile',
+      'ca-ftb-entity-status-letter',
+    ])
+  })
+
+  it('parses result when BigQuery returns it as a JSON-encoded string', () => {
+    const parsed = ComplianceDiscoveryJobRowSchema.parse({
+      ...valid,
+      status: 'completed',
+      finished_at: '2024-01-01T00:00:30Z',
+      result: '{"runs":[],"findings":[]}',
+    })
+    expect(parsed.result).toEqual({ runs: [], findings: [] })
+  })
+
+  it('keeps an unparseable JSON string as-is so the downstream check fails loudly', () => {
+    expect(() =>
+      ComplianceDiscoveryJobRowSchema.parse({
+        ...valid,
+        requested_sources: 'this is not valid JSON',
+      }),
     ).toThrow()
   })
 })

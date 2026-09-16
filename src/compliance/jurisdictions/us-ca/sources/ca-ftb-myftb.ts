@@ -8,6 +8,7 @@ const MYFTB_TERMS_URL =
 export const caFtbMyFtbSource: Source = {
   id: 'ca-ftb-myftb',
   jurisdiction: 'us-ca',
+  agency: 'California Franchise Tax Board',
   kind: 'playwright',
   authRequired: true,
   description: 'User-assisted MyFTB read-only business account review.',

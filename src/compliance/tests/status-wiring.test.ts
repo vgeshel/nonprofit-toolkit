@@ -69,6 +69,7 @@ const RUN_ROW = {
   error_type: null,
   error_message: null,
   payload: { matchStatus: 'found' },
+  job_id: null,
 }
 
 const IDENTIFIERS = {

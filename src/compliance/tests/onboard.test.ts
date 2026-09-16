@@ -388,7 +388,7 @@ describe('runOnboarding', () => {
     })
     expect(result.isOk()).toBe(true)
     expect(port.createDataset).toHaveBeenCalledTimes(1)
-    expect(port.createTable).toHaveBeenCalledTimes(4)
+    expect(port.createTable).toHaveBeenCalledTimes(5)
     expect(ids.writeMock).toHaveBeenCalledTimes(1)
     expect(bq.upsertMock).toHaveBeenCalledTimes(1)
   })
@@ -414,7 +414,7 @@ describe('runOnboarding', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(result.value.migration.createdDataset).toBe(true)
-    expect(result.value.migration.createdTables.length).toBe(4)
+    expect(result.value.migration.createdTables.length).toBe(5)
   })
 
   it('does not write anything if the migration fails', async () => {

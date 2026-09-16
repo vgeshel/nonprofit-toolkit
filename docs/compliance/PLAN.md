@@ -1,5 +1,7 @@
 # Compliance Toolkit — Plan
 
+See also: [docs/compliance-mcp/PLAN.md](../compliance-mcp/PLAN.md) — the MCP surface (tools, resources, prompt) and the Claude Code plugin packaging that ship the compliance toolkit to claude.ai, Claude Code, and autonomous agents.
+
 ## Goal
 
 Help a single-tenant US nonprofit maintain federal and California state compliance through agent-assisted workflows. There is no UI: the agent (Claude Code or similar) is the interface. Users talk to skills; skills orchestrate code.

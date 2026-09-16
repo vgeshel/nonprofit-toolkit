@@ -1050,8 +1050,27 @@ describe('BigQueryClient', () => {
       expect(mockQuery).not.toHaveBeenCalled()
     })
 
-    it('returns error when query execution fails', async () => {
-      mockQuery.mockRejectedValue(new Error('BigQuery error'))
+    it('returns error preserving the underlying BigQuery detail', async () => {
+      mockQuery.mockRejectedValue(
+        new Error('Unrecognized name: amount at [4:7]'),
+      )
+
+      const result = await client.executeReadOnlyQuery(
+        'SELECT amount FROM donations.events',
+      )
+
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.type).toBe('query')
+        expect(result.error.message).toBe(
+          'Query execution failed: Unrecognized name: amount at [4:7]',
+        )
+        expect(result.error.cause).toBeInstanceOf(Error)
+      }
+    })
+
+    it('falls back to a generic message when the cause is not an Error', async () => {
+      mockQuery.mockRejectedValue('socket hang up')
 
       const result = await client.executeReadOnlyQuery(
         'SELECT * FROM donations.events',
@@ -1060,6 +1079,7 @@ describe('BigQueryClient', () => {
       expect(result.isErr()).toBe(true)
       if (result.isErr()) {
         expect(result.error.type).toBe('query')
+        expect(result.error.message).toBe('Query execution failed')
       }
     })
   })

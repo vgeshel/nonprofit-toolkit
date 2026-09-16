@@ -345,6 +345,7 @@ function resultToAsync<T>(
 export const caCdtfaPermitLicenseVerificationSource: Source = {
   id: 'ca-cdtfa-permit-license-verification',
   jurisdiction: 'us-ca',
+  agency: 'California Department of Tax and Fee Administration',
   kind: 'playwright',
   authRequired: false,
   description:
@@ -362,6 +363,7 @@ export const caCdtfaPermitLicenseVerificationSource: Source = {
 export const caCdtfaOnlineServicesSource: Source = {
   id: 'ca-cdtfa-online-services',
   jurisdiction: 'us-ca',
+  agency: 'California Department of Tax and Fee Administration',
   kind: 'playwright',
   authRequired: true,
   description:

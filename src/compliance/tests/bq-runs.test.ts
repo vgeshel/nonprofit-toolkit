@@ -18,6 +18,7 @@ const ROW: ComplianceDiscoveryRunRow = {
   error_type: null,
   error_message: null,
   payload: { ok: true },
+  job_id: null,
 }
 
 function fakeRunner(
@@ -67,7 +68,21 @@ describe('createDiscoveryRunsAccessor.recordRun', () => {
       error_type: 'STRING',
       error_message: 'STRING',
       payload: 'STRING',
+      job_id: 'STRING',
     })
+  })
+
+  it('includes job_id in the INSERT when the row carries one', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
+    const accessor = createDiscoveryRunsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+    const jobId = '11111111-1111-4111-8111-111111111111'
+    await accessor.recordRun({ ...ROW, job_id: jobId })
+    const [sql, params] = query.mock.calls[0] ?? []
+    expect(sql).toMatch(/job_id/)
+    expect(params?.job_id).toBe(jobId)
   })
 
   it('passes SQL NULL for a null payload', async () => {
@@ -158,5 +173,77 @@ describe('createDiscoveryRunsAccessor.listLatestRuns', () => {
     if (!result.isErr()) return
     expect(result.error.type).toBe('query')
     expect(result.error.message).toContain('BQ down')
+  })
+})
+
+describe('createDiscoveryRunsAccessor.listRunsByJob', () => {
+  const JOB_ID = '11111111-1111-4111-8111-111111111111'
+
+  it('reads every run row tagged with the given job id', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() =>
+      okAsync([{ ...ROW, job_id: JOB_ID }]),
+    )
+    const accessor = createDiscoveryRunsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listRunsByJob(JOB_ID)
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(result.value).toHaveLength(1)
+    expect(result.value[0]?.job_id).toBe(JOB_ID)
+
+    const [sql, params] = query.mock.calls[0] ?? []
+    expect(sql).toMatch(/SELECT \*/i)
+    expect(sql).toMatch(/WHERE job_id = @job_id/i)
+    expect(params).toEqual({ job_id: JOB_ID })
+  })
+
+  it('returns an empty array when no runs exist for the job yet', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() => okAsync([]))
+    const accessor = createDiscoveryRunsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listRunsByJob(JOB_ID)
+    expect(result.isOk()).toBe(true)
+    if (result.isOk()) {
+      expect(result.value).toEqual([])
+    }
+  })
+
+  it('propagates a runner error', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() =>
+      errAsync({ type: 'query', message: 'BQ down' }),
+    )
+    const accessor = createDiscoveryRunsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listRunsByJob(JOB_ID)
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.type).toBe('query')
+      expect(result.error.message).toBe('BQ down')
+    }
+  })
+
+  it('returns a parse error for malformed rows', async () => {
+    const query = vi.fn<BqQueryRunner['query']>(() =>
+      okAsync([{ ...ROW, status: 'inflight' }]),
+    )
+    const accessor = createDiscoveryRunsAccessor({
+      runner: fakeRunner(query),
+      projectId: 'proj',
+    })
+
+    const result = await accessor.listRunsByJob(JOB_ID)
+    expect(result.isErr()).toBe(true)
+    if (result.isErr()) {
+      expect(result.error.type).toBe('parse')
+    }
   })
 })

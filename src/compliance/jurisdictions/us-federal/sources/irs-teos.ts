@@ -435,6 +435,7 @@ function makeFindings(args: BuildOutputArgs): Finding[] {
 export const irsTeosSource: Source = {
   id: 'irs-teos',
   jurisdiction: 'us-federal',
+  agency: 'IRS',
   kind: 'api',
   authRequired: false,
   description: DESCRIPTION,

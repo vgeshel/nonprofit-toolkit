@@ -9,6 +9,7 @@ const CA_AG_TERMS_URL = 'https://oag.ca.gov/privacy'
 export const caAgOnlineFilingSource: Source = {
   id: 'ca-ag-online-filing',
   jurisdiction: 'us-ca',
+  agency: 'California Attorney General — Registry of Charitable Trusts',
   kind: 'playwright',
   authRequired: true,
   description:

@@ -20,6 +20,20 @@ export function openDefaultBrowserPage(): ResultAsync<
   }))
 }
 
+/**
+ * Realistic Chrome desktop user agent. Some California-government SPAs
+ * (notably CA SOS bizfile) refuse to render their React app when the
+ * navigator UA matches Playwright's default (which contains
+ * "HeadlessChrome"); the page mounts but produces an empty body. We
+ * set this on the context so every page launched here inherits it.
+ *
+ * Kept in sync with a recent stable Chrome version. Bumping is
+ * mechanical; failing scrapers complaining about empty pages are a
+ * signal that the upstream tightened its UA gate.
+ */
+const DEFAULT_BROWSER_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
 async function openDefaultBrowserPageUnsafe(): Promise<BrowserPageSession> {
   const display = await startVirtualDisplayIfNeeded()
   const { chromium } = await import('playwright')
@@ -28,10 +42,15 @@ async function openDefaultBrowserPageUnsafe(): Promise<BrowserPageSession> {
     headless: process.env.COMPLIANCE_BROWSER_HEADLESS === '1',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   })
-  const page = await browser.newPage()
+  const context = await browser.newContext({
+    userAgent: DEFAULT_BROWSER_USER_AGENT,
+    viewport: { width: 1280, height: 900 },
+  })
+  const page = await context.newPage()
   return {
     page,
     close: async () => {
+      await context.close()
       await browser.close()
       await display.close()
     },

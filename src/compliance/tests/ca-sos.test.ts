@@ -258,7 +258,7 @@ describe('caSosBizfileSource.run', () => {
     )
     expect(page.actions.indexOf('wait-response')).toBeLessThan(
       page.actions.indexOf(
-        'locator-click-force button[aria-label="Execute search"], button.search-button',
+        'locator-click button[aria-label="Execute search"], button.search-button',
       ),
     )
     expect(result.value.record).toMatchObject({

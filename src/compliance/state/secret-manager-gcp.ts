@@ -74,6 +74,66 @@ const AccessResponseSchema = z.object({
 const ErrorCodeSchema = z.object({ code: z.number().optional() })
 
 /**
+ * Schema for the optional structured fields a Google gRPC error carries
+ * alongside `.message`. We log a `details` extracted from these so that
+ * permission / quota failures aren't reduced to a useless top-level
+ * message.
+ */
+const ErrorDetailsSchema = z.object({
+  code: z.number().optional(),
+  details: z.string().optional(),
+  statusDetails: z.unknown().optional(),
+  reason: z.string().optional(),
+})
+
+/**
+ * Build a human-readable error message from a gRPC error. The
+ * `@google-cloud/secret-manager` library sometimes leaves `err.message`
+ * as a non-string (or as the template literal "undefined undefined:
+ * undefined" when `code`, `status`, and `details` are all missing) — for
+ * example when the credential refresh underlying the call fails before
+ * the RPC reaches the server. Reach into the structured fields so we
+ * surface something the operator can actually act on.
+ *
+ * Exported for direct test coverage.
+ */
+export function describeSecretManagerError(err: Error): string {
+  const baseMessage =
+    typeof err.message === 'string' && err.message.length > 0 ? err.message : ''
+  const parts: string[] = []
+  if (baseMessage !== '' && !/\bundefined\b/.test(baseMessage)) {
+    parts.push(baseMessage)
+  }
+  // ErrorDetailsSchema has every field optional, so parsing an Error
+  // (which is always an object) never fails — we can use `.parse()`
+  // safely without a guard branch.
+  const parsed = ErrorDetailsSchema.parse(err)
+  if (parsed.reason !== undefined) {
+    parts.push(`reason=${parsed.reason}`)
+  }
+  if (parsed.details !== undefined) {
+    parts.push(`details=${parsed.details}`)
+  }
+  if (parsed.code !== undefined) {
+    parts.push(`code=${String(parsed.code)}`)
+  }
+  if (err.name !== '' && err.name !== 'Error') {
+    parts.push(`name=${err.name}`)
+  }
+  if (parts.length === 0) {
+    // Last resort: stringify the whole object so we see SOMETHING.
+    const safe = JSON.stringify(
+      err,
+      Object.getOwnPropertyNames(err).filter(
+        (k) => k !== 'stack' && k !== 'metadata',
+      ),
+    )
+    parts.push(`unstructured: ${safe}`)
+  }
+  return parts.join(' | ')
+}
+
+/**
  * Translate a thrown SDK error into a typed `SecretManagerError`.
  *
  * Exported (under the `_internal` namespace) so the non-Error branch can be
@@ -89,13 +149,14 @@ const ErrorCodeSchema = z.object({ code: z.number().optional() })
 export function toSecretManagerError(err: unknown): SecretManagerError {
   if (err instanceof Error) {
     const code = ErrorCodeSchema.parse(err).code
+    const message = describeSecretManagerError(err)
     if (code === GRPC_NOT_FOUND) {
-      return { type: 'not_found', message: err.message }
+      return { type: 'not_found', message }
     }
     if (code === GRPC_PERMISSION_DENIED) {
-      return { type: 'permission_denied', message: err.message }
+      return { type: 'permission_denied', message }
     }
-    return { type: 'sdk', message: err.message }
+    return { type: 'sdk', message }
   }
   return { type: 'sdk', message: String(err) }
 }

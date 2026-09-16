@@ -132,6 +132,16 @@ export class FirestoreOAuthStorage implements OAuthStorage {
     this.db = new Firestore({ projectId, ignoreUndefinedProperties: true })
   }
 
+  /**
+   * Expose the underlying Firestore client for callers that need to
+   * read/write outside the OAuth schema (e.g. the compliance-discover
+   * async-job lifecycle). Same project, same credentials, one client
+   * instance — no point in instantiating a second one.
+   */
+  get client(): Firestore {
+    return this.db
+  }
+
   // ── Clients ──────────────────────────────────────────────────────
 
   async getClient(

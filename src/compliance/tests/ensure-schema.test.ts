@@ -48,10 +48,10 @@ describe('ensureComplianceSchema', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(result.value.createdDataset).toBe(true)
-    expect(result.value.createdTables.length).toBe(4)
+    expect(result.value.createdTables.length).toBe(5)
     expect(result.value.skippedTables).toEqual([])
     expect(port.createDataset).toHaveBeenCalledTimes(1)
-    expect(port.createTable).toHaveBeenCalledTimes(4)
+    expect(port.createTable).toHaveBeenCalledTimes(5)
   })
 
   it('is a no-op when dataset and tables all already exist', async () => {
@@ -68,7 +68,7 @@ describe('ensureComplianceSchema', () => {
     if (!result.isOk()) return
     expect(result.value.createdDataset).toBe(false)
     expect(result.value.createdTables).toEqual([])
-    expect(result.value.skippedTables.length).toBe(4)
+    expect(result.value.skippedTables.length).toBe(5)
     expect(port.createDataset).not.toHaveBeenCalled()
     expect(port.createTable).not.toHaveBeenCalled()
   })

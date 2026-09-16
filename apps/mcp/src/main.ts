@@ -23,6 +23,7 @@ import { GoogleOAuthProvider } from './auth/provider'
 import { FirestoreOAuthStorage } from './auth/storage'
 import { loadConfig } from './config'
 import { createLogger } from './logger'
+import { registerComplianceSurface } from './tools/compliance/index'
 import { buildDonationsPrompt } from './tools/donations-prompt'
 import { handleGenerateLetter } from './tools/generate-letter'
 import { handleQueryBigQuery } from './tools/query-bigquery'
@@ -65,17 +66,23 @@ async function main(): Promise<void> {
 
   const baseUrl = new URL(config.BASE_URL)
 
-  // Track transports per session
-  const transports = new Map<string, StreamableHTTPServerTransport>()
+  // The MCP transport runs in stateless mode (sessionIdGenerator: undefined)
+  // because Cloud Run scales to zero. Stateful mode kept session state in an
+  // in-memory map keyed by session id, which was lost on every cold start —
+  // every subsequent request from a still-connected Claude.ai client got 400
+  // (session not found). Stateless: each request creates a fresh transport +
+  // McpServer, handles the message, and the GC takes care of the rest. We do
+  // not use server-initiated notifications, so the loss of session-scoped
+  // state has no functional impact.
 
   /**
    * Create and configure a new MCP server instance.
    */
   function createMcpServerInstance(): McpServer {
     const mcp = new McpServer(
-      { name: 'donations-etl', version: '1.0.0' },
+      { name: 'nonprofit-toolkit', version: '1.0.0' },
       {
-        capabilities: { tools: {}, prompts: {} },
+        capabilities: { tools: {}, prompts: {}, resources: {} },
       },
     )
 
@@ -212,6 +219,14 @@ async function main(): Promise<void> {
       },
     )
 
+    // Compliance surface — tools, resources, and the overview prompt.
+    // See `docs/compliance-mcp/PLAN.md` for the full design.
+    registerComplianceSurface(mcp, {
+      config,
+      logger,
+      firestore: storage.client,
+    })
+
     return mcp
   }
 
@@ -281,37 +296,21 @@ async function main(): Promise<void> {
     resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(baseUrl),
   })
 
-  // MCP Streamable HTTP endpoint — parse JSON body for POST requests
-  // so we can pass it as parsedBody to the transport
+  // MCP Streamable HTTP endpoint. Stateless: each request gets a fresh
+  // transport + McpServer; nothing is tracked between requests. Body is
+  // parsed by express.json() so we can pass it as parsedBody to the
+  // transport (the SDK supports either the raw stream or a pre-parsed body).
   app.all('/mcp', bearerAuth, express.json(), async (req, res) => {
-    const rawSessionId = req.headers['mcp-session-id']
-    const sessionId =
-      typeof rawSessionId === 'string' ? rawSessionId : undefined
-
-    const existingTransport = sessionId ? transports.get(sessionId) : undefined
-
-    if (existingTransport) {
-      await existingTransport.handleRequest(req, res, req.body)
-      return
-    }
-
-    // New session
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID(),
-      onsessioninitialized: (id) => {
-        transports.set(id, transport)
-        logger.info({ sessionId: id }, 'MCP session started')
-      },
-      onsessionclosed: (id) => {
-        transports.delete(id)
-        logger.info({ sessionId: id }, 'MCP session closed')
-      },
+      sessionIdGenerator: undefined,
     })
-
     const mcp = createMcpServerInstance()
     await mcp.connect(transport)
-
-    await transport.handleRequest(req, res, req.body)
+    try {
+      await transport.handleRequest(req, res, req.body)
+    } finally {
+      await transport.close()
+    }
   })
 
   // Error handler — log unhandled errors with full stack
@@ -343,14 +342,12 @@ async function main(): Promise<void> {
     )
   })
 
-  // Graceful shutdown
+  // Graceful shutdown. Stateless transport means there are no per-session
+  // resources to drain — just stop accepting new requests and tear down
+  // the browser.
   const shutdown = async () => {
     logger.info('Shutting down...')
     server.close()
-    for (const [, transport] of transports) {
-      await transport.close()
-    }
-    transports.clear()
     await closeBrowser()
     process.exit(0)
   }

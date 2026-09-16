@@ -12,6 +12,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createGcpSecretManagerPort,
+  describeSecretManagerError,
   toSecretManagerError,
   type SecretManagerClient,
 } from '../state/secret-manager-gcp.ts'
@@ -136,6 +137,63 @@ describe('createGcpSecretManagerPort.accessSecret', () => {
     if (result.isErr()) {
       expect(result.error.type).toBe('sdk')
     }
+  })
+
+  it('describes a gRPC error using the structured fields when available', () => {
+    interface RichError extends Error {
+      code?: number
+      details?: string
+      reason?: string
+    }
+    const err: RichError = new Error('PERMISSION_DENIED')
+    err.code = 7
+    err.details = 'Permission denied on resource secret X.'
+    err.reason = 'IAM_PERMISSION_DENIED'
+    const msg = describeSecretManagerError(err)
+    expect(msg).toContain('PERMISSION_DENIED')
+    expect(msg).toContain('reason=IAM_PERMISSION_DENIED')
+    expect(msg).toContain('details=Permission denied on resource secret X.')
+    expect(msg).toContain('code=7')
+  })
+
+  it('drops the "undefined undefined: undefined" message and uses details when available', () => {
+    interface RichError extends Error {
+      code?: number
+      details?: string
+    }
+    // Reproduces the production failure mode where the gRPC error's
+    // `.message` was the literal string "undefined undefined: undefined"
+    // because the underlying credential refresh produced no structured
+    // status. We should drop that useless message and fall back to
+    // whatever structured fields the error carries.
+    const err: RichError = new Error('undefined undefined: undefined')
+    err.code = 16
+    err.details = 'invalid_grant: account not authorized'
+    const msg = describeSecretManagerError(err)
+    expect(msg).not.toContain('undefined undefined: undefined')
+    expect(msg).toContain('invalid_grant')
+    expect(msg).toContain('code=16')
+  })
+
+  it('falls back to a JSON dump when nothing useful is present on the error', () => {
+    const err = new Error('')
+    const msg = describeSecretManagerError(err)
+    expect(msg).toContain('unstructured')
+  })
+
+  it('preserves the original message when it is structured', () => {
+    const err = new Error('boom')
+    const msg = describeSecretManagerError(err)
+    expect(msg).toContain('boom')
+  })
+
+  it('includes the constructor name when not the default "Error"', () => {
+    class GoogleAuthError extends Error {
+      override readonly name = 'GoogleAuthError'
+    }
+    const err = new GoogleAuthError('auth failed')
+    const msg = describeSecretManagerError(err)
+    expect(msg).toContain('name=GoogleAuthError')
   })
 
   it('translates non-Error thrown values to a sdk error directly', () => {

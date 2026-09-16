@@ -305,6 +305,7 @@ function makeEvidenceRunRow(
     error_type: null,
     error_message: null,
     payload,
+    job_id: null,
   }
 }
 

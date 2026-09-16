@@ -105,6 +105,7 @@ function makeSource(id: string): Source {
   return {
     id,
     jurisdiction: 'us-ca',
+    agency: 'Test Agency',
     kind: 'playwright',
     authRequired: true,
     description: 'User-assisted source.',

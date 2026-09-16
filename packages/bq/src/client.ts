@@ -67,6 +67,21 @@ function createError(
 }
 
 /**
+ * Build the message for a failed read-only query, preserving the
+ * underlying BigQuery detail (e.g. "Unrecognized name: amount at [4:7]").
+ *
+ * That detail is exactly what an LLM caller needs to self-correct a bad
+ * column or syntax error; a bare "Query execution failed" hides it and
+ * leaves the model (and user) with nothing actionable.
+ */
+function describeQueryFailure(cause: unknown): string {
+  const detail = cause instanceof Error ? cause.message : ''
+  return detail.length > 0
+    ? `Query execution failed: ${detail}`
+    : 'Query execution failed'
+}
+
+/**
  * Default chunk size for NDJSON files.
  */
 const DEFAULT_CHUNK_SIZE = 10000
@@ -500,7 +515,7 @@ export class BigQueryClient {
         query: limitedSql,
         maximumBytesBilled: String(maxBytes),
       }),
-      (error) => createError('query', 'Query execution failed', error),
+      (error) => createError('query', describeQueryFailure(error), error),
     ).map(([rows]) => z.array(z.record(z.string(), z.unknown())).parse(rows))
   }
 

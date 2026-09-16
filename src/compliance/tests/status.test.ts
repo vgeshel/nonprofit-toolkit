@@ -48,6 +48,7 @@ const RUN: ComplianceDiscoveryRunRow = {
   error_type: null,
   error_message: null,
   payload: { matchStatus: 'found' },
+  job_id: null,
 }
 
 const IRS_BMF_RUN: ComplianceDiscoveryRunRow = {

@@ -109,6 +109,7 @@ function makeSource(args: {
   return {
     id: args.id,
     jurisdiction: 'us-federal',
+    agency: 'Test Agency',
     kind: 'api',
     authRequired: false,
     description: 'fake',
@@ -305,6 +306,7 @@ describe('runDiscoveryProduction', () => {
     const source: Source = {
       id: 'fake-src',
       jurisdiction: 'us-federal',
+      agency: 'Test Agency',
       kind: 'api',
       authRequired: false,
       description: 'fake',
