@@ -10,10 +10,3 @@ Always fetch current documentation before using any library:
 - Claude Agent SDK: https://platform.claude.com/docs/en/agent-sdk/typescript.md
 
 When using any library, search the web for its current documentation first.
-
-## Technology Stack
-
-- **Runtime**: Bun (not Node.js)
-- **Language**: TypeScript in strict mode
-- **Testing**: Vitest
-- **Validation**: Zod for runtime validation
