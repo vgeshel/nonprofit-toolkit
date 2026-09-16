@@ -14,6 +14,7 @@ import {
   type SourceMetrics,
 } from '@donations-etl/bq'
 import {
+  BenevityConnector,
   CheckDepositsConnector,
   FunraiseConnector,
   GivebutterConnector,
@@ -70,6 +71,8 @@ export interface DailyOptions {
   funraiseCsv?: string
   /** Path to directory containing Venmo CSV exports */
   venmoDir?: string
+  /** Path to directory containing Benevity Donations Report CSVs */
+  benevityDir?: string
 }
 
 /**
@@ -88,6 +91,8 @@ export interface BackfillOptions {
   funraiseCsv?: string
   /** Path to directory containing Venmo CSV exports */
   venmoDir?: string
+  /** Path to directory containing Benevity Donations Report CSVs */
+  benevityDir?: string
 }
 
 /**
@@ -204,7 +209,7 @@ export class Orchestrator {
     const runId = uuidv4()
     const now = DateTime.utc()
     const lookbackHours = this.config.LOOKBACK_HOURS
-    const { skipMerge, mergeOnly, funraiseCsv, venmoDir } = options
+    const { skipMerge, mergeOnly, funraiseCsv, venmoDir, benevityDir } = options
 
     // Add Funraise connector if CSV path is provided
     if (funraiseCsv) {
@@ -219,8 +224,24 @@ export class Orchestrator {
       this.connectors.set('venmo', new VenmoConnector({ csvDirPath: venmoDir }))
     }
 
+    // Add Benevity connector if a report directory is provided
+    if (benevityDir) {
+      this.connectors.set(
+        'benevity',
+        new BenevityConnector({ reportDirPath: benevityDir }),
+      )
+    }
+
     this.logger.info(
-      { runId, mode: 'daily', skipMerge, mergeOnly, funraiseCsv, venmoDir },
+      {
+        runId,
+        mode: 'daily',
+        skipMerge,
+        mergeOnly,
+        funraiseCsv,
+        venmoDir,
+        benevityDir,
+      },
       'Starting daily ETL run',
     )
 
@@ -233,6 +254,9 @@ export class Orchestrator {
     }
     if (venmoDir && !sources.includes('venmo')) {
       sources = [...sources, 'venmo']
+    }
+    if (benevityDir && !sources.includes('benevity')) {
+      sources = [...sources, 'benevity']
     }
     const enabledSources = sources.filter((s) => this.connectors.has(s))
 
@@ -278,7 +302,7 @@ export class Orchestrator {
   runBackfill(
     options: BackfillOptions,
   ): ResultAsync<RunResult[], OrchestratorError> {
-    const { skipMerge, mergeOnly, funraiseCsv, venmoDir } = options
+    const { skipMerge, mergeOnly, funraiseCsv, venmoDir, benevityDir } = options
 
     // Add Funraise connector if CSV path is provided
     if (funraiseCsv) {
@@ -291,6 +315,14 @@ export class Orchestrator {
     // Add Venmo connector if directory path is provided
     if (venmoDir) {
       this.connectors.set('venmo', new VenmoConnector({ csvDirPath: venmoDir }))
+    }
+
+    // Add Benevity connector if a report directory is provided
+    if (benevityDir) {
+      this.connectors.set(
+        'benevity',
+        new BenevityConnector({ reportDirPath: benevityDir }),
+      )
     }
 
     // If mergeOnly, run a single merge without extracting data
@@ -317,6 +349,9 @@ export class Orchestrator {
     }
     if (venmoDir && !sources.includes('venmo')) {
       sources = [...sources, 'venmo']
+    }
+    if (benevityDir && !sources.includes('benevity')) {
+      sources = [...sources, 'benevity']
     }
     const enabledSources = sources.filter((s) => this.connectors.has(s))
 

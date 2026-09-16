@@ -18,6 +18,7 @@ export const SourceEnum = z.enum([
   'venmo',
   'wise',
   'patreon',
+  'benevity',
 ])
 export type Source = z.infer<typeof SourceEnum>
 

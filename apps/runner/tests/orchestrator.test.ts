@@ -76,6 +76,7 @@ const mockFunraiseConnector = { fetchAll: vi.fn<FetchAllFn>() }
 const mockVenmoConnector = { fetchAll: vi.fn<FetchAllFn>() }
 const mockWiseConnector = { fetchAll: vi.fn<FetchAllFn>() }
 const mockPatreonConnector = { fetchAll: vi.fn<FetchAllFn>() }
+const mockBenevityConnector = { fetchAll: vi.fn<FetchAllFn>() }
 
 // Mock dependencies with class-based implementations
 vi.mock('@donations-etl/connectors', () => ({
@@ -102,6 +103,9 @@ vi.mock('@donations-etl/connectors', () => ({
   },
   PatreonConnector: class MockPatreonConnector {
     fetchAll = mockPatreonConnector.fetchAll
+  },
+  BenevityConnector: class MockBenevityConnector {
+    fetchAll = mockBenevityConnector.fetchAll
   },
 }))
 
@@ -905,6 +909,55 @@ describe('Orchestrator', () => {
         // Both Mercury and Venmo should have been called
         expect(mockMercuryConnector.fetchAll).toHaveBeenCalled()
         expect(mockVenmoConnector.fetchAll).toHaveBeenCalled()
+      })
+    })
+
+    describe('Benevity report support', () => {
+      it('adds Benevity connector when benevityDir is provided', async () => {
+        mockBenevityConnector.fetchAll.mockReset()
+        mockBqClient.getWatermark.mockReset()
+
+        mockBqClient.getWatermark.mockReturnValue(okAsync(null))
+        mockBenevityConnector.fetchAll.mockReturnValue(okAsync([]))
+
+        const configNoSources: Config = {
+          ...config,
+          MERCURY_API_KEY: undefined,
+          PAYPAL_CLIENT_ID: undefined,
+          PAYPAL_SECRET: undefined,
+        }
+
+        const orchestrator = new Orchestrator(configNoSources, logger)
+
+        const result = await orchestrator.runDaily({
+          benevityDir: '/path/to/benevity',
+        })
+
+        expect(result.isOk()).toBe(true)
+        expect(mockBenevityConnector.fetchAll).toHaveBeenCalled()
+      })
+
+      it('auto-adds benevity to sources when benevityDir is provided', async () => {
+        mockMercuryConnector.fetchAll.mockReset()
+        mockBenevityConnector.fetchAll.mockReset()
+        mockBqClient.getWatermark.mockReset()
+        mockBqClient.updateWatermark.mockReset()
+
+        mockBqClient.getWatermark.mockReturnValue(okAsync(null))
+        mockBqClient.updateWatermark.mockReturnValue(okAsync(undefined))
+        mockMercuryConnector.fetchAll.mockReturnValue(okAsync([]))
+        mockBenevityConnector.fetchAll.mockReturnValue(okAsync([]))
+
+        const orchestrator = new Orchestrator(config, logger)
+
+        const result = await orchestrator.runDaily({
+          sources: ['mercury'],
+          benevityDir: '/path/to/benevity',
+        })
+
+        expect(result.isOk()).toBe(true)
+        expect(mockMercuryConnector.fetchAll).toHaveBeenCalled()
+        expect(mockBenevityConnector.fetchAll).toHaveBeenCalled()
       })
     })
   })
@@ -2164,6 +2217,73 @@ describe('Orchestrator', () => {
         // Both Mercury and Venmo should have been called
         expect(mockMercuryConnector.fetchAll).toHaveBeenCalled()
         expect(mockVenmoConnector.fetchAll).toHaveBeenCalled()
+      })
+    })
+
+    describe('Benevity report support', () => {
+      it('adds Benevity connector when benevityDir is provided', async () => {
+        mockBenevityConnector.fetchAll.mockReset()
+        mockBqClient.insertRun.mockReset()
+        mockBqClient.updateRun.mockReset()
+
+        mockBqClient.insertRun.mockReturnValue(okAsync(undefined))
+        mockBqClient.updateRun.mockReturnValue(okAsync(undefined))
+        mockBenevityConnector.fetchAll.mockReturnValue(okAsync([]))
+
+        const configNoSources: Config = {
+          ...config,
+          MERCURY_API_KEY: undefined,
+          PAYPAL_CLIENT_ID: undefined,
+          PAYPAL_SECRET: undefined,
+        }
+
+        const orchestrator = new Orchestrator(configNoSources, logger)
+
+        const result = await orchestrator.runBackfill({
+          from: '2024-01-01',
+          to: '2024-02-01',
+          chunk: 'month',
+          benevityDir: '/path/to/benevity',
+        })
+
+        expect(result.isOk()).toBe(true)
+        expect(mockBenevityConnector.fetchAll).toHaveBeenCalled()
+      })
+
+      it('auto-adds benevity to sources when benevityDir is provided', async () => {
+        mockMercuryConnector.fetchAll.mockReset()
+        mockBenevityConnector.fetchAll.mockReset()
+        mockBqClient.writeEventsToGcs.mockReset()
+        mockBqClient.loadFromGcs.mockReset()
+        mockBqClient.merge.mockReset()
+        mockBqClient.insertRun.mockReset()
+        mockBqClient.updateRun.mockReset()
+
+        mockBqClient.insertRun.mockReturnValue(okAsync(undefined))
+        mockBqClient.updateRun.mockReturnValue(okAsync(undefined))
+        mockBqClient.writeEventsToGcs.mockReturnValue(okAsync(['path1.ndjson']))
+        mockBqClient.loadFromGcs.mockReturnValue(
+          okAsync({ rowsLoaded: 1, bytesProcessed: 500 }),
+        )
+        mockBqClient.merge.mockReturnValue(
+          okAsync({ rowsInserted: 1, rowsUpdated: 0 }),
+        )
+        mockMercuryConnector.fetchAll.mockReturnValue(okAsync([]))
+        mockBenevityConnector.fetchAll.mockReturnValue(okAsync([]))
+
+        const orchestrator = new Orchestrator(config, logger)
+
+        const result = await orchestrator.runBackfill({
+          from: '2024-01-01',
+          to: '2024-02-01',
+          chunk: 'month',
+          sources: ['mercury'],
+          benevityDir: '/path/to/benevity',
+        })
+
+        expect(result.isOk()).toBe(true)
+        expect(mockMercuryConnector.fetchAll).toHaveBeenCalled()
+        expect(mockBenevityConnector.fetchAll).toHaveBeenCalled()
       })
     })
 

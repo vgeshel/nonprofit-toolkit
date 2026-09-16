@@ -188,9 +188,9 @@ This checklist tracks implementation progress. Each item must have 100% test cov
 
 ## Deferred (Post-Milestone 1)
 
-- [ ] Wise connector
-- [ ] Benevity connector
-- [ ] Venmo connector
+- [x] Wise connector
+- [x] Venmo connector
+- [x] Benevity connector (CSV reports + `scripts/benevity-download.ts`)
 - [ ] `--continueOnError` flag
 - [ ] Retry logic with exponential backoff
 - [ ] Metrics/observability integration
