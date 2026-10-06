@@ -208,9 +208,9 @@ describe('runOnboarding', () => {
     const bq = fakeBq()
     const answers: OnboardingAnswers = {
       ...ANSWERS,
-      caFtbEntityId: '6423690',
-      caFtbEntityName: 'LELEKA FOUNDATION',
-      cdtfaSellerPermitNumber: '202-822944',
+      caFtbEntityId: '1234567',
+      caFtbEntityName: 'EXAMPLE CHARITY',
+      cdtfaSellerPermitNumber: '201-234567',
       cdtfaUseTaxAccountNumber: 'UT-00123456',
       cdtfaSpecialTaxAccountNumber: 'STF-000123',
     }
@@ -227,9 +227,9 @@ describe('runOnboarding', () => {
       'us-ca': {
         sosEntityNumber: 'C0123456',
         agCharityNumber: 'CT0123456',
-        ftbEntityId: '6423690',
-        ftbEntityName: 'LELEKA FOUNDATION',
-        cdtfaSellerPermitNumber: '202-822944',
+        ftbEntityId: '1234567',
+        ftbEntityName: 'EXAMPLE CHARITY',
+        cdtfaSellerPermitNumber: '201-234567',
         cdtfaUseTaxAccountNumber: 'UT-00123456',
         cdtfaSpecialTaxAccountNumber: 'STF-000123',
       },

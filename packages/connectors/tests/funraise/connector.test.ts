@@ -33,7 +33,7 @@ function createSampleRow(id: string, amount: string): FunraiseCsvRow {
     Id: id,
     Amount: amount,
     'Transaction Date': '2026-01-24T00:05:47.440049-08:00[US/Pacific]',
-    'Supporter Id': '2768225',
+    'Supporter Id': '20000001',
     'First Name': 'Test',
     'Last Name': 'User',
     'Institution Name': '',

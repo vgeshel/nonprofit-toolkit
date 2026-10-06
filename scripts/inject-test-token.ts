@@ -13,6 +13,9 @@ import { z } from 'zod'
 
 const EnvSchema = z.object({
   PROJECT_ID: z.string(),
+  // The Google Workspace domain the MCP server accepts; the fake installation
+  // claims a user in that domain.
+  MCP_ALLOWED_DOMAIN: z.string().min(1),
 })
 const env = EnvSchema.parse(process.env)
 
@@ -34,8 +37,8 @@ const installation = {
   refreshToken: REFRESH_TOKEN,
   clientId: 'test-client',
   userId: 'test-user',
-  userEmail: 'test@leleka.care',
-  userDomain: 'leleka.care',
+  userEmail: `test@${env.MCP_ALLOWED_DOMAIN}`,
+  userDomain: env.MCP_ALLOWED_DOMAIN,
   issuedAt: now,
   expiresAt: now + 3600,
 }

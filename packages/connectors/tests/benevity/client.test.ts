@@ -19,18 +19,18 @@ import type { BenevityReport } from '../../src/benevity/schema'
  */
 const CURRENT_REPORT = `Donations Report,
 "#-------------------------------------------",
-Charity Name,LELEKA FOUNDATION
-Charity ID,840-472377309
+Charity Name,EXAMPLE CHARITY
+Charity ID,840-123456789
 Period Ending,Mon 1 May 2023 0:00:00
 Currency,USD
 Payment Method,EFT
-Disbursement ID,AA7RTXAPHV
+Disbursement ID,DISB000002
 Note,Rounding may be applied to some values in this report.
 "#-------------------------------------------",
 
 Company,Project,Donation Date,Donor First Name,Donor Last Name,Email,Address,City,State/Province,Postal Code,Activity,Comment,Transaction ID,Donation Frequency,Currency,Project Remote ID,Source,Reason,Total Donation to be Acknowledged,Match Amount,Cause Support Fee,Merchant Fee,Fee Comment
-Google,LELEKA FOUNDATION,2023-04-01T01:10:39Z,Sergey,Volk,servolk@example.com,Not shared by donor,Not shared by donor,Not shared by donor,94086,,,4EX805TUGH,Unspecified,USD,,Donation,Match,0.00,599.88,0.00,0.00,
-N1234,LELEKA FOUNDATION,2023-04-02T05:53:48Z,Svitlana,Kostylova,sk@example.com,Not shared by donor,Not shared by donor,Not shared by donor,92656,,,4EXJNE8R8M,Unspecified,USD,,Donation,Match,0.00,"1,000.00",29.00,0.00,
+Google,EXAMPLE CHARITY,2023-04-01T01:10:39Z,Grace,Hopper,grace@example.com,Not shared by donor,Not shared by donor,Not shared by donor,90001,,,TXN0000001,Unspecified,USD,,Donation,Match,0.00,599.88,0.00,0.00,
+N1234,EXAMPLE CHARITY,2023-04-02T05:53:48Z,Alan,Turing,alan@example.com,Not shared by donor,Not shared by donor,Not shared by donor,90002,,,TXN0000002,Unspecified,USD,,Donation,Match,0.00,"1,000.00",29.00,0.00,
 Totals,,,,,,,,,,,,,,,,,,0.00,"1,599.88",29.00,0.00
 Total Donations (Gross),"1,599.88"
 Check Fee,0.00
@@ -42,16 +42,16 @@ Net Total Payment,"1,570.88"
  */
 const LEGACY_REPORT = `Donations Report,
 "#-------------------------------------------",
-Charity Name,LELEKA FOUNDATION
-Charity ID,840-472377309
+Charity Name,EXAMPLE CHARITY
+Charity ID,840-123456789
 Period Ending,Sat 31 Oct 2015 0:00:00
 Currency,USD
 Payment Method,CHECK
-Disbursement ID,4J7P4KVZ8W
+Disbursement ID,DISB000001
 "#-------------------------------------------",
 
 Company,Project,Donation Date,Donor First Name,Donor Last Name,Email,Address,City,State/Province,Postal Code,Activity,Comment,Transaction ID,Donation Frequency,Currency,Project Remote ID,Source,Reason,Total Donation to be Acknowledged,Match Amount,Fee Comment
-Apple,LELEKA FOUNDATION,2015-10-06T00:00:00Z,Ada,Lovelace,ada@example.com,1 Main St,Cupertino,CA,95014,,,OLD1,One Time,USD,,Payroll,User Donation,50.00,50.00,
+Apple,EXAMPLE CHARITY,2015-10-15T00:00:00Z,Ada,Lovelace,ada@example.com,1 Main St,Cupertino,CA,95014,,,OLD1,One Time,USD,,Payroll,User Donation,50.00,50.00,
 Totals,,,,,,,,,,,,,,,,,,50.00,50.00
 Total Donations (Gross),100.00
 Check Fee,2.00
@@ -72,36 +72,36 @@ describe('getErrorMessage', () => {
 
 describe('parseBenevityReport', () => {
   it('parses the preamble into report metadata', () => {
-    const result = parseBenevityReport(CURRENT_REPORT, 'AA7RTXAPHV.csv')
+    const result = parseBenevityReport(CURRENT_REPORT, 'DISB000002.csv')
     expect(result.isOk()).toBe(true)
 
     const report = result._unsafeUnwrap()
-    expect(report.filename).toBe('AA7RTXAPHV.csv')
+    expect(report.filename).toBe('DISB000002.csv')
     expect(report.meta).toEqual({
-      charityName: 'LELEKA FOUNDATION',
-      charityId: '840-472377309',
+      charityName: 'EXAMPLE CHARITY',
+      charityId: '840-123456789',
       periodEnding: 'Mon 1 May 2023 0:00:00',
       currency: 'USD',
       paymentMethod: 'EFT',
-      disbursementId: 'AA7RTXAPHV',
+      disbursementId: 'DISB000002',
     })
   })
 
   it('parses donation rows and skips the trailer', () => {
     const report = parseBenevityReport(
       CURRENT_REPORT,
-      'AA7RTXAPHV.csv',
+      'DISB000002.csv',
     )._unsafeUnwrap()
 
     expect(report.rows).toHaveLength(2)
-    expect(report.rows[0]?.['Transaction ID']).toBe('4EX805TUGH')
+    expect(report.rows[0]?.['Transaction ID']).toBe('TXN0000001')
     expect(report.rows[1]?.['Match Amount']).toBe('1,000.00')
   })
 
   it('parses the trailer totals', () => {
     const report = parseBenevityReport(
       CURRENT_REPORT,
-      'AA7RTXAPHV.csv',
+      'DISB000002.csv',
     )._unsafeUnwrap()
 
     expect(report.totals).toEqual({
@@ -114,7 +114,7 @@ describe('parseBenevityReport', () => {
   it('parses the legacy variant, defaulting its missing fee columns', () => {
     const report = parseBenevityReport(
       LEGACY_REPORT,
-      '4J7P4KVZ8W.csv',
+      'DISB000001.csv',
     )._unsafeUnwrap()
 
     expect(report.meta.paymentMethod).toBe('CHECK')
@@ -130,8 +130,8 @@ describe('parseBenevityReport', () => {
 
   it('accepts a report with no donation rows', () => {
     const empty = `Donations Report,
-Charity Name,LELEKA FOUNDATION
-Charity ID,840-472377309
+Charity Name,EXAMPLE CHARITY
+Charity ID,840-123456789
 Period Ending,Mon 1 May 2023 0:00:00
 Currency,USD
 Payment Method,EFT
@@ -154,14 +154,14 @@ Net Total Payment,0.00
     )
     const report = parseBenevityReport(
       truncated,
-      'AA7RTXAPHV.csv',
+      'DISB000002.csv',
     )._unsafeUnwrap()
     expect(report.meta.paymentMethod).toBe('EFT')
   })
 
   it('treats a valueless preamble field as missing', () => {
     const blankCharityId = CURRENT_REPORT.replace(
-      'Charity ID,840-472377309',
+      'Charity ID,840-123456789',
       'Charity ID',
     )
     const result = parseBenevityReport(blankCharityId, 'broken.csv')
@@ -175,19 +175,19 @@ Net Total Payment,0.00
     const noFeeValue = CURRENT_REPORT.replace('Check Fee,0.00', 'Check Fee')
     const report = parseBenevityReport(
       noFeeValue,
-      'AA7RTXAPHV.csv',
+      'DISB000002.csv',
     )._unsafeUnwrap()
     expect(report.totals.paymentFeeCents).toBe(0)
   })
 
   it('errors when the donation header row is absent', () => {
     const noHeader = `Donations Report,
-Charity Name,LELEKA FOUNDATION
-Charity ID,840-472377309
+Charity Name,EXAMPLE CHARITY
+Charity ID,840-123456789
 Period Ending,Mon 1 May 2023 0:00:00
 Currency,USD
 Payment Method,EFT
-Disbursement ID,AA7RTXAPHV
+Disbursement ID,DISB000002
 `
     const result = parseBenevityReport(noHeader, 'broken.csv')
     expect(result.isErr()).toBe(true)
@@ -198,7 +198,7 @@ Disbursement ID,AA7RTXAPHV
 
   it('errors when the preamble is missing a required field', () => {
     const noDisbursement = CURRENT_REPORT.replace(
-      'Disbursement ID,AA7RTXAPHV\n',
+      'Disbursement ID,DISB000002\n',
       '',
     )
     const result = parseBenevityReport(noDisbursement, 'broken.csv')
@@ -241,8 +241,8 @@ Disbursement ID,AA7RTXAPHV
 
   it('errors on a donation row with the wrong column count', () => {
     const shortRow = CURRENT_REPORT.replace(
-      'Google,LELEKA FOUNDATION,2023-04-01T01:10:39Z,Sergey,Volk,servolk@example.com,Not shared by donor,Not shared by donor,Not shared by donor,94086,,,4EX805TUGH,Unspecified,USD,,Donation,Match,0.00,599.88,0.00,0.00,',
-      'Google,LELEKA FOUNDATION,2023-04-01T01:10:39Z',
+      'Google,EXAMPLE CHARITY,2023-04-01T01:10:39Z,Grace,Hopper,grace@example.com,Not shared by donor,Not shared by donor,Not shared by donor,90001,,,TXN0000001,Unspecified,USD,,Donation,Match,0.00,599.88,0.00,0.00,',
+      'Google,EXAMPLE CHARITY,2023-04-01T01:10:39Z',
     )
     const result = parseBenevityReport(shortRow, 'broken.csv')
     expect(result.isErr()).toBe(true)
@@ -252,7 +252,7 @@ Disbursement ID,AA7RTXAPHV
   })
 
   it('errors on a donation row that fails schema validation', () => {
-    const noTxId = CURRENT_REPORT.replace(',4EX805TUGH,', ',,')
+    const noTxId = CURRENT_REPORT.replace(',TXN0000001,', ',,')
     const result = parseBenevityReport(noTxId, 'broken.csv')
     expect(result.isErr()).toBe(true)
     expect(result._unsafeUnwrapErr().message).toContain(
@@ -312,8 +312,8 @@ describe('BenevityClient', () => {
 
   describe('readAllReports', () => {
     it('reads every CSV in the directory', async () => {
-      await writeFile(join(dir, 'AA7RTXAPHV.csv'), CURRENT_REPORT)
-      await writeFile(join(dir, '4J7P4KVZ8W.csv'), LEGACY_REPORT)
+      await writeFile(join(dir, 'DISB000002.csv'), CURRENT_REPORT)
+      await writeFile(join(dir, 'DISB000001.csv'), LEGACY_REPORT)
 
       const result = await new BenevityClient(dir).readAllReports()
       expect(result.isOk()).toBe(true)
@@ -324,11 +324,11 @@ describe('BenevityClient', () => {
         reports
           .map((report: BenevityReport) => report.meta.disbursementId)
           .sort(),
-      ).toEqual(['4J7P4KVZ8W', 'AA7RTXAPHV'])
+      ).toEqual(['DISB000001', 'DISB000002'])
     })
 
     it('ignores non-CSV files such as a manifest', async () => {
-      await writeFile(join(dir, 'AA7RTXAPHV.csv'), CURRENT_REPORT)
+      await writeFile(join(dir, 'DISB000002.csv'), CURRENT_REPORT)
       await writeFile(join(dir, 'manifest.json'), '{"count":1}')
 
       const reports = (
@@ -366,7 +366,7 @@ describe('BenevityClient', () => {
     })
 
     it('fails loudly when one report is malformed', async () => {
-      await writeFile(join(dir, 'AA7RTXAPHV.csv'), CURRENT_REPORT)
+      await writeFile(join(dir, 'DISB000002.csv'), CURRENT_REPORT)
       await writeFile(join(dir, 'broken.csv'), 'Donations Report,\n')
 
       const result = await new BenevityClient(dir).readAllReports()

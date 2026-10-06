@@ -310,19 +310,19 @@ describe('FunraiseClient', () => {
       ]
 
       const row = [
-        '13092983',
-        '2768225',
-        'Magnus',
-        'Johansen',
+        '10000001',
+        '20000001',
+        'Kari',
+        'Nordmann',
         '',
         'Individual',
-        'Camilla Colletts vei 20',
+        'Eksempelveien 1',
         'Oslo',
         'Oslo',
-        '0258',
+        '0001',
         'Norway',
-        '+4798074020',
-        'magnusbergjohansen@gmail.com',
+        '+4712345678',
+        'kari.nordmann@example.com',
         '',
         '107.70',
         '',
@@ -334,12 +334,12 @@ describe('FunraiseClient', () => {
         '0',
         'Complete',
         'Website Donate',
-        '26314',
+        '10001',
         '2026-01-24T00:05:47.440049-08:00[US/Pacific]',
         'false',
         'true',
         '',
-        'Yuri Kubrushko',
+        'Ola Nordmann',
         'inspired by',
         '',
         'false',
@@ -348,16 +348,16 @@ describe('FunraiseClient', () => {
         'AMEX',
         '12/29',
         'true',
-        '123190',
+        '900001',
         '35',
         'Monthly',
         'false',
         'USD',
-        '2001',
+        '4242',
         'SUCCEEDED',
-        'ch_3St1qpFZglB4Ea6W0BLHNXwk',
+        'ch_test_0000000000000000001',
         '',
-        '00002706',
+        '00000001',
         '',
         '',
         '',
@@ -370,8 +370,8 @@ describe('FunraiseClient', () => {
         '',
         '107.70',
         '',
-        '1353163',
-        'Johansen Household',
+        '30000001',
+        'Nordmann Household',
         '5.00',
         '5.0',
         '107.70',
@@ -387,9 +387,9 @@ describe('FunraiseClient', () => {
       expect(result.isOk()).toBe(true)
       if (result.isOk()) {
         expect(result.value).toHaveLength(1)
-        expect(result.value[0]?.Id).toBe('13092983')
+        expect(result.value[0]?.Id).toBe('10000001')
         expect(result.value[0]?.Amount).toBe('107.70')
-        expect(result.value[0]?.['First Name']).toBe('Magnus')
+        expect(result.value[0]?.['First Name']).toBe('Kari')
         expect(result.value[0]?.Status).toBe('Complete')
       }
     })

@@ -88,10 +88,10 @@ describe('summarizeTokenRequest', () => {
   it('captures redirect_uri and resource for diagnosis', () => {
     const result = summarizeTokenRequest({
       redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
-      resource: 'https://mcp-server-u5atmmvqqq-uc.a.run.app/',
+      resource: 'https://mcp.example.com/',
     })
     expect(result.redirectUri).toBe('https://claude.ai/api/mcp/auth_callback')
-    expect(result.resource).toBe('https://mcp-server-u5atmmvqqq-uc.a.run.app/')
+    expect(result.resource).toBe('https://mcp.example.com/')
   })
 
   it('returns null redirectUri / resource when absent or non-string', () => {

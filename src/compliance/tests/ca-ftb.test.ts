@@ -11,16 +11,16 @@ import type {
 const ACCESS_URL = 'https://webapp.ftb.ca.gov/eletter/'
 
 const ENTITY: Entity = {
-  legal_name: 'Leleka Foundation',
+  legal_name: 'Example Charity',
   state_of_incorporation: 'DC',
   fiscal_year_end_month: 12,
   fiscal_year_end_day: 31,
-  formation_date: '2014-12-14',
-  mailing_address_line1: '380 Hamilton Ave',
-  mailing_address_line2: 'Unit 291',
-  mailing_address_city: 'Palo Alto',
+  formation_date: '2010-01-15',
+  mailing_address_line1: '100 Example St',
+  mailing_address_line2: 'Suite 1',
+  mailing_address_city: 'Springfield',
   mailing_address_region: 'CA',
-  mailing_address_postal_code: '94302-2405',
+  mailing_address_postal_code: '90000-0000',
   mailing_address_country: 'US',
   updated_at: '2026-04-28T04:36:09.668Z',
 }
@@ -28,10 +28,10 @@ const ENTITY: Entity = {
 function summaryText(overrides: Partial<Record<string, string>> = {}): string {
   return [
     'The following Entity was found.',
-    `Entity ID: ${overrides.entityId ?? '6423690'}`,
-    `Entity Name: ${overrides.entityName ?? 'LELEKA FOUNDATION'}`,
+    `Entity ID: ${overrides.entityId ?? '1234567'}`,
+    `Entity Name: ${overrides.entityName ?? 'EXAMPLE CHARITY'}`,
     `Address: ${
-      overrides.address ?? '380 HAMILTON AVE UNIT 291 PALO ALTO, CA 94302-2405'
+      overrides.address ?? '100 EXAMPLE ST SUITE 1 SPRINGFIELD, CA 90000-0000'
     }`,
     `Entity Status: ${overrides.entityStatus ?? 'ACTIVE'}`,
     `Exempt Status: ${overrides.exemptStatus ?? 'NOT EXEMPT'}`,
@@ -45,7 +45,7 @@ function resultText(): string {
     'Results displayed below.',
     'Entities matching the search criteria',
     'Entity ID\tEntity Name\tCity',
-    '6423690\tLELEKA FOUNDATION\tPALO ALTO',
+    '1234567\tEXAMPLE CHARITY\tSPRINGFIELD',
   ].join('\n')
 }
 
@@ -227,11 +227,11 @@ function contextWithPage(
   page: FakePage,
   identifiers: SourceContext['identifiers'] = {
     'us-ca': {
-      sosEntityNumber: '6423690',
-      ftbEntityId: '6423690',
-      ftbEntityName: 'LELEKA FOUNDATION',
+      sosEntityNumber: '1234567',
+      ftbEntityId: '1234567',
+      ftbEntityName: 'EXAMPLE CHARITY',
     },
-    'us-federal': { ein: '47-2377309' },
+    'us-federal': { ein: '12-3456789' },
   },
 ): SourceContext {
   const close = vi.fn<() => Promise<void>>(() => Promise.resolve())
@@ -272,21 +272,21 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(page.actions).toContain(`goto ${ACCESS_URL}`)
-    expect(page.actions).toContain('fill #EntityId=6423690')
+    expect(page.actions).toContain('fill #EntityId=1234567')
     expect(page.actions).toContain(
       'locator-click-force button[title="Search for an Entity."]',
     )
-    expect(page.actions).toContain('locator-click-force 6423690')
+    expect(page.actions).toContain('locator-click-force 1234567')
     expect(result.value.record).toMatchObject({
       source_id: 'ca-ftb-entity-status-letter',
       fetched_at: '2026-05-03T12:00:00.000Z',
       payload: {
         matchStatus: 'found',
         sourceType: 'public_entity_status_letter',
-        search: { field: 'Entity ID', value: '6423690' },
-        entity_id: '6423690',
-        entity_name: 'LELEKA FOUNDATION',
-        address: '380 HAMILTON AVE UNIT 291 PALO ALTO, CA 94302-2405',
+        search: { field: 'Entity ID', value: '1234567' },
+        entity_id: '1234567',
+        entity_name: 'EXAMPLE CHARITY',
+        address: '100 EXAMPLE ST SUITE 1 SPRINGFIELD, CA 90000-0000',
         ftb_status: 'ACTIVE',
         exempt_status_verified: 'NOT EXEMPT',
       },
@@ -307,18 +307,18 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     const result = await caFtbEntityStatusLetterSource.run(
       ENTITY,
       contextWithPage(page, {
-        'us-federal': { ein: '47-2377309' },
-        'us-ca': { sosEntityNumber: '6423690' },
+        'us-federal': { ein: '12-3456789' },
+        'us-ca': { sosEntityNumber: '1234567' },
       }),
     )
 
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
-    expect(page.actions).toContain('fill #EntityId=6423690')
-    expect(page.actions).toContain('locator-click-force 6423690')
+    expect(page.actions).toContain('fill #EntityId=1234567')
+    expect(page.actions).toContain('locator-click-force 1234567')
     expect(result.value.record.payload).toMatchObject({
-      search: { field: 'Entity ID', value: '6423690' },
-      entity_id: '6423690',
+      search: { field: 'Entity ID', value: '1234567' },
+      entity_id: '1234567',
     })
   })
 
@@ -328,17 +328,17 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     const result = await caFtbEntityStatusLetterSource.run(
       ENTITY,
       contextWithPage(page, {
-        'us-federal': { ein: '47-2377309' },
+        'us-federal': { ein: '12-3456789' },
       }),
     )
 
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
-    expect(page.actions).toContain('fill #EntityName=Leleka Foundation')
+    expect(page.actions).toContain('fill #EntityName=Example Charity')
     expect(page.actions).toContain('locator-click-force table button')
     expect(result.value.record.payload).toMatchObject({
-      search: { field: 'Entity Name', value: 'Leleka Foundation' },
-      entity_id: '6423690',
+      search: { field: 'Entity Name', value: 'Example Charity' },
+      entity_id: '1234567',
     })
   })
 
@@ -359,7 +359,7 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     expect(result.value.record.payload).toEqual({
       matchStatus: 'not_found',
       sourceType: 'public_entity_status_letter',
-      search: { field: 'Entity ID', value: '6423690' },
+      search: { field: 'Entity ID', value: '1234567' },
     })
   })
 
@@ -526,12 +526,12 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(
-      page.actions.filter((action) => action === 'fill #EntityId=6423690')
+      page.actions.filter((action) => action === 'fill #EntityId=1234567')
         .length,
     ).toBe(2)
     expect(result.value.record.payload).toMatchObject({
       matchStatus: 'found',
-      entity_id: '6423690',
+      entity_id: '1234567',
       ftb_status: 'ACTIVE',
       exempt_status_verified: 'NOT EXEMPT',
     })
@@ -560,7 +560,7 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     expect(result.error.message).toContain('discarded')
     expect(result.error.message).toContain('3')
     expect(
-      page.actions.filter((action) => action === 'fill #EntityId=6423690')
+      page.actions.filter((action) => action === 'fill #EntityId=1234567')
         .length,
     ).toBe(3)
   })
@@ -616,7 +616,7 @@ describe('caFtbEntityStatusLetterSource.run', () => {
     if (!result.isOk()) return
     expect(result.value.record.payload).toMatchObject({
       matchStatus: 'found',
-      entity_id: '6423690',
+      entity_id: '1234567',
       ftb_status: 'ACTIVE',
       exempt_status_verified: 'NOT EXEMPT',
     })

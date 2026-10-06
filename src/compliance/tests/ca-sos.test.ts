@@ -17,16 +17,16 @@ const SEARCH_API_URL =
   'https://bizfileonline.sos.ca.gov/api/Records/businesssearch'
 
 const ENTITY: Entity = {
-  legal_name: 'Leleka Foundation',
+  legal_name: 'Example Charity',
   state_of_incorporation: 'DC',
   fiscal_year_end_month: 12,
   fiscal_year_end_day: 31,
-  formation_date: '2014-12-14',
-  mailing_address_line1: '380 Hamilton Ave',
-  mailing_address_line2: 'Unit 291',
-  mailing_address_city: 'Palo Alto',
+  formation_date: '2010-01-15',
+  mailing_address_line1: '100 Example St',
+  mailing_address_line2: 'Suite 1',
+  mailing_address_city: 'Springfield',
   mailing_address_region: 'CA',
-  mailing_address_postal_code: '94302-2405',
+  mailing_address_postal_code: '90000-0000',
   mailing_address_country: 'US',
   updated_at: '2026-04-28T04:36:09.668Z',
 }
@@ -35,12 +35,12 @@ function businessSearchPayload(
   overrides: Partial<Record<string, unknown>> = {},
 ): Record<string, unknown> {
   return businessSearchPayloadWithRows({
-    '8668745': {
+    '1000001': {
       SORT_INDEX: 0,
-      TITLE: ['Leleka Foundation (6423690)'],
-      ID: 8668745,
+      TITLE: ['Example Charity (1234567)'],
+      ID: 1000001,
       FILING_DATE: '10/14/2024',
-      RECORD_NUM: '252053035001073229192221244135201168215067026252',
+      RECORD_NUM: '000000000000000000000000000000000000000000000001',
       FORMED_IN: 'DISTRICT OF COLUMBIA',
       AGENT: 'CALIFORNIA CORPORATE AGENTS, INC.',
       STATUS: 'Active',
@@ -200,11 +200,11 @@ function contextWithPage(
   page: FakePage,
   identifiers: SourceContext['identifiers'] = {
     'us-ca': {
-      sosEntityNumber: '6423690',
-      ftbEntityId: '6423690',
-      ftbEntityName: 'LELEKA FOUNDATION',
+      sosEntityNumber: '1234567',
+      ftbEntityId: '1234567',
+      ftbEntityName: 'EXAMPLE CHARITY',
     },
-    'us-federal': { ein: '47-2377309' },
+    'us-federal': { ein: '12-3456789' },
   },
 ): SourceContext {
   const close = vi.fn<() => Promise<void>>(() => Promise.resolve())
@@ -237,7 +237,7 @@ describe('caSosBizfileSource metadata', () => {
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 500 })),
       ),
-      identifiers: { 'us-federal': { ein: '47-2377309' } },
+      identifiers: { 'us-federal': { ein: '12-3456789' } },
     }
 
     expect(_internal.getBrowserPageFactory(context)).toBeTypeOf('function')
@@ -254,7 +254,7 @@ describe('caSosBizfileSource.run', () => {
     if (!result.isOk()) return
     expect(page.actions).toContain(`goto ${ACCESS_URL}`)
     expect(page.actions).toContain(
-      'fill input[placeholder="Search by name or file number"]=6423690',
+      'fill input[placeholder="Search by name or file number"]=1234567',
     )
     expect(page.actions.indexOf('wait-response')).toBeLessThan(
       page.actions.indexOf(
@@ -267,9 +267,9 @@ describe('caSosBizfileSource.run', () => {
       payload: {
         matchStatus: 'found',
         sourceType: 'public_bizfile_business_search',
-        search: { field: 'SOS Entity Number', value: '6423690' },
-        entity_name: 'Leleka Foundation',
-        sos_entity_number: '6423690',
+        search: { field: 'SOS Entity Number', value: '1234567' },
+        entity_name: 'Example Charity',
+        sos_entity_number: '1234567',
         initial_filing_date: '10/14/2024',
         entity_status: 'Active',
         entity_type: 'Nonprofit Corporation - Out of State',
@@ -294,23 +294,23 @@ describe('caSosBizfileSource.run', () => {
     const result = await caSosBizfileSource.run(
       ENTITY,
       contextWithPage(page, {
-        'us-ca': { sosEntityNumber: 'C6423690' },
-        'us-federal': { ein: '47-2377309' },
+        'us-ca': { sosEntityNumber: 'C1234567' },
+        'us-federal': { ein: '12-3456789' },
       }),
     )
 
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(page.actions).toContain(
-      'fill input[placeholder="Search by name or file number"]=6423690',
+      'fill input[placeholder="Search by name or file number"]=1234567',
     )
     expect(result.value.record.payload).toMatchObject({
       search: {
         field: 'SOS Entity Number',
-        value: '6423690',
-        configuredValue: 'C6423690',
+        value: '1234567',
+        configuredValue: 'C1234567',
       },
-      sos_entity_number: '6423690',
+      sos_entity_number: '1234567',
     })
   })
 
@@ -319,17 +319,17 @@ describe('caSosBizfileSource.run', () => {
 
     const result = await caSosBizfileSource.run(
       ENTITY,
-      contextWithPage(page, { 'us-federal': { ein: '47-2377309' } }),
+      contextWithPage(page, { 'us-federal': { ein: '12-3456789' } }),
     )
 
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(page.actions).toContain(
-      'fill input[placeholder="Search by name or file number"]=Leleka Foundation',
+      'fill input[placeholder="Search by name or file number"]=Example Charity',
     )
     expect(result.value.record.payload).toMatchObject({
-      search: { field: 'Entity Name', value: 'Leleka Foundation' },
-      entity_name: 'Leleka Foundation',
+      search: { field: 'Entity Name', value: 'Example Charity' },
+      entity_name: 'Example Charity',
     })
   })
 
@@ -343,7 +343,7 @@ describe('caSosBizfileSource.run', () => {
     expect(result.value.record.payload).toEqual({
       matchStatus: 'not_found',
       sourceType: 'public_bizfile_business_search',
-      search: { field: 'SOS Entity Number', value: '6423690' },
+      search: { field: 'SOS Entity Number', value: '1234567' },
       resultCount: 0,
     })
   })
@@ -363,7 +363,7 @@ describe('caSosBizfileSource.run', () => {
     expect(result.value.record.payload).toEqual({
       matchStatus: 'not_found',
       sourceType: 'public_bizfile_business_search',
-      search: { field: 'SOS Entity Number', value: '6423690' },
+      search: { field: 'SOS Entity Number', value: '1234567' },
       resultCount: 1,
     })
   })
@@ -397,14 +397,14 @@ describe('caSosBizfileSource.run', () => {
 
     const result = await caSosBizfileSource.run(
       ENTITY,
-      contextWithPage(page, { 'us-federal': { ein: '47-2377309' } }),
+      contextWithPage(page, { 'us-federal': { ein: '12-3456789' } }),
     )
 
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(result.value.record.payload).toMatchObject({
       matchStatus: 'not_found',
-      search: { field: 'Entity Name', value: 'Leleka Foundation' },
+      search: { field: 'Entity Name', value: 'Example Charity' },
       resultCount: 2,
     })
   })
@@ -424,7 +424,7 @@ describe('caSosBizfileSource.run', () => {
             ENTITY_TYPE: 'Nonprofit Corporation',
           },
           '1': {
-            TITLE: ['Leleka Foundation (6423690)'],
+            TITLE: ['Example Charity (1234567)'],
             FILING_DATE: '10/15/2024',
             FORMED_IN: 'DISTRICT OF COLUMBIA',
             AGENT: 'CALIFORNIA CORPORATE AGENTS, INC.',
@@ -437,14 +437,14 @@ describe('caSosBizfileSource.run', () => {
 
     const result = await caSosBizfileSource.run(
       ENTITY,
-      contextWithPage(page, { 'us-federal': { ein: '47-2377309' } }),
+      contextWithPage(page, { 'us-federal': { ein: '12-3456789' } }),
     )
 
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(result.value.record.payload).toMatchObject({
       matchStatus: 'found',
-      entity_name: 'Leleka Foundation',
+      entity_name: 'Example Charity',
       ca_record_id: null,
     })
   })
@@ -453,7 +453,7 @@ describe('caSosBizfileSource.run', () => {
     const page = new FakePage(
       new FakeResponse(
         200,
-        businessSearchPayload({ TITLE: ['Leleka Foundation'] }),
+        businessSearchPayload({ TITLE: ['Example Charity'] }),
       ),
     )
 
@@ -570,7 +570,7 @@ describe('caSosBizfileSource.run', () => {
   it('surfaces title parse errors from row summaries', () => {
     const result = _internal.summarizeRow({
       SORT_INDEX: 0,
-      TITLE: ['Leleka Foundation'],
+      TITLE: ['Example Charity'],
       FILING_DATE: '10/14/2024',
       STATUS: 'Active',
       ENTITY_TYPE: 'Nonprofit Corporation - Out of State',

@@ -21,7 +21,7 @@ import {
   type PortalDriver,
 } from './benevity-download-lib'
 
-const CAUSE_ID = '840-472377309'
+const CAUSE_ID = '840-123456789'
 
 function link(id: string): DisbursementLink {
   return {
@@ -81,7 +81,7 @@ describe('errorMessage', () => {
 describe('reportsPageUrl', () => {
   it('builds the legacy reports URL for a cause', () => {
     expect(reportsPageUrl(CAUSE_ID)).toBe(
-      'https://causes.benevity.org/causesapp/reports/disbursements/840-472377309',
+      'https://causes.benevity.org/causesapp/reports/disbursements/840-123456789',
     )
   })
 })

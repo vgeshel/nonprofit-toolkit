@@ -18,7 +18,7 @@ import {
  */
 const CURRENT_ROW = {
   Company: 'Google',
-  Project: 'LELEKA FOUNDATION',
+  Project: 'EXAMPLE CHARITY',
   'Donation Date': '2026-07-27T16:51:41Z',
   'Donor First Name': 'Artem',
   'Donor Last Name': 'Kalchenko',
@@ -27,7 +27,7 @@ const CURRENT_ROW = {
   City: 'Paris',
   'State/Province': 'IDF',
   'Postal Code': '75009',
-  Activity: 'Continued Support for Ukraine',
+  Activity: 'General Support',
   Comment: 'Slava',
   'Transaction ID': '7JMB73R4QH',
   'Donation Frequency': 'Recurring',
@@ -142,13 +142,11 @@ describe('isDonationHeaderRow', () => {
   })
 
   it('rejects a data row', () => {
-    expect(isDonationHeaderRow(['Google', 'LELEKA FOUNDATION'])).toBe(false)
+    expect(isDonationHeaderRow(['Google', 'EXAMPLE CHARITY'])).toBe(false)
   })
 
   it('rejects a metadata row', () => {
-    expect(isDonationHeaderRow(['Charity Name', 'LELEKA FOUNDATION'])).toBe(
-      false,
-    )
+    expect(isDonationHeaderRow(['Charity Name', 'EXAMPLE CHARITY'])).toBe(false)
   })
 
   it('rejects a single-column row', () => {
@@ -236,8 +234,8 @@ describe('BenevityCsvRowSchema', () => {
 describe('BenevityReportMetaSchema', () => {
   it('accepts a complete preamble', () => {
     const result = BenevityReportMetaSchema.safeParse({
-      charityName: 'LELEKA FOUNDATION',
-      charityId: '840-472377309',
+      charityName: 'EXAMPLE CHARITY',
+      charityId: '840-123456789',
       periodEnding: 'Mon 7 Sep 2026 0:00:00',
       currency: 'USD',
       paymentMethod: 'EFT',
@@ -248,8 +246,8 @@ describe('BenevityReportMetaSchema', () => {
 
   it('rejects a preamble missing the disbursement id', () => {
     const result = BenevityReportMetaSchema.safeParse({
-      charityName: 'LELEKA FOUNDATION',
-      charityId: '840-472377309',
+      charityName: 'EXAMPLE CHARITY',
+      charityId: '840-123456789',
       periodEnding: 'Mon 7 Sep 2026 0:00:00',
       currency: 'USD',
       paymentMethod: 'EFT',
