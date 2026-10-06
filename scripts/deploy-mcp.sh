@@ -160,17 +160,21 @@ else
   # Grant SA access to secrets
   if [[ "$DRY_RUN" != "true" ]]; then
     log "Granting ${RUNTIME_SA} access to secrets..."
-    # MCP-owned secrets, plus compliance-entity-ids (which is created
-    # on-demand by the compliance-onboard skill, not by this script —
-    # but the MCP server still needs read access at runtime so the
-    # compliance-status tool can return identifiers).
-    for SECRET_NAME in MCP_GOOGLE_CLIENT_SECRET ORG_NAME ORG_ADDRESS ORG_MISSION ORG_TAX_STATUS DEFAULT_SIGNER_NAME DEFAULT_SIGNER_TITLE compliance-entity-ids; do
+    for SECRET_NAME in MCP_GOOGLE_CLIENT_SECRET ORG_NAME ORG_ADDRESS ORG_MISSION ORG_TAX_STATUS DEFAULT_SIGNER_NAME DEFAULT_SIGNER_TITLE; do
       gcloud secrets add-iam-policy-binding "${SECRET_NAME}" \
         --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
         --role="roles/secretmanager.secretAccessor" \
         --project="${PROJECT_ID}" \
-        --quiet >/dev/null 2>&1 || warn "  Skipping grant on ${SECRET_NAME} (secret may not exist yet)"
+        --quiet >/dev/null 2>&1
     done
+    # compliance-entity-ids is created on demand by the compliance-onboard
+    # skill, not by this script, so it may not exist yet; the MCP server
+    # still needs read access once it does.
+    gcloud secrets add-iam-policy-binding "compliance-entity-ids" \
+      --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
+      --role="roles/secretmanager.secretAccessor" \
+      --project="${PROJECT_ID}" \
+      --quiet >/dev/null 2>&1 || warn "  compliance-entity-ids does not exist yet; run compliance-onboard, then redeploy"
     log "  Access granted"
   fi
 fi
