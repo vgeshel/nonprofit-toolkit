@@ -118,6 +118,7 @@ describe('PayPalConnector', () => {
           {
             transaction_info: {
               transaction_id: 'TX1',
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '100.00' },
               transaction_status: 'S',
               transaction_initiation_date: '2024-01-15T10:30:00Z',
@@ -155,6 +156,7 @@ describe('PayPalConnector', () => {
           {
             transaction_info: {
               transaction_id: 'TX1',
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '50.00' },
               transaction_status: 'S',
             },
@@ -183,6 +185,7 @@ describe('PayPalConnector', () => {
           {
             transaction_info: {
               transaction_id: 'TX2',
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '75.00' },
               transaction_status: 'S',
             },
@@ -242,12 +245,13 @@ describe('PayPalConnector', () => {
       })
     })
 
-    it('filters out outgoing payments', async () => {
+    it('filters out outgoing payments and non-payment credits', async () => {
       const mockResponse = createMockResponse(
         [
           {
             transaction_info: {
               transaction_id: 'TX_IN',
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '100.00' },
               transaction_status: 'S',
             },
@@ -255,7 +259,16 @@ describe('PayPalConnector', () => {
           {
             transaction_info: {
               transaction_id: 'TX_OUT',
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '-50.00' },
+              transaction_status: 'S',
+            },
+          },
+          {
+            transaction_info: {
+              transaction_id: 'TX_FX',
+              transaction_event_code: 'T0200',
+              transaction_amount: { currency_code: 'USD', value: '54.12' },
               transaction_status: 'S',
             },
           },
@@ -272,7 +285,7 @@ describe('PayPalConnector', () => {
 
       expect(result.isOk()).toBe(true)
       if (result.isOk()) {
-        // Only incoming payment should be included
+        // Only the incoming payment is included; the T0200 conversion is not
         expect(result.value.events).toHaveLength(1)
         expect(result.value.events[0]?.external_id).toBe('TX_IN')
       }
@@ -317,6 +330,7 @@ describe('PayPalConnector', () => {
           {
             transaction_info: {
               transaction_id: 'TX1',
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '100.00' },
               transaction_status: 'S',
             },
@@ -346,6 +360,7 @@ describe('PayPalConnector', () => {
           {
             transaction_info: {
               transaction_id: 'TX1',
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '100.00' },
               transaction_status: 'S',
             },
@@ -362,6 +377,7 @@ describe('PayPalConnector', () => {
           {
             transaction_info: {
               transaction_id: 'TX2',
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '200.00' },
               transaction_status: 'S',
             },
@@ -392,6 +408,7 @@ describe('PayPalConnector', () => {
           {
             transaction_info: {
               transaction_id: 'TX1',
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '100.00' },
               transaction_status: 'S',
             },
@@ -450,6 +467,7 @@ describe('PayPalConnector', () => {
           {
             transaction_info: {
               transaction_id: `TX${pageNum}`,
+              transaction_event_code: 'T0013',
               transaction_amount: { currency_code: 'USD', value: '50.00' },
               transaction_status: 'S',
             },

@@ -204,36 +204,30 @@ describe('mapPayPalPaymentMethod', () => {
     expect(mapPayPalPaymentMethod(undefined)).toBe('paypal')
   })
 
-  it('returns "bank_transfer" for T0006', () => {
-    expect(mapPayPalPaymentMethod('T0006')).toBe('bank_transfer')
+  it('returns "paypal" for Express Checkout (T0006) and Standard web checkout (T0007)', () => {
+    expect(mapPayPalPaymentMethod('T0006')).toBe('paypal')
+    expect(mapPayPalPaymentMethod('T0007')).toBe('paypal')
   })
 
-  it('returns "bank_transfer" for T0007', () => {
-    expect(mapPayPalPaymentMethod('T0007')).toBe('bank_transfer')
+  it('returns "credit_card" for credit card payment (T0005)', () => {
+    expect(mapPayPalPaymentMethod('T0005')).toBe('credit_card')
   })
 
-  it('returns "debit_card" for T05xx codes', () => {
-    expect(mapPayPalPaymentMethod('T0500')).toBe('debit_card')
-    expect(mapPayPalPaymentMethod('T0502')).toBe('debit_card')
+  it('returns "credit_card" for Virtual Terminal payment (T0012)', () => {
+    expect(mapPayPalPaymentMethod('T0012')).toBe('credit_card')
   })
 
-  it('returns "credit_card" for T06xx codes', () => {
-    expect(mapPayPalPaymentMethod('T0600')).toBe('credit_card')
-    expect(mapPayPalPaymentMethod('T0601')).toBe('credit_card')
-  })
-
-  it('returns "paypal" for general transaction codes', () => {
+  it('returns "paypal" for other payment codes', () => {
     expect(mapPayPalPaymentMethod('T0000')).toBe('paypal')
-    expect(mapPayPalPaymentMethod('T0100')).toBe('paypal')
-    expect(mapPayPalPaymentMethod('T0200')).toBe('paypal')
+    expect(mapPayPalPaymentMethod('T0001')).toBe('paypal')
+    expect(mapPayPalPaymentMethod('T0002')).toBe('paypal')
+    expect(mapPayPalPaymentMethod('T0011')).toBe('paypal')
+    expect(mapPayPalPaymentMethod('T0013')).toBe('paypal')
   })
 
-  it('returns "paypal" for unknown event codes (fallback)', () => {
-    // Event codes not matching T00-T06 fall through to default
-    expect(mapPayPalPaymentMethod('T0700')).toBe('paypal')
-    expect(mapPayPalPaymentMethod('T0800')).toBe('paypal')
-    expect(mapPayPalPaymentMethod('T1000')).toBe('paypal')
-    expect(mapPayPalPaymentMethod('X1234')).toBe('paypal')
+  it('does not treat T05xx/T06xx account-funding codes as card payments', () => {
+    expect(mapPayPalPaymentMethod('T0500')).toBe('paypal')
+    expect(mapPayPalPaymentMethod('T0600')).toBe('paypal')
   })
 })
 
@@ -337,41 +331,50 @@ describe('extractAttributionHuman', () => {
 })
 
 describe('isIncomingPayment', () => {
-  it('returns true for positive amounts', () => {
-    const tx: PayPalTransactionDetail = {
-      transaction_info: {
-        transaction_id: 'TX1',
-        transaction_amount: { currency_code: 'USD', value: '100.00' },
-      },
+  const createTx = (
+    eventCode: string | undefined,
+    value: string | undefined,
+  ): PayPalTransactionDetail => ({
+    transaction_info: {
+      transaction_id: 'TX1',
+      transaction_event_code: eventCode,
+      transaction_amount:
+        value === undefined ? undefined : { currency_code: 'USD', value },
+    },
+  })
+
+  it('returns true for positive payment-category (T00xx) transactions', () => {
+    for (const code of ['T0000', 'T0001', 'T0002', 'T0007', 'T0011', 'T0013']) {
+      expect(isIncomingPayment(createTx(code, '100.00'))).toBe(true)
     }
-    expect(isIncomingPayment(tx)).toBe(true)
   })
 
   it('returns false for negative amounts', () => {
-    const tx: PayPalTransactionDetail = {
-      transaction_info: {
-        transaction_id: 'TX1',
-        transaction_amount: { currency_code: 'USD', value: '-50.00' },
-      },
-    }
-    expect(isIncomingPayment(tx)).toBe(false)
+    expect(isIncomingPayment(createTx('T0000', '-50.00'))).toBe(false)
   })
 
   it('returns false for zero amounts', () => {
-    const tx: PayPalTransactionDetail = {
-      transaction_info: {
-        transaction_id: 'TX1',
-        transaction_amount: { currency_code: 'USD', value: '0.00' },
-      },
-    }
-    expect(isIncomingPayment(tx)).toBe(false)
+    expect(isIncomingPayment(createTx('T0013', '0.00'))).toBe(false)
   })
 
   it('returns false for missing amount', () => {
-    const tx: PayPalTransactionDetail = {
-      transaction_info: { transaction_id: 'TX1' },
+    expect(isIncomingPayment(createTx('T0013', undefined))).toBe(false)
+  })
+
+  it('returns false for unparseable amount', () => {
+    expect(isIncomingPayment(createTx('T0013', 'abc'))).toBe(false)
+  })
+
+  it('returns false when the event code is missing', () => {
+    expect(isIncomingPayment(createTx(undefined, '100.00'))).toBe(false)
+  })
+
+  it('returns false for positive non-payment codes', () => {
+    // Currency conversion, bank deposit, credit card deposit, payment refund,
+    // dispute hold release, account correction
+    for (const code of ['T0200', 'T0300', 'T0700', 'T1107', 'T1111', 'T1900']) {
+      expect(isIncomingPayment(createTx(code, '100.00'))).toBe(false)
     }
-    expect(isIncomingPayment(tx)).toBe(false)
   })
 })
 
@@ -384,7 +387,7 @@ describe('transformPayPalTransaction', () => {
     transaction_info: {
       paypal_account_id: 'MERCHANT123',
       transaction_id: 'TX12345678',
-      transaction_event_code: 'T0006',
+      transaction_event_code: 'T0005',
       transaction_initiation_date: '2024-01-15T10:30:00Z',
       transaction_updated_date: '2024-01-15T10:35:00Z',
       transaction_amount: { currency_code: 'USD', value: '100.00' },
@@ -427,7 +430,7 @@ describe('transformPayPalTransaction', () => {
     expect(result.donor_email).toBe('donor@example.com')
     expect(result.donor_phone).toBe('+15551234567')
     expect(result.status).toBe('succeeded')
-    expect(result.payment_method).toBe('bank_transfer')
+    expect(result.payment_method).toBe('credit_card')
     expect(result.description).toBe('Monthly Donation')
     expect(result.run_id).toBe(runId)
   })
@@ -453,7 +456,7 @@ describe('transformPayPalTransaction', () => {
     expect(result.source_metadata).toMatchObject({
       paypal_account_id: 'MERCHANT123',
       payer_account_id: 'PAYER456',
-      transaction_event_code: 'T0006',
+      transaction_event_code: 'T0005',
       invoice_id: 'INV-001',
       custom_field: 'CAMPAIGN-2024',
       protection_eligibility: 'ELIGIBLE',
@@ -544,9 +547,14 @@ describe('transformPayPalTransaction', () => {
 describe('transformPayPalTransactions', () => {
   const runId = '550e8400-e29b-41d4-a716-446655440000'
 
-  const createTx = (id: string, amount: string): PayPalTransactionDetail => ({
+  const createTx = (
+    id: string,
+    amount: string,
+    eventCode = 'T0013',
+  ): PayPalTransactionDetail => ({
     transaction_info: {
       transaction_id: id,
+      transaction_event_code: eventCode,
       transaction_amount: { currency_code: 'USD', value: amount },
       transaction_status: 'S',
     },
@@ -556,14 +564,13 @@ describe('transformPayPalTransactions', () => {
     const transactions = [createTx('TX1', '100.00'), createTx('TX2', '200.00')]
     const result = transformPayPalTransactions(transactions, runId)
 
-    expect(result).toHaveLength(2)
-    expect(result[0]?.external_id).toBe('TX1')
-    expect(result[0]?.amount_cents).toBe(10000)
-    expect(result[1]?.external_id).toBe('TX2')
-    expect(result[1]?.amount_cents).toBe(20000)
+    expect(result.map((e) => [e.external_id, e.amount_cents])).toEqual([
+      ['TX1', 10000],
+      ['TX2', 20000],
+    ])
   })
 
-  it('filters out outgoing payments by default', () => {
+  it('filters out outgoing payments', () => {
     const transactions = [
       createTx('TX_IN', '100.00'),
       createTx('TX_OUT', '-50.00'),
@@ -572,22 +579,29 @@ describe('transformPayPalTransactions', () => {
 
     const result = transformPayPalTransactions(transactions, runId)
 
-    expect(result).toHaveLength(2)
-    expect(result[0]?.external_id).toBe('TX_IN')
-    expect(result[1]?.external_id).toBe('TX_IN2')
+    expect(result.map((e) => e.external_id)).toEqual(['TX_IN', 'TX_IN2'])
   })
 
-  it('includes outgoing payments when requested', () => {
+  it('filters out non-payment credits that duplicate or are not donations', () => {
+    // A EUR donation produces a T0011 EUR credit and a T0200 USD conversion
+    // credit for the same money; only the donation must be kept.
     const transactions = [
-      createTx('TX_IN', '100.00'),
-      createTx('TX_OUT', '-50.00'),
+      createTx('DONATION_EUR', '50.00', 'T0011'),
+      createTx('FX_USD', '54.12', 'T0200'),
+      createTx('BANK_DEPOSIT', '1000.00', 'T0300'),
+      createTx('CARD_DEPOSIT', '110.00', 'T0700'),
+      createTx('REFUND_FROM_MERCHANT', '44.78', 'T1107'),
+      createTx('HOLD_RELEASE', '30.78', 'T1111'),
+      createTx('CORRECTION', '38.47', 'T1900'),
+      createTx('PPGF_PAYOUT', '5000.00', 'T0001'),
     ]
 
-    const result = transformPayPalTransactions(transactions, runId, true)
+    const result = transformPayPalTransactions(transactions, runId)
 
-    expect(result).toHaveLength(2)
-    expect(result[0]?.external_id).toBe('TX_IN')
-    expect(result[1]?.external_id).toBe('TX_OUT')
+    expect(result.map((e) => e.external_id)).toEqual([
+      'DONATION_EUR',
+      'PPGF_PAYOUT',
+    ])
   })
 
   it('returns empty array for empty input', () => {
