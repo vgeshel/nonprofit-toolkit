@@ -1,0 +1,9 @@
+{
+  "name": "nonprofit-toolkit-compliance",
+  "displayName": "Nonprofit Toolkit (compliance)",
+  "version": "0.1.0",
+  "description": "Compliance toolkit skills for the nonprofit toolkit project: federal + California entity onboarding, current-state checks, and IRS / CA AG / CA SOS / CA FTB / CDTFA discovery. Registers the nonprofit-toolkit remote MCP server via .mcp.json.",
+  "license": "MIT",
+  "repository": "https://github.com/vgeshel/nonprofit-toolkit",
+  "keywords": ["nonprofit", "compliance", "irs", "california", "mcp"]
+}

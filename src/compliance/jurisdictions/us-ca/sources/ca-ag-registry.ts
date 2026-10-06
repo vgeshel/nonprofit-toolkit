@@ -669,6 +669,7 @@ function resultToAsync<T>(
 export const caAgRegistrySource: Source = {
   id: 'ca-ag-registry',
   jurisdiction: 'us-ca',
+  agency: 'California Attorney General — Registry of Charitable Trusts',
   kind: 'api',
   authRequired: false,
   description:

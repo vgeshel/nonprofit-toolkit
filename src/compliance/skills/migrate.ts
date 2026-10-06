@@ -166,6 +166,10 @@ const SOURCE_POLICY_UPGRADE_FIELDS: readonly TableSchemaField[] = [
   { name: 'source_freshness', type: 'JSON', mode: 'NULLABLE' },
 ]
 
+const DISCOVERY_RUNS_JOB_LINKAGE_FIELDS: readonly TableSchemaField[] = [
+  { name: 'job_id', type: 'STRING', mode: 'NULLABLE' },
+]
+
 function ensureAllTables(
   args: RunMigrationArgs,
 ): ResultAsync<TableEnsureReport, MigrationPortError> {
@@ -259,7 +263,13 @@ function ensureSchemaUpgradeColumns(
 function schemaUpgradeFieldsForTable(
   tableId: string,
 ): readonly TableSchemaField[] {
-  return tableId === 'sources' ? SOURCE_POLICY_UPGRADE_FIELDS : []
+  if (tableId === 'sources') {
+    return SOURCE_POLICY_UPGRADE_FIELDS
+  }
+  if (tableId === 'discovery_runs') {
+    return DISCOVERY_RUNS_JOB_LINKAGE_FIELDS
+  }
+  return []
 }
 
 function ensureSchemaUpgradeColumn(

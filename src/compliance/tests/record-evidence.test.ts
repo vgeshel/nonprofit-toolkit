@@ -169,6 +169,7 @@ function makeAuthenticatedSource(
   return {
     id: 'ca-cdtfa-online-services',
     jurisdiction: 'us-ca',
+    agency: 'Test Agency',
     kind: 'playwright',
     authRequired: true,
     description: 'User-assisted CDTFA Online Services review.',
@@ -185,6 +186,7 @@ function makeManualSource(): Source {
   return {
     id: 'ca-sos-bizfile',
     jurisdiction: 'us-ca',
+    agency: 'Test Agency',
     kind: 'manual',
     authRequired: false,
     description: 'Manual California Secretary of State bizfile review.',
@@ -208,6 +210,7 @@ function makeFtbEntityStatusLetterSource(): Source {
   return {
     id: 'ca-ftb-entity-status-letter',
     jurisdiction: 'us-ca',
+    agency: 'Test Agency',
     kind: 'manual',
     authRequired: false,
     description:
@@ -234,6 +237,7 @@ function makeAutomatedSource(): Source {
   return {
     id: 'irs-teos',
     jurisdiction: 'us-federal',
+    agency: 'Test Agency',
     kind: 'api',
     authRequired: false,
     description: 'IRS Tax Exempt Organization Search.',

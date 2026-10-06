@@ -136,6 +136,7 @@ function makeSource(args: MakeSourceArgs): Source {
   return {
     id: args.id,
     jurisdiction: 'us-federal',
+    agency: 'Test Agency',
     kind: 'api',
     authRequired: false,
     description: 'fake',
@@ -305,6 +306,7 @@ describe('runDiscovery', () => {
     const source: Source = {
       id: 'a',
       jurisdiction: 'us-federal',
+      agency: 'Test Agency',
       kind: 'api',
       authRequired: false,
       description: 'policy blocked',
@@ -508,6 +510,7 @@ describe('runDiscovery', () => {
     const manualSource: Source = {
       id: 'ca-sos-bizfile',
       jurisdiction: 'us-ca',
+      agency: 'Test Agency',
       kind: 'manual',
       authRequired: false,
       description: 'CA SOS bizfile',
@@ -592,7 +595,7 @@ describe('runDiscovery', () => {
     })
     expect(result.isOk()).toBe(true)
     expect(port.createDataset).toHaveBeenCalledTimes(1)
-    expect(port.createTable).toHaveBeenCalledTimes(4)
+    expect(port.createTable).toHaveBeenCalledTimes(5)
     expect(source.run).toHaveBeenCalledTimes(1)
   })
 
@@ -621,7 +624,7 @@ describe('runDiscovery', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(result.value.migration.createdDataset).toBe(true)
-    expect(result.value.migration.createdTables.length).toBe(4)
+    expect(result.value.migration.createdTables.length).toBe(5)
   })
 
   it('does not run sources if the migration fails', async () => {

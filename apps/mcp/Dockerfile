@@ -11,10 +11,17 @@ COPY packages/connectors/package.json packages/connectors/
 RUN bun install --frozen-lockfile
 COPY packages/ packages/
 COPY apps/mcp/ apps/mcp/
-RUN bun build apps/mcp/src/main.ts --outdir dist --target bun \
+COPY src/ src/
+# Two entrypoints share this image: the MCP HTTP server (dist/main.js,
+# the default CMD) and the out-of-band compliance-discovery Cloud Run Job
+# (dist/compliance-discover-job.js, selected via a command override on the
+# Job resource).
+RUN bun build apps/mcp/src/main.ts apps/mcp/src/compliance-discover-job.ts \
+    --outdir dist --target bun \
     --external playwright --external playwright-core \
     --external express --external @google-cloud/firestore \
     --external @google-cloud/bigquery --external @google-cloud/storage \
+    --external @google-cloud/secret-manager --external google-auth-library \
     --external @modelcontextprotocol/sdk
 
 FROM oven/bun:1

@@ -32,6 +32,12 @@ describe('FirestoreOAuthStorage', () => {
     storage = new FirestoreOAuthStorage('test-project')
   })
 
+  describe('client (Firestore handle accessor)', () => {
+    it('exposes the underlying Firestore instance', () => {
+      expect(storage.client).toBeDefined()
+    })
+  })
+
   describe('clients', () => {
     it('returns undefined for non-existent client', async () => {
       mockGet.mockResolvedValue({ exists: false, data: () => undefined })

@@ -59,6 +59,7 @@ function makeSuccessSource(
   return {
     id: 'fake',
     jurisdiction: 'us-federal',
+    agency: 'Test Agency',
     kind: 'api',
     authRequired: overrides.authRequired ?? false,
     description: 'fake',
@@ -74,6 +75,7 @@ function makeAuthenticatedPortalSource(): Source {
   return {
     id: 'ca-cdtfa-online-services',
     jurisdiction: 'us-ca',
+    agency: 'Test Agency',
     kind: 'playwright',
     authRequired: true,
     description: 'CDTFA Online Services',
@@ -106,6 +108,7 @@ function makePublicBrowserSource(output: SourceRunOutput): Source {
   return {
     id: 'public-browser-source',
     jurisdiction: 'us-ca',
+    agency: 'Test Agency',
     kind: 'playwright',
     authRequired: false,
     description: 'Public browser source',
@@ -124,6 +127,7 @@ function makeFailingSource(
   return {
     id: 'fake',
     jurisdiction: 'us-federal',
+    agency: 'Test Agency',
     kind,
     authRequired: false,
     description: 'fake',
@@ -139,6 +143,7 @@ function makeManualSource(): Source {
   return {
     id: 'manual-check',
     jurisdiction: 'us-ca',
+    agency: 'Test Agency',
     kind: 'manual',
     authRequired: false,
     description: 'manual source',
@@ -399,6 +404,7 @@ describe('runSource', () => {
     const source: Source = {
       id: 'blocked',
       jurisdiction: 'us-ca',
+      agency: 'Test Agency',
       kind: 'api',
       authRequired: false,
       description: 'blocked',
@@ -439,6 +445,7 @@ describe('runSource', () => {
     const source: Source = {
       id: 'blocked',
       jurisdiction: 'us-ca',
+      agency: 'Test Agency',
       kind: 'api',
       authRequired: false,
       description: 'blocked',

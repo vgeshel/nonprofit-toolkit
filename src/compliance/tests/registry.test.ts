@@ -22,6 +22,7 @@ function makeSource(
   return {
     id: args.id ?? 'fake-source',
     jurisdiction: 'us-federal',
+    agency: 'Test Agency',
     kind: 'api',
     authRequired: false,
     description: 'fake source',
@@ -49,6 +50,7 @@ function makeManualSource(args: { readonly manualOnlyReason: string }): Source {
   return {
     id: 'manual-source',
     jurisdiction: 'us-ca',
+    agency: 'Test Agency',
     kind: 'manual',
     authRequired: false,
     description: 'manual source',

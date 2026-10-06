@@ -304,6 +304,20 @@ export interface SourceContext {
 interface SourceBase {
   readonly id: string
   readonly jurisdiction: JurisdictionId
+  /**
+   * Human-readable name of the issuing agency. Required because the
+   * jurisdiction id alone (e.g. `us-ca`) doesn't disambiguate between
+   * the FTB, AG, SOS, and CDTFA — and downstream LLM narratives benefit
+   * from an explicit hint so they don't conflate them in prose.
+   *
+   * Examples:
+   *   - 'IRS'
+   *   - 'California Franchise Tax Board'
+   *   - 'California Attorney General — Registry of Charitable Trusts'
+   *   - 'California Secretary of State'
+   *   - 'California Department of Tax and Fee Administration'
+   */
+  readonly agency: string
   readonly kind: SourceKind
   readonly authRequired: boolean
   readonly description: string

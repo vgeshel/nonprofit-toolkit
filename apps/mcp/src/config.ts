@@ -17,6 +17,11 @@ export const ConfigSchema = z.object({
   PROJECT_ID: z.string(),
   DATASET_CANON: z.string().default('donations'),
 
+  // GCP region + the Cloud Run Job that runs compliance discovery
+  // out-of-band (triggered by the compliance-discover-start tool).
+  REGION: z.string().default('us-central1'),
+  COMPLIANCE_DISCOVER_JOB_NAME: z.string().default('compliance-discover'),
+
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string(),
   GOOGLE_CLIENT_SECRET: z.string(),

@@ -320,6 +320,7 @@ function buildOutput(
 export const irsEoBmfSource: Source = {
   id: 'irs-eo-bmf',
   jurisdiction: 'us-federal',
+  agency: 'IRS',
   kind: 'api',
   authRequired: false,
   description:

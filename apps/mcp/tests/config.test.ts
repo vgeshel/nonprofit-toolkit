@@ -51,6 +51,22 @@ describe('ConfigSchema', () => {
     expect(config.DATASET_CANON).toBe('donations')
   })
 
+  it('applies default REGION and compliance-discover job name', () => {
+    const config = ConfigSchema.parse(validEnv)
+    expect(config.REGION).toBe('us-central1')
+    expect(config.COMPLIANCE_DISCOVER_JOB_NAME).toBe('compliance-discover')
+  })
+
+  it('overrides REGION and compliance-discover job name', () => {
+    const config = ConfigSchema.parse({
+      ...validEnv,
+      REGION: 'europe-west1',
+      COMPLIANCE_DISCOVER_JOB_NAME: 'eu-discover',
+    })
+    expect(config.REGION).toBe('europe-west1')
+    expect(config.COMPLIANCE_DISCOVER_JOB_NAME).toBe('eu-discover')
+  })
+
   it('applies default org identity fields', () => {
     const config = ConfigSchema.parse(validEnv)
 

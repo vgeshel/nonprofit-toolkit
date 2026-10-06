@@ -231,6 +231,7 @@ export default defineConfig(
       'apps/slack-bot/tests/logger.test.ts',
       'apps/mcp/src/config.ts',
       'apps/mcp/src/logger.ts',
+      'apps/mcp/src/compliance-discover-job.ts',
       'apps/mcp/tests/config.test.ts',
       'apps/mcp/tests/logger.test.ts',
       'packages/letter/src/html.ts',

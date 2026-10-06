@@ -66,6 +66,7 @@ MCP_ALLOWED_DOMAIN="${MCP_ALLOWED_DOMAIN:?MCP_ALLOWED_DOMAIN must be set}"
 
 SERVICE_NAME="mcp-server"
 IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:latest"
+COMPLIANCE_DISCOVER_JOB_NAME="${COMPLIANCE_DISCOVER_JOB_NAME:-compliance-discover}"
 
 log "Deployment configuration:"
 log "  Project:  ${PROJECT_ID}"
@@ -166,6 +167,14 @@ else
         --project="${PROJECT_ID}" \
         --quiet >/dev/null 2>&1
     done
+    # compliance-entity-ids is created on demand by the compliance-onboard
+    # skill, not by this script, so it may not exist yet; the MCP server
+    # still needs read access once it does.
+    gcloud secrets add-iam-policy-binding "compliance-entity-ids" \
+      --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
+      --role="roles/secretmanager.secretAccessor" \
+      --project="${PROJECT_ID}" \
+      --quiet >/dev/null 2>&1 || warn "  compliance-entity-ids does not exist yet; run compliance-onboard, then redeploy"
     log "  Access granted"
   fi
 fi
@@ -225,7 +234,10 @@ PROJECT_ID=${PROJECT_ID},\
 DATASET_CANON=${DATASET_CANON},\
 GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},\
 MCP_ALLOWED_DOMAIN=${MCP_ALLOWED_DOMAIN},\
-BASE_URL=${BASE_URL_VALUE}" \
+BASE_URL=${BASE_URL_VALUE},\
+REGION=${REGION},\
+COMPLIANCE_DISCOVER_JOB_NAME=${COMPLIANCE_DISCOVER_JOB_NAME},\
+COMPLIANCE_BROWSER_HEADLESS=1" \
     --set-secrets "\
 GOOGLE_CLIENT_SECRET=MCP_GOOGLE_CLIENT_SECRET:latest,\
 ORG_NAME=ORG_NAME:latest,\
@@ -234,11 +246,11 @@ ORG_MISSION=ORG_MISSION:latest,\
 ORG_TAX_STATUS=ORG_TAX_STATUS:latest,\
 DEFAULT_SIGNER_NAME=DEFAULT_SIGNER_NAME:latest,\
 DEFAULT_SIGNER_TITLE=DEFAULT_SIGNER_TITLE:latest" \
-    --memory 1Gi \
-    --cpu 1 \
+    --memory 4Gi \
+    --cpu 2 \
     --min-instances 0 \
     --max-instances 3 \
-    --timeout 120s \
+    --timeout 600s \
     --port 8080 \
     --allow-unauthenticated \
     --quiet
@@ -261,6 +273,41 @@ DEFAULT_SIGNER_TITLE=DEFAULT_SIGNER_TITLE:latest" \
   fi
 
   log "Deploy complete."
+fi
+
+echo ""
+
+# ── Compliance discovery Cloud Run Job ────────────────────────────
+# The compliance-discover-start MCP tool triggers an execution of this
+# Job (same image, different entrypoint) so discovery runs out-of-band —
+# surviving the service scaling to zero and the 600s request timeout.
+
+log "Ensuring Cloud Run Job: ${COMPLIANCE_DISCOVER_JOB_NAME}..."
+if [[ "$DRY_RUN" == "true" ]]; then
+  log "  Would create/update job ${COMPLIANCE_DISCOVER_JOB_NAME} (entrypoint: bun dist/compliance-discover-job.js)"
+  log "  Would grant ${RUNTIME_SA_EMAIL} permission to run it with overrides"
+else
+  # `gcloud run jobs deploy` creates the job or updates it in place.
+  gcloud run jobs deploy "${COMPLIANCE_DISCOVER_JOB_NAME}" \
+    --region "${REGION}" --project "${PROJECT_ID}" \
+    --image "${IMAGE_URI}" \
+    --service-account "${RUNTIME_SA_EMAIL}" \
+    --command bun \
+    --args dist/compliance-discover-job.js \
+    --set-env-vars "PROJECT_ID=${PROJECT_ID},DATASET_CANON=${DATASET_CANON},REGION=${REGION},COMPLIANCE_BROWSER_HEADLESS=1" \
+    --memory 4Gi --cpu 2 --max-retries 1 --tasks 1 --task-timeout 3600s \
+    --quiet
+  log "  Job deployed."
+
+  # The MCP service starts executions with per-run env overrides
+  # (DISCOVERY_JOB_ID, source filter). That needs run.jobs.runWithOverrides,
+  # which roles/run.invoker does not carry.
+  gcloud run jobs add-iam-policy-binding "${COMPLIANCE_DISCOVER_JOB_NAME}" \
+    --region "${REGION}" --project "${PROJECT_ID}" \
+    --member "serviceAccount:${RUNTIME_SA_EMAIL}" \
+    --role "roles/run.jobsExecutorWithOverrides" \
+    --quiet >/dev/null
+  log "  Granted ${RUNTIME_SA_EMAIL} run.jobsExecutorWithOverrides on the job."
 fi
 
 echo ""
