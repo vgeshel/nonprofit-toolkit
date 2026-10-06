@@ -21,5 +21,8 @@ bun typecheck
 # Run linting
 bun lint
 
-# Run tests with coverage (enforces 90% branch threshold)
+# Run tests with coverage (enforces 100% thresholds)
 bun test:coverage
+
+# Fail if coverage measured no files (thresholds would pass vacuously)
+bun run scripts/check-coverage-report.ts
