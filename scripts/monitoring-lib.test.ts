@@ -453,7 +453,7 @@ describe('describeSummary', () => {
     expect(
       describeSummary({ notificationChannel: null, policies: {} }, undefined),
     ).toEqual([
-      'ALERT_SLACK_CHANNEL is not set; alert policies record incidents but notify no one.',
+      'ALERT_SLACK_CHANNEL is not set; alert policies record incidents but notify no one. (In .env, quote it: an unquoted # starts a comment.)',
     ])
   })
 
