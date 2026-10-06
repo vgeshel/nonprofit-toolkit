@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { resolveNotificationChannels } from './monitoring-lib'
 import {
   type CommandResult,
   type CommandRunner,
@@ -136,10 +137,20 @@ async function main(args: string[]): Promise<void> {
   }
 
   if (options.command === 'ensure-monitoring') {
-    await ensureSlackMonitoring(options, {
-      run: defaultRun,
-      writeFile: defaultWritePolicyFile,
-    })
+    const token = await defaultRun('gcloud', ['auth', 'print-access-token'])
+    const channels = await resolveNotificationChannels(
+      options.projectId,
+      options.slackChannel,
+      { fetch, accessToken: token.stdout.trim() },
+    )
+    if (channels.isErr()) {
+      console.error(channels.error.message)
+      process.exit(1)
+    }
+    await ensureSlackMonitoring(
+      { ...options, notificationChannels: channels.value },
+      { run: defaultRun, writeFile: defaultWritePolicyFile },
+    )
     console.log('Slack monitoring is configured')
     process.exit(0)
   }
