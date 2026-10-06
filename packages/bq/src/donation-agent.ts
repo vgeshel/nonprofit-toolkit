@@ -91,6 +91,7 @@ The table is \`${config.datasetCanon}.events\` with these columns:
 | description | STRING | Transaction description (nullable) |
 | attribution | STRING | Campaign tracking code (nullable) |
 | attribution_human | STRING | Human-readable campaign name (nullable) |
+| is_recurring | BOOL | TRUE = recurring gift, FALSE = known one-off, NULL = source has no signal |
 | source_metadata | JSON | Source-specific metadata |
 
 The table is partitioned by DATE(event_ts) and clustered by (source, donor_email).
@@ -108,6 +109,7 @@ The table is partitioned by DATE(event_ts) and clustered by (source, donor_email
 9. **For period comparisons** (e.g., "YTD vs same period last year"), use TIMESTAMP ranges, NOT EXTRACT on month/day. Example: to compare Jan 1–Apr 1 across two years, use \`event_ts >= TIMESTAMP('2025-01-01') AND event_ts < TIMESTAMP('2025-04-01')\` — never \`EXTRACT(MONTH) <= 4 AND EXTRACT(DAY) <= 1\` which only matches day 1 of each month.
 10. **Campaign** means the \`attribution_human\` column.
 11. **When the user says "donor" without specifying a field**, search both \`donor_name\` and \`donor_email\`.
+12. **Recurring** means \`is_recurring = TRUE\`. NULL means the source has no signal (bank, Wise, Venmo, checks), so never count NULL as one-off: one-off means \`is_recurring = FALSE\`.
 
 ## Formatting Rules for Your Final Answer
 

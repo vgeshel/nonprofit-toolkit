@@ -257,6 +257,8 @@ describe('transformMercuryTransaction', () => {
     const result = transformMercuryTransaction(tx, runId)
 
     expect(result.source).toBe('mercury')
+
+    expect(result.is_recurring).toBeNull()
     expect(result.external_id).toBe('tx_12345')
     expect(result.event_ts).toBe('2024-01-15T10:30:00Z')
     expect(result.created_at).toBe('2024-01-15T10:30:00Z')

@@ -45,6 +45,7 @@ function createValidEvent(
     description: 'Monthly donation',
     attribution: null,
     attribution_human: null,
+    is_recurring: null,
     source_metadata: { counterpartyId: 'cpty_456' },
     run_id: '550e8400-e29b-41d4-a716-446655440000',
     ...overrides,
@@ -314,6 +315,32 @@ describe('DonationEventSchema', () => {
     it('rejects 4-letter currency codes', () => {
       const event = createValidEvent({ currency: 'USDT' })
       expect(() => DonationEventSchema.parse(event)).toThrow(ZodError)
+    })
+  })
+
+  describe('is_recurring validation', () => {
+    it('accepts true, false and null', () => {
+      for (const value of [true, false, null]) {
+        const result = DonationEventSchema.parse(
+          createValidEvent({ is_recurring: value }),
+        )
+        expect(result.is_recurring).toBe(value)
+      }
+    })
+
+    it('rejects a missing is_recurring so every connector decides explicitly', () => {
+      const result = safeParseDonationEvent(createEventWithout('is_recurring'))
+      expect(result.success).toBe(false)
+      expect(result.error?.issues[0]?.path).toEqual(['is_recurring'])
+    })
+
+    it('rejects a string in place of a boolean', () => {
+      const result = safeParseDonationEvent({
+        ...createValidEvent(),
+        is_recurring: 'true',
+      })
+      expect(result.success).toBe(false)
+      expect(result.error?.issues[0]?.path).toEqual(['is_recurring'])
     })
   })
 

@@ -119,6 +119,22 @@ export function buildSourceMetadata(
 }
 
 /**
+ * Map Benevity's `Donation Frequency` to is_recurring. Reports use exactly
+ * `Recurring`, `One Time` and `Unspecified`; the last says nothing either way,
+ * so it stays null rather than being read as a one-off.
+ */
+export function mapDonationFrequency(frequency: string): boolean | null {
+  switch (frequency.trim().toLowerCase()) {
+    case 'recurring':
+      return true
+    case 'one time':
+      return false
+    default:
+      return null
+  }
+}
+
+/**
  * Reversals arrive as negative amounts; everything else in these reports has
  * already settled and been disbursed.
  */
@@ -186,6 +202,7 @@ export function transformBenevityRow(
     description: normalizeWithheld(row.Comment),
     attribution: normalizeWithheld(row.Activity),
     attribution_human: normalizeWithheld(row.Activity),
+    is_recurring: mapDonationFrequency(row['Donation Frequency']),
     source_metadata: buildSourceMetadata(row, meta),
     run_id: runId,
   })

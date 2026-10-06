@@ -191,6 +191,8 @@ export function transformSourceTransaction(
     description: tx.description ?? null,
     attribution: null,
     attribution_human: null,
+    // true/false only when the source says so; null when it has no signal
+    is_recurring: null,
     source_metadata: { ...tx }, // Store full raw data
     run_id: runId,
   }

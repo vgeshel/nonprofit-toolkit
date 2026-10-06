@@ -46,6 +46,8 @@ describe('GivebutterConnector', () => {
     donated: id * 10,
     payout: id * 10 - 0.5,
     currency: 'USD',
+    is_recurring: false,
+    plan_id: null,
     transacted_at: '2024-01-15T10:30:00Z',
     created_at: '2024-01-15T10:30:00Z',
   })
