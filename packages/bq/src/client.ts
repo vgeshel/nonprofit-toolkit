@@ -69,6 +69,35 @@ function createError(
 }
 
 /**
+ * Column schema for loading NDJSON into stg_events. Must list the same columns,
+ * in the same order, as the stg_events DDL in schema.sql.
+ */
+export const STG_EVENTS_LOAD_FIELDS = [
+  { name: 'run_id', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'source', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'external_id', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'event_ts', type: 'TIMESTAMP', mode: 'REQUIRED' },
+  { name: 'created_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
+  { name: 'ingested_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
+  { name: 'amount_cents', type: 'INT64', mode: 'REQUIRED' },
+  { name: 'fee_cents', type: 'INT64', mode: 'REQUIRED' },
+  { name: 'net_amount_cents', type: 'INT64', mode: 'REQUIRED' },
+  { name: 'currency', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'donor_name', type: 'STRING' },
+  { name: 'payer_name', type: 'STRING' },
+  { name: 'donor_email', type: 'STRING' },
+  { name: 'donor_phone', type: 'STRING' },
+  { name: 'donor_address', type: 'JSON' },
+  { name: 'status', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'payment_method', type: 'STRING' },
+  { name: 'description', type: 'STRING' },
+  { name: 'attribution', type: 'STRING' },
+  { name: 'attribution_human', type: 'STRING' },
+  { name: 'is_recurring', type: 'BOOL' },
+  { name: 'source_metadata', type: 'JSON', mode: 'REQUIRED' },
+] as const
+
+/**
  * Default chunk size for NDJSON files.
  */
 const DEFAULT_CHUNK_SIZE = 10000
@@ -327,31 +356,7 @@ export class BigQueryClient {
             sourceFormat: 'NEWLINE_DELIMITED_JSON',
             sourceUris: [fullUri],
             writeDisposition: 'WRITE_APPEND',
-            schema: {
-              fields: [
-                { name: 'run_id', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'source', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'external_id', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'event_ts', type: 'TIMESTAMP', mode: 'REQUIRED' },
-                { name: 'created_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
-                { name: 'ingested_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
-                { name: 'amount_cents', type: 'INT64', mode: 'REQUIRED' },
-                { name: 'fee_cents', type: 'INT64', mode: 'REQUIRED' },
-                { name: 'net_amount_cents', type: 'INT64', mode: 'REQUIRED' },
-                { name: 'currency', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'donor_name', type: 'STRING' },
-                { name: 'payer_name', type: 'STRING' },
-                { name: 'donor_email', type: 'STRING' },
-                { name: 'donor_phone', type: 'STRING' },
-                { name: 'donor_address', type: 'JSON' },
-                { name: 'status', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'payment_method', type: 'STRING' },
-                { name: 'description', type: 'STRING' },
-                { name: 'attribution', type: 'STRING' },
-                { name: 'attribution_human', type: 'STRING' },
-                { name: 'source_metadata', type: 'JSON', mode: 'REQUIRED' },
-              ],
-            },
+            schema: { fields: [...STG_EVENTS_LOAD_FIELDS] },
           },
         },
       }),

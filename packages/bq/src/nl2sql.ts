@@ -70,6 +70,7 @@ The table is \`${config.datasetCanon}.events\` with these columns:
 | description | STRING | Transaction description (nullable) |
 | attribution | STRING | Campaign tracking code (nullable) |
 | attribution_human | STRING | Human-readable campaign name (nullable) |
+| is_recurring | BOOL | TRUE = recurring gift, FALSE = known one-off, NULL = source has no signal |
 | source_metadata | JSON | Source-specific metadata |
 
 The table is partitioned by DATE(event_ts) and clustered by (source, donor_email).
@@ -86,6 +87,7 @@ The table is partitioned by DATE(event_ts) and clustered by (source, donor_email
 8. **For "last month"**, use \`DATE_TRUNC(event_ts, MONTH) = DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)\`
 9. **Campaign** means the \`attribution_human\` column.
 10. **When the user says "donor" without specifying a field**, search both \`donor_name\` and \`donor_email\`.
+11. **Recurring** means \`is_recurring = TRUE\`. NULL means the source has no signal (bank, Wise, Venmo, checks), so never count NULL as one-off: one-off means \`is_recurring = FALSE\`.
 
 ## Examples
 

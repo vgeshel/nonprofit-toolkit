@@ -110,6 +110,7 @@ export function transformMercuryTransaction(
     description: tx.bankDescription ?? tx.note ?? tx.externalMemo ?? null,
     attribution: null, // Mercury doesn't have campaign/attribution info
     attribution_human: null,
+    is_recurring: null, // No recurrence signal in this source
     source_metadata: {
       accountName, // For filtering during staging-to-final load
       counterpartyId: tx.counterpartyId,

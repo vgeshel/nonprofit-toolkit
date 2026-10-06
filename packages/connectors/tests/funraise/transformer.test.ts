@@ -10,6 +10,7 @@ import {
   extractEmail,
   extractPhone,
   formatDonorName,
+  mapFunraiseRecurring,
   mapFunraiseStatus,
   parseAmountToCents,
   parseFunraiseDateToISO,
@@ -467,6 +468,21 @@ describe('buildSourceMetadata', () => {
   })
 })
 
+describe('mapFunraiseRecurring', () => {
+  it('maps "true" to true', () => {
+    expect(mapFunraiseRecurring('true')).toBe(true)
+  })
+
+  it('maps "false" to false', () => {
+    expect(mapFunraiseRecurring('false')).toBe(false)
+  })
+
+  it('maps a blank or missing column to null', () => {
+    expect(mapFunraiseRecurring('')).toBeNull()
+    expect(mapFunraiseRecurring('yes')).toBeNull()
+  })
+})
+
 describe('transformFunraiseRow', () => {
   const runId = '550e8400-e29b-41d4-a716-446655440000'
 
@@ -539,6 +555,19 @@ describe('transformFunraiseRow', () => {
     ...overrides,
   })
 
+  it('marks a one-off gift as not recurring', () => {
+    const result = transformFunraiseRow(
+      createRow({ Recurring: 'false', 'Recurring Id': '', Frequency: '' }),
+      runId,
+    )
+    expect(result._unsafeUnwrap().is_recurring).toBe(false)
+  })
+
+  it('leaves is_recurring null when the export has no Recurring value', () => {
+    const result = transformFunraiseRow(createRow({ Recurring: '' }), runId)
+    expect(result._unsafeUnwrap().is_recurring).toBeNull()
+  })
+
   it('transforms a complete row to DonationEvent', () => {
     const row = createRow({})
     const result = transformFunraiseRow(row, runId)
@@ -556,6 +585,7 @@ describe('transformFunraiseRow', () => {
       expect(event.currency).toBe('USD')
       expect(event.donor_name).toBe('Magnus Johansen')
       expect(event.payer_name).toBeNull()
+      expect(event.is_recurring).toBe(true)
       expect(event.donor_email).toBe('magnusbergjohansen@gmail.com')
       expect(event.donor_phone).toBe('+4798074020')
       expect(event.status).toBe('succeeded')
