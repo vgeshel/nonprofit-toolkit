@@ -118,23 +118,14 @@ export function extractDonorAddress(
 /**
  * Determine payment method from PayPal transaction event code.
  *
- * Event codes encode the payment type (e.g., T0006 = bank transfer)
+ * See https://developer.paypal.com/docs/reports/reference/tcodes/. Only two
+ * payment codes identify the funding instrument: T0005 (credit card payment)
+ * and T0012 (Virtual Terminal payment, a card keyed in by the merchant).
+ * Checkout codes such as T0006 (Express Checkout) and T0007 (Standard web
+ * checkout) can be funded by balance, bank or card, so they map to 'paypal'.
  */
-export function mapPayPalPaymentMethod(
-  eventCode: string | undefined,
-): string | null {
-  if (!eventCode) return 'paypal'
-
-  // Common PayPal event codes
-  if (eventCode.startsWith('T00')) {
-    // T0000-T0099: General payments
-    if (eventCode === 'T0006') return 'bank_transfer'
-    if (eventCode === 'T0007') return 'bank_transfer'
-    return 'paypal'
-  }
-  if (eventCode.startsWith('T05')) return 'debit_card' // Debit card payments
-  if (eventCode.startsWith('T06')) return 'credit_card' // Credit card payments
-
+export function mapPayPalPaymentMethod(eventCode: string | undefined): string {
+  if (eventCode === 'T0005' || eventCode === 'T0012') return 'credit_card'
   return 'paypal'
 }
 
@@ -158,14 +149,19 @@ export function mapPayPalRecurring(
 /**
  * Check if a transaction is an incoming payment (credit).
  *
- * PayPal uses event codes where certain ranges indicate credits vs debits.
- * Also checks the amount sign.
+ * Requires a positive amount and an event code in PayPal's "Payments received
+ * and sent" category (T00xx). Other positive credits are not donations:
+ * currency conversions (T02xx) duplicate a foreign-currency payment, bank and
+ * card deposits (T03xx, T07xx) fund the balance, refunds and hold releases
+ * (T11xx) return money already counted, and corrections (T19xx) adjust it.
  */
 export function isIncomingPayment(tx: PayPalTransactionDetail): boolean {
-  const amount = tx.transaction_info.transaction_amount?.value
+  const info = tx.transaction_info
+  if (!info.transaction_event_code?.startsWith('T00')) return false
+
+  const amount = info.transaction_amount?.value
   if (!amount) return false
 
-  // Positive amounts are credits (incoming)
   const value = parseFloat(amount)
   return !isNaN(value) && value > 0
 }
@@ -260,18 +256,13 @@ export function transformPayPalTransaction(
 
 /**
  * Transform multiple PayPal transactions to DonationEvents.
- * Only includes incoming payments (credits) by default since those are donations.
- *
- * @param transactions PayPal transactions to transform
- * @param runId UUID for the ETL run
- * @param includeOutgoing Whether to include outgoing transactions (default: false)
+ * Only includes incoming payments, since those are donations.
  */
 export function transformPayPalTransactions(
   transactions: PayPalTransactionDetail[],
   runId: string,
-  includeOutgoing = false,
 ): DonationEvent[] {
   return transactions
-    .filter((tx) => includeOutgoing || isIncomingPayment(tx))
+    .filter(isIncomingPayment)
     .map((tx) => transformPayPalTransaction(tx, runId))
 }

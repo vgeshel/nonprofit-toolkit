@@ -124,7 +124,6 @@ export class PayPalConnector implements Connector {
         const events = transformPayPalTransactions(
           response.transaction_details,
           runId,
-          false,
         )
 
         // Determine if there are more pages
