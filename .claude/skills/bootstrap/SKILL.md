@@ -129,7 +129,7 @@ Ask: "Would you like to test the ETL locally?"
 If yes:
 
 ```bash
-dotenvx run -- bun apps/runner/src/main.ts daily
+dotenvx run --overload -- bun apps/runner/src/main.ts daily
 ```
 
 Review the output with the user. Verify that configured sources are fetching data and
@@ -187,7 +187,7 @@ Ask: "Would you like to provision GCP infrastructure and deploy now?"
 If yes, invoke the provisioning workflow:
 
 ```bash
-dotenvx run -- ./infra/provision.sh
+dotenvx run --overload -- ./infra/provision.sh
 ```
 
 After provisioning, verify:
