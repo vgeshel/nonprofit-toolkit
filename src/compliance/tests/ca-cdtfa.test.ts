@@ -15,16 +15,16 @@ import type {
 const ACCESS_URL = 'https://onlineservices.cdtfa.ca.gov/'
 
 const ENTITY: Entity = {
-  legal_name: 'Leleka Foundation',
+  legal_name: 'Example Charity',
   state_of_incorporation: 'DC',
   fiscal_year_end_month: 12,
   fiscal_year_end_day: 31,
-  formation_date: '2014-12-14',
-  mailing_address_line1: '380 Hamilton Ave',
-  mailing_address_line2: 'Unit 291',
-  mailing_address_city: 'Palo Alto',
+  formation_date: '2010-01-15',
+  mailing_address_line1: '100 Example St',
+  mailing_address_line2: 'Suite 1',
+  mailing_address_city: 'Springfield',
   mailing_address_region: 'CA',
-  mailing_address_postal_code: '94302-2405',
+  mailing_address_postal_code: '90000-0000',
   mailing_address_country: 'US',
   updated_at: '2026-04-28T04:36:09.668Z',
 }
@@ -172,16 +172,16 @@ function validPermitValues(
   overrides: ReadonlyMap<string, string> = new Map(),
 ): ReadonlyMap<string, string> {
   return new Map<string, string>([
-    ['#d-4', '202-822944'],
+    ['#d-4', '201-234567'],
     ['#f-3', '01-Sep-2023'],
     ['#f-4', ''],
-    ['#f-5', 'LELEKA FOUNDATION'],
+    ['#f-5', 'EXAMPLE CHARITY'],
     ['#f-6', ''],
-    ['#f-7', '380 HAMILTON AVE UNIT 291'],
+    ['#f-7', '100 EXAMPLE ST SUITE 1'],
     ['#f-8', ''],
     ['#f-9', ''],
-    ['#f-a', 'PALO ALTO'],
-    ['#f-b', '94302'],
+    ['#f-a', 'SPRINGFIELD'],
+    ['#f-b', '90000'],
     ...overrides.entries(),
   ])
 }
@@ -197,10 +197,10 @@ function contextWithPage(
   page: FakePage,
   identifiers: SourceContext['identifiers'] = {
     'us-ca': {
-      sosEntityNumber: '6423690',
-      cdtfaSellerPermitNumber: '202-822944',
+      sosEntityNumber: '1234567',
+      cdtfaSellerPermitNumber: '201-234567',
     },
-    'us-federal': { ein: '47-2377309' },
+    'us-federal': { ein: '12-3456789' },
   },
 ): SourceContext {
   const close = vi.fn<() => Promise<void>>(() => Promise.resolve())
@@ -233,7 +233,7 @@ describe('caCdtfaPermitLicenseVerificationSource metadata', () => {
       fetch: vi.fn<FetchImpl>(() =>
         Promise.resolve(new Response('', { status: 500 })),
       ),
-      identifiers: { 'us-federal': { ein: '47-2377309' } },
+      identifiers: { 'us-federal': { ein: '12-3456789' } },
     }
 
     expect(_internal.getBrowserPageFactory(context)).toBeTypeOf('function')
@@ -253,7 +253,7 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
     if (!result.isOk()) return
     expect(page.actions).toContain(`goto ${ACCESS_URL}`)
     expect(page.actions).toContain('select #d-3=Sellers Permit')
-    expect(page.actions).toContain('fill #d-4=202822944')
+    expect(page.actions).toContain('fill #d-4=201234567')
     expect(page.actions).toContain('click button:has-text("Search")')
     expect(result.value.record).toMatchObject({
       source_id: 'ca-cdtfa-permit-license-verification',
@@ -263,22 +263,22 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
         sourceType: 'public_permit_license_account_verification',
         search: {
           accountType: 'Sellers Permit',
-          identifier: '202-822944',
-          normalizedIdentifier: '202822944',
+          identifier: '201-234567',
+          normalizedIdentifier: '201234567',
         },
         account_type: 'Sellers Permit',
-        account_number: '202-822944',
+        account_number: '201-234567',
         verification_status: 'This is a valid Sellers Permit.',
         is_valid: true,
         start_date: '01-Sep-2023',
         end_date: null,
-        owner_name: 'LELEKA FOUNDATION',
+        owner_name: 'EXAMPLE CHARITY',
         dba_name: null,
-        address: '380 HAMILTON AVE UNIT 291',
+        address: '100 EXAMPLE ST SUITE 1',
         suspension_begin: null,
         suspension_end: null,
-        city: 'PALO ALTO',
-        zip_code: '94302',
+        city: 'SPRINGFIELD',
+        zip_code: '90000',
       },
     })
     expect(result.value.record.payload.evidence).toMatchObject({
@@ -315,10 +315,10 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
       ENTITY,
       contextWithPage(page, {
         'us-ca': {
-          sosEntityNumber: '6423690',
+          sosEntityNumber: '1234567',
           cdtfaUseTaxAccountNumber: 'UT-00123456',
         },
-        'us-federal': { ein: '47-2377309' },
+        'us-federal': { ein: '12-3456789' },
       }),
     )
 
@@ -349,10 +349,10 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
       ENTITY,
       contextWithPage(page, {
         'us-ca': {
-          sosEntityNumber: '6423690',
+          sosEntityNumber: '1234567',
           cdtfaSellerPermitNumber: '999-999999',
         },
-        'us-federal': { ein: '47-2377309' },
+        'us-federal': { ein: '12-3456789' },
       }),
     )
 
@@ -383,7 +383,7 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
     expect(result.isOk()).toBe(true)
     if (!result.isOk()) return
     expect(result.value.record.payload).toMatchObject({
-      account_number: '202-822944',
+      account_number: '201-234567',
     })
   })
 
@@ -393,8 +393,8 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
     const result = await caCdtfaPermitLicenseVerificationSource.run(
       ENTITY,
       contextWithPage(page, {
-        'us-ca': { sosEntityNumber: '6423690' },
-        'us-federal': { ein: '47-2377309' },
+        'us-ca': { sosEntityNumber: '1234567' },
+        'us-federal': { ein: '12-3456789' },
       }),
     )
 
@@ -412,10 +412,10 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
       ENTITY,
       contextWithPage(page, {
         'us-ca': {
-          sosEntityNumber: '6423690',
+          sosEntityNumber: '1234567',
           cdtfaSpecialTaxAccountNumber: 'ST-123456',
         },
-        'us-federal': { ein: '47-2377309' },
+        'us-federal': { ein: '12-3456789' },
       }),
     )
 
@@ -432,10 +432,10 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
       ENTITY,
       contextWithPage(page, {
         'us-ca': {
-          sosEntityNumber: '6423690',
+          sosEntityNumber: '1234567',
           cdtfaSellerPermitNumber: 'ABC',
         },
-        'us-federal': { ein: '47-2377309' },
+        'us-federal': { ein: '12-3456789' },
       }),
     )
 
@@ -449,8 +449,8 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
   it('returns a parse error when public page text does not include a known verification result', () => {
     const result = _internal.readVerificationStatus('Search Criteria only', {
       accountType: 'Sellers Permit',
-      identifier: '202-822944',
-      normalizedIdentifier: '202822944',
+      identifier: '201-234567',
+      normalizedIdentifier: '201234567',
     })
 
     expect(result.isErr()).toBe(true)
@@ -465,8 +465,8 @@ describe('caCdtfaPermitLicenseVerificationSource.run', () => {
       page,
       {
         accountType: 'Sellers Permit',
-        identifier: '202-822944',
-        normalizedIdentifier: '202822944',
+        identifier: '201-234567',
+        normalizedIdentifier: '201234567',
       },
       'Search Criteria only',
     )

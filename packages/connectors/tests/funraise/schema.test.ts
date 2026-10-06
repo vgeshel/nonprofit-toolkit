@@ -6,7 +6,7 @@ import { FunraiseCsvRowSchema } from '../../src/funraise/schema'
 
 describe('FunraiseCsvRowSchema', () => {
   const validRow = {
-    Id: '13092983',
+    Id: '10000001',
     Amount: '107.70',
     'Transaction Date': '2026-01-24T00:05:47.440049-08:00[US/Pacific]',
     'First Name': 'John',
@@ -86,19 +86,19 @@ describe('FunraiseCsvRowSchema', () => {
   describe('all CSV columns', () => {
     it('accepts a complete row with all fields from real CSV export', () => {
       const completeRow = {
-        Id: '13092983',
-        'Supporter Id': '2768225',
-        'First Name': 'Magnus',
-        'Last Name': 'Johansen',
+        Id: '10000001',
+        'Supporter Id': '20000001',
+        'First Name': 'Kari',
+        'Last Name': 'Nordmann',
         'Institution Name': '',
         'Institution Category': 'Individual',
-        Address: 'Camilla Colletts vei 20',
+        Address: 'Eksempelveien 1',
         City: 'Oslo',
         'State/Province': 'Oslo',
-        'Postal Code': '0258',
+        'Postal Code': '0001',
         Country: 'Norway',
-        Phone: '+4798074020',
-        Email: 'magnusbergjohansen@gmail.com',
+        Phone: '+4712345678',
+        Email: 'kari.nordmann@example.com',
         'Prospecting | Real Estate Value': '',
         Amount: '107.70',
         'Soft Credit Supporter Id': '',
@@ -110,12 +110,12 @@ describe('FunraiseCsvRowSchema', () => {
         'Operations Tip Amount': '0',
         Status: 'Complete',
         Form: 'Website Donate',
-        'Form Id': '26314',
+        'Form Id': '10001',
         'Transaction Date': '2026-01-24T00:05:47.440049-08:00[US/Pacific]',
         Match: 'false',
         Dedication: 'true',
         'Dedication Email': '',
-        'Dedication Name': 'Yuri Kubrushko',
+        'Dedication Name': 'Ola Nordmann',
         'Dedication Type': 'inspired by',
         'Dedication Message': '',
         Anonymous: 'false',
@@ -124,16 +124,16 @@ describe('FunraiseCsvRowSchema', () => {
         'Card Type': 'AMEX',
         'Expiration Date': '12/29',
         Recurring: 'true',
-        'Recurring Id': '123190',
+        'Recurring Id': '900001',
         Sequence: '35',
         Frequency: 'Monthly',
         Offline: 'false',
         Currency: 'USD',
-        'Last Four': '2001',
+        'Last Four': '4242',
         'Gateway Response': 'SUCCEEDED',
-        'Gateway Transaction Id': 'ch_3St1qpFZglB4Ea6W0BLHNXwk',
+        'Gateway Transaction Id': 'ch_test_0000000000000000001',
         'Import External Id': '',
-        Name: '00002706',
+        Name: '00000001',
         'Check Number': '',
         Memo: '',
         Note: '',
@@ -146,8 +146,8 @@ describe('FunraiseCsvRowSchema', () => {
         Allocations: '',
         'Source Amount': '107.70',
         URL: '',
-        'Household Id': '1353163',
-        'Household Name': 'Johansen Household',
+        'Household Id': '30000001',
+        'Household Name': 'Nordmann Household',
         'Platform Fee Amount': '5.00',
         'Platform Fee Percent': '5.0',
         'Tax Deductible Amount': '107.70',
@@ -156,7 +156,7 @@ describe('FunraiseCsvRowSchema', () => {
       const result = FunraiseCsvRowSchema.safeParse(completeRow)
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.Id).toBe('13092983')
+        expect(result.data.Id).toBe('10000001')
         expect(result.data.Amount).toBe('107.70')
         expect(result.data['Platform Fee Amount']).toBe('5.00')
         expect(result.data.Recurring).toBe('true')

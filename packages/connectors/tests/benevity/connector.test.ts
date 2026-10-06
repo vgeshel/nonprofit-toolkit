@@ -31,11 +31,11 @@ function report(
 ): BenevityReport {
   const row = BenevityCsvRowSchema.parse({
     Company: 'Google',
-    Project: 'LELEKA FOUNDATION',
+    Project: 'EXAMPLE CHARITY',
     'Donation Date': '2026-07-06T20:56:08Z',
-    'Donor First Name': 'James',
-    'Donor Last Name': 'Duke',
-    Email: 'jamesduke@example.com',
+    'Donor First Name': 'Ada',
+    'Donor Last Name': 'Lovelace',
+    Email: 'ada@example.com',
     'Transaction ID': transactionId,
     Currency: 'USD',
     'Total Donation to be Acknowledged': amount,
@@ -47,8 +47,8 @@ function report(
   return {
     filename: `${disbursementId}.csv`,
     meta: {
-      charityName: 'LELEKA FOUNDATION',
-      charityId: '840-472377309',
+      charityName: 'EXAMPLE CHARITY',
+      charityId: '840-123456789',
       periodEnding: 'Mon 17 Aug 2026 0:00:00',
       currency: 'USD',
       paymentMethod: 'EFT',

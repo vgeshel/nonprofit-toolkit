@@ -795,7 +795,7 @@ describe('deriveComplianceFindings', () => {
       runs: [
         ftbRun({
           matchStatus: 'found',
-          entity_id: '6423690',
+          entity_id: '1234567',
           entity_name: 'FOO FOUNDATION',
           ftb_status: 'ACTIVE',
           exempt_status_verified: 'NOT EXEMPT',
@@ -826,7 +826,7 @@ describe('deriveComplianceFindings', () => {
       runs: [
         ftbRun({
           matchStatus: 'found',
-          entity_id: '6423690',
+          entity_id: '1234567',
           entity_name: 'FOO FOUNDATION',
           ftb_status: 'ACTIVE',
           exempt_status_verified: 'EXEMPT',
@@ -845,7 +845,7 @@ describe('deriveComplianceFindings', () => {
       runs: [
         ftbRun({
           matchStatus: 'not_found',
-          search: { field: 'Entity ID', value: '6423690' },
+          search: { field: 'Entity ID', value: '1234567' },
         }),
       ],
       now: () => new Date('2026-05-03T12:00:00.000Z'),
@@ -989,7 +989,7 @@ describe('deriveComplianceFindings', () => {
         cdtfaRun({
           matchStatus: 'found',
           account_type: 'Sellers Permit',
-          account_number: '202-822944',
+          account_number: '201-234567',
           verification_status: 'This is a valid Sellers Permit.',
           is_valid: true,
           owner_name: 'FOO FOUNDATION',
@@ -1043,7 +1043,7 @@ describe('deriveComplianceFindings', () => {
         cdtfaRun({
           matchStatus: 'found',
           account_type: 'Sellers Permit',
-          account_number: '202-822944',
+          account_number: '201-234567',
           verification_status: 'This is a valid Sellers Permit.',
           is_valid: true,
           owner_name: 'Different Foundation',

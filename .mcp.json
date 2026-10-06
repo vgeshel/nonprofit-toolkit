@@ -6,7 +6,7 @@
     },
     "donations": {
       "type": "http",
-      "url": "https://mcp-server-u5atmmvqqq-uc.a.run.app/mcp"
+      "url": "${DONATIONS_MCP_URL:-https://donations-mcp.invalid/mcp}"
     }
   }
 }

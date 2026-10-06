@@ -487,21 +487,21 @@ describe('transformFunraiseRow', () => {
   const runId = '550e8400-e29b-41d4-a716-446655440000'
 
   const createRow = (overrides: Partial<FunraiseCsvRow>): FunraiseCsvRow => ({
-    Id: '13092983',
+    Id: '10000001',
     Amount: '107.70',
     'Transaction Date': '2026-01-24T00:05:47.440049-08:00[US/Pacific]',
-    'Supporter Id': '2768225',
-    'First Name': 'Magnus',
-    'Last Name': 'Johansen',
+    'Supporter Id': '20000001',
+    'First Name': 'Kari',
+    'Last Name': 'Nordmann',
     'Institution Name': '',
     'Institution Category': '',
-    Address: 'Camilla Colletts vei 20',
+    Address: 'Eksempelveien 1',
     City: 'Oslo',
     'State/Province': 'Oslo',
-    'Postal Code': '0258',
+    'Postal Code': '0001',
     Country: 'Norway',
-    Phone: '+4798074020',
-    Email: 'magnusbergjohansen@gmail.com',
+    Phone: '+4712345678',
+    Email: 'kari.nordmann@example.com',
     Status: 'Complete',
     'Payment Method': 'Credit Card',
     'Card Type': 'AMEX',
@@ -511,7 +511,7 @@ describe('transformFunraiseRow', () => {
     'Tax Deductible Amount': '107.70',
     'Source Amount': '107.70',
     Form: 'Website Donate',
-    'Form Id': '26314',
+    'Form Id': '10001',
     'Campaign Goal Id': '',
     'Campaign Page URL': '',
     'Campaign Page Id': '',
@@ -522,11 +522,11 @@ describe('transformFunraiseRow', () => {
     'UTM Campaign': '',
     Dedication: 'true',
     'Dedication Email': '',
-    'Dedication Name': 'Yuri Kubrushko',
+    'Dedication Name': 'Ola Nordmann',
     'Dedication Type': 'inspired by',
     'Dedication Message': '',
     Recurring: 'true',
-    'Recurring Id': '123190',
+    'Recurring Id': '900001',
     Sequence: '35',
     Frequency: 'Monthly',
     'Prospecting | Real Estate Value': '',
@@ -539,19 +539,19 @@ describe('transformFunraiseRow', () => {
     Comment: '',
     'Expiration Date': '12/29',
     Offline: 'false',
-    'Last Four': '2001',
+    'Last Four': '4242',
     'Gateway Response': 'SUCCEEDED',
-    'Gateway Transaction Id': 'ch_3St1qpFZglB4Ea6W0BLHNXwk',
+    'Gateway Transaction Id': 'ch_test_0000000000000000001',
     'Import External Id': '',
-    Name: '00002706',
+    Name: '00000001',
     'Check Number': '',
     Memo: '',
     Note: '',
     Tags: '',
     Allocations: '',
     URL: '',
-    'Household Id': '1353163',
-    'Household Name': 'Johansen Household',
+    'Household Id': '30000001',
+    'Household Name': 'Nordmann Household',
     ...overrides,
   })
 
@@ -577,17 +577,17 @@ describe('transformFunraiseRow', () => {
       const event = result.value
 
       expect(event.source).toBe('funraise')
-      expect(event.external_id).toBe('13092983')
+      expect(event.external_id).toBe('10000001')
       expect(event.event_ts).toBe('2026-01-24T08:05:47.440Z')
       expect(event.amount_cents).toBe(10770)
       expect(event.fee_cents).toBe(500)
       expect(event.net_amount_cents).toBe(10270)
       expect(event.currency).toBe('USD')
-      expect(event.donor_name).toBe('Magnus Johansen')
+      expect(event.donor_name).toBe('Kari Nordmann')
       expect(event.payer_name).toBeNull()
       expect(event.is_recurring).toBe(true)
-      expect(event.donor_email).toBe('magnusbergjohansen@gmail.com')
-      expect(event.donor_phone).toBe('+4798074020')
+      expect(event.donor_email).toBe('kari.nordmann@example.com')
+      expect(event.donor_phone).toBe('+4712345678')
       expect(event.status).toBe('succeeded')
       expect(event.payment_method).toBe('Credit Card')
       expect(event.attribution).toBe('website')
@@ -603,11 +603,11 @@ describe('transformFunraiseRow', () => {
     expect(result.isOk()).toBe(true)
     if (result.isOk()) {
       expect(result.value.donor_address).toEqual({
-        line1: 'Camilla Colletts vei 20',
+        line1: 'Eksempelveien 1',
         line2: null,
         city: 'Oslo',
         state: 'Oslo',
-        postal_code: '0258',
+        postal_code: '0001',
         country: 'NO',
       })
     }

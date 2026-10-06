@@ -438,7 +438,7 @@ describe('formatDiscoveryReport', () => {
       identifiers: {
         ...IDENTIFIERS,
         'us-ca': {
-          sosEntityNumber: '6423690',
+          sosEntityNumber: '1234567',
           agCharityNumber: 'CT1234567',
         },
       },
@@ -464,10 +464,10 @@ describe('formatDiscoveryReport', () => {
 
     const actionSection = actionRequiredSection(rendered)
     expect(actionSection).toContain(
-      '- FTB entity ID: 6423690 (using California SOS entity number)',
+      '- FTB entity ID: 1234567 (using California SOS entity number)',
     )
     expect(actionSection).toContain(
-      'Open the business account for this FTB entity ID: 6423690.',
+      'Open the business account for this FTB entity ID: 1234567.',
     )
   })
 

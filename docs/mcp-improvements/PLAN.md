@@ -14,7 +14,7 @@ Acceptance gates from `.claude/rules/*` apply throughout: TDD, 100% coverage on 
 | -------------------------------------------------------------------- | ------------------------------------- | -------------------------------------- |
 | Diagnostic logging on the OAuth flow                                 | **Shipped**                           | commit `66dd3c6`, revision `00022-6mm` |
 | Access-token TTL 1h → 7d                                             | **Shipped**                           | commit `b244572`, revision `00023-b7z` |
-| Draft PR opened                                                      | **Open**                              | leleka-foundation/nonprofit-toolkit#18 |
+| Draft PR opened                                                      | **Open**                              | #18                                    |
 | Cloud Run session affinity                                           | **Deferred** — not needed in practice | —                                      |
 | `no-cpu-throttling`                                                  | **Deferred** — not needed in practice | —                                      |
 | Stateless `StreamableHTTPServerTransport`                            | **Deferred** — not needed in practice | —                                      |
@@ -73,4 +73,4 @@ This is the dominant disconnect signal. Session routing and CPU throttling may s
 
 ## Promotion gate
 
-Promote PR leleka-foundation/nonprofit-toolkit#18 out of draft once production observation passes (no spontaneous disconnects for 1–2 weeks).
+Promote PR #18 out of draft once production observation passes (no spontaneous disconnects for 1–2 weeks).
