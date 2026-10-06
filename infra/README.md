@@ -21,7 +21,7 @@ This directory contains the GCP provisioning script for the Donations ETL pipeli
 
 2. Run the provisioning script:
    ```bash
-   dotenvx run -- ./infra/provision.sh
+   dotenvx run --overload -- ./infra/provision.sh
    ```
 
 ## What It Provisions
@@ -143,7 +143,7 @@ The Check Deposits source reads data from a Google Spreadsheet. The ETL job uses
 
 3. **Re-run provisioning** to update the Cloud Run job with the spreadsheet ID:
    ```bash
-   dotenvx run -- ./infra/provision.sh
+   dotenvx run --overload -- ./infra/provision.sh
    ```
 
 ### Local Development

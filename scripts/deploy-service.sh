@@ -39,7 +39,7 @@ if [[ -z "${__SLACK_BOT_DEPLOY_LOADED:-}" ]]; then
     exit 1
   fi
   export __SLACK_BOT_DEPLOY_LOADED=1
-  exec dotenvx run -- bash "$0" "$@"
+  exec dotenvx run --overload -- bash "$0" "$@"
 fi
 
 # Parse arguments

@@ -166,7 +166,7 @@ command -v dotenvx || bun add -g @dotenvx/dotenvx
 Execute the provisioning script:
 
 ```bash
-dotenvx run -- ./infra/provision.sh
+dotenvx run --overload -- ./infra/provision.sh
 ```
 
 This script is idempotent and will:
@@ -199,7 +199,7 @@ If yes:
 4. If the scheduler jobs don't exist (e.g., `REPORT_SLACK_CHANNEL` was added after provisioning),
    re-run provisioning or create them manually:
    ```bash
-   dotenvx run -- ./infra/provision.sh
+   dotenvx run --overload -- ./infra/provision.sh
    ```
 5. Optionally adjust the schedule and timezone by updating `.env`:
    - `REPORT_WEEKLY_SCHEDULE` (default: `0 8 * * 1` — Monday 8 AM)

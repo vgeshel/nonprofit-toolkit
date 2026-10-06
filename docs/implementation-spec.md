@@ -1043,7 +1043,7 @@ See `.env.example` in the spec for the full list.
 
 ### Provisioning
 
-Run via: `dotenvx run -- ./infra/provision.sh`
+Run via: `dotenvx run --overload -- ./infra/provision.sh`
 
 The script handles:
 

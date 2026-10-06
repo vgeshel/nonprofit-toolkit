@@ -5,7 +5,9 @@ set -euo pipefail
 # Donations ETL provisioning (GCP CLI-only, idempotent)
 # ------------------------------------------------------------
 # Expected to be run via dotenvx:
-#   dotenvx run -- ./infra/provision.sh
+#   dotenvx run --overload -- ./infra/provision.sh
+# --overload makes .env win over variables already exported in the shell, so a
+# stale exported credential can never be written to Secret Manager.
 #
 # Reads config from env (injected from .env):
 #   PROJECT_ID, REGION, LOCATION, BUCKET, AR_REPO, IMAGE_NAME, JOB_NAME,
@@ -340,7 +342,7 @@ ensure_scheduler_job() {
       --message-body '{}' \
       --oauth-service-account-email "${SCHEDULER_SA_EMAIL}" \
       --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform" \
-      --headers "Content-Type=application/json" >/dev/null
+      --update-headers "Content-Type=application/json" >/dev/null
     log "Scheduler job updated."
   else
     gcloud scheduler jobs create http "${SCHEDULER_JOB_NAME}" \
@@ -398,7 +400,7 @@ ensure_report_scheduler_jobs() {
       --message-body "${weekly_body}" \
       --oauth-service-account-email "${SCHEDULER_SA_EMAIL}" \
       --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform" \
-      --headers "Content-Type=application/json" >/dev/null
+      --update-headers "Content-Type=application/json" >/dev/null
     log "Weekly report scheduler updated."
   else
     gcloud scheduler jobs create http "${weekly_name}" \
@@ -428,7 +430,7 @@ ensure_report_scheduler_jobs() {
       --message-body "${monthly_body}" \
       --oauth-service-account-email "${SCHEDULER_SA_EMAIL}" \
       --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform" \
-      --headers "Content-Type=application/json" >/dev/null
+      --update-headers "Content-Type=application/json" >/dev/null
     log "Monthly report scheduler updated."
   else
     gcloud scheduler jobs create http "${monthly_name}" \

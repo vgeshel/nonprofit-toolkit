@@ -75,7 +75,7 @@
     "format:check": "bunx --bun prettier --check .",
     "prepare": "husky",
     "build": "bun build apps/runner/src/main.ts --outdir dist/apps/runner --target bun",
-    "etl:run": "dotenvx run -- bun apps/runner/src/main.ts",
+    "etl:run": "dotenvx run --overload -- bun apps/runner/src/main.ts",
     "deploy": "./scripts/deploy.sh"
   },
   "workspaces": [
