@@ -134,10 +134,10 @@ describe('entrypoint', () => {
       process.env.STUDIO_COVERAGE_THRESHOLDS_RUN_MAIN = 'true'
       vi.resetModules()
       await import('./check-coverage-thresholds')
-      // Give time for async main() to complete
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    } catch {
-      // Expected: process.exit throws
+      // Keep process.exit mocked until async main() reaches it
+      await vi.waitFor(() => {
+        expect(exitSpy).toHaveBeenCalled()
+      })
     } finally {
       exitSpy.mockRestore()
       consoleSpy.mockRestore()

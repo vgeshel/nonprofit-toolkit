@@ -381,9 +381,10 @@ steps:
         process.env.STUDIO_CHECK_GITHUB_SCRIPT_RUN_MAIN = 'true'
         vi.resetModules()
         await import('./check-github-script')
-        await new Promise((resolve) => setTimeout(resolve, 50))
-      } catch {
-        // Expected: process.exit throws
+        // Keep process.exit mocked until async main() reaches it
+        await vi.waitFor(() => {
+          expect(exited).toBe(true)
+        })
       } finally {
         expect(exited).toBe(true)
         exitSpy.mockRestore()
