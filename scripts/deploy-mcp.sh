@@ -234,6 +234,8 @@ DATASET_CANON=${DATASET_CANON},\
 GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},\
 MCP_ALLOWED_DOMAIN=${MCP_ALLOWED_DOMAIN},\
 BASE_URL=${BASE_URL_VALUE},\
+REGION=${REGION},\
+COMPLIANCE_DISCOVER_JOB_NAME=${COMPLIANCE_DISCOVER_JOB_NAME},\
 COMPLIANCE_BROWSER_HEADLESS=1" \
     --set-secrets "\
 GOOGLE_CLIENT_SECRET=MCP_GOOGLE_CLIENT_SECRET:latest,\
@@ -282,43 +284,29 @@ echo ""
 log "Ensuring Cloud Run Job: ${COMPLIANCE_DISCOVER_JOB_NAME}..."
 if [[ "$DRY_RUN" == "true" ]]; then
   log "  Would create/update job ${COMPLIANCE_DISCOVER_JOB_NAME} (entrypoint: bun dist/compliance-discover-job.js)"
-  log "  Would grant ${RUNTIME_SA_EMAIL} permission to run it"
+  log "  Would grant ${RUNTIME_SA_EMAIL} permission to run it with overrides"
 else
-  JOB_ENV="PROJECT_ID=${PROJECT_ID},DATASET_CANON=${DATASET_CANON},REGION=${REGION},COMPLIANCE_BROWSER_HEADLESS=1"
-  if gcloud run jobs describe "${COMPLIANCE_DISCOVER_JOB_NAME}" \
-      --region "${REGION}" --project "${PROJECT_ID}" >/dev/null 2>&1; then
-    gcloud run jobs update "${COMPLIANCE_DISCOVER_JOB_NAME}" \
-      --region "${REGION}" --project "${PROJECT_ID}" \
-      --image "${IMAGE_URI}" \
-      --service-account "${RUNTIME_SA_EMAIL}" \
-      --command bun \
-      --args dist/compliance-discover-job.js \
-      --set-env-vars "${JOB_ENV}" \
-      --memory 4Gi --cpu 2 --max-retries 1 --tasks 1 --task-timeout 3600s \
-      --quiet
-    log "  Job updated."
-  else
-    gcloud run jobs create "${COMPLIANCE_DISCOVER_JOB_NAME}" \
-      --region "${REGION}" --project "${PROJECT_ID}" \
-      --image "${IMAGE_URI}" \
-      --service-account "${RUNTIME_SA_EMAIL}" \
-      --command bun \
-      --args dist/compliance-discover-job.js \
-      --set-env-vars "${JOB_ENV}" \
-      --memory 4Gi --cpu 2 --max-retries 1 --tasks 1 --task-timeout 3600s \
-      --quiet
-    log "  Job created."
-  fi
+  # `gcloud run jobs deploy` creates the job or updates it in place.
+  gcloud run jobs deploy "${COMPLIANCE_DISCOVER_JOB_NAME}" \
+    --region "${REGION}" --project "${PROJECT_ID}" \
+    --image "${IMAGE_URI}" \
+    --service-account "${RUNTIME_SA_EMAIL}" \
+    --command bun \
+    --args dist/compliance-discover-job.js \
+    --set-env-vars "PROJECT_ID=${PROJECT_ID},DATASET_CANON=${DATASET_CANON},REGION=${REGION},COMPLIANCE_BROWSER_HEADLESS=1" \
+    --memory 4Gi --cpu 2 --max-retries 1 --tasks 1 --task-timeout 3600s \
+    --quiet
+  log "  Job deployed."
 
-  # Let the MCP service's runtime SA trigger executions of this Job.
-  # roles/run.invoker carries run.jobs.run for job execution; if a future
-  # IAM change requires more, grant roles/run.developer instead.
+  # The MCP service starts executions with per-run env overrides
+  # (DISCOVERY_JOB_ID, source filter). That needs run.jobs.runWithOverrides,
+  # which roles/run.invoker does not carry.
   gcloud run jobs add-iam-policy-binding "${COMPLIANCE_DISCOVER_JOB_NAME}" \
     --region "${REGION}" --project "${PROJECT_ID}" \
     --member "serviceAccount:${RUNTIME_SA_EMAIL}" \
-    --role "roles/run.invoker" \
+    --role "roles/run.jobsExecutorWithOverrides" \
     --quiet >/dev/null
-  log "  Granted ${RUNTIME_SA_EMAIL} run.invoker on the job."
+  log "  Granted ${RUNTIME_SA_EMAIL} run.jobsExecutorWithOverrides on the job."
 fi
 
 echo ""

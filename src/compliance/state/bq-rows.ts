@@ -156,7 +156,7 @@ export const COMPLIANCE_TABLES: readonly ComplianceTableDefinition[] = [
   {
     name: 'discovery_jobs',
     description:
-      'One row per async compliance-discover job (parent of the per-source discovery_runs rows). Tracks lifecycle status, the filter the caller requested, and (on completion) the assembled DiscoveryReport.',
+      'Schema for async compliance-discover jobs (parent of the per-source discovery_runs rows, linked by job_id). Job lifecycle is tracked in Firestore (mcp_compliance_jobs) because BigQuery streaming inserts cannot be updated promptly, so this table is not written to.',
     fields: [
       { name: 'job_id', type: 'STRING', mode: 'REQUIRED' },
       { name: 'started_at', type: 'TIMESTAMP', mode: 'REQUIRED' },

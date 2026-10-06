@@ -23,12 +23,12 @@ import {
 } from '../skills/discover-job.ts'
 import type { DiscoveryReport } from '../skills/discover.ts'
 import type { FindingsAccessor } from '../state/bq-findings.ts'
-import type { DiscoveryJobsAccessor } from '../state/bq-jobs.ts'
 import type {
   ComplianceDiscoveryJobRow,
   ComplianceDiscoveryRunRow,
 } from '../state/bq-rows.ts'
 import type { DiscoveryRunsAccessor } from '../state/bq-runs.ts'
+import type { DiscoveryJobsAccessor } from '../state/discovery-jobs.ts'
 
 const JOB_ID = '11111111-1111-4111-8111-111111111111'
 

@@ -13,13 +13,13 @@
  */
 import type { ResultAsync } from 'neverthrow'
 import { ResultAsync as RA, errAsync, okAsync } from 'neverthrow'
+import type { ComplianceDiscoveryJobRow } from './bq-rows.ts'
+import { ComplianceDiscoveryJobRowSchema } from './bq-rows.ts'
 import type {
   DiscoveryJobsAccessor,
   JobFinishUpdate,
   JobsAccessorError,
-} from './bq-jobs.ts'
-import type { ComplianceDiscoveryJobRow } from './bq-rows.ts'
-import { ComplianceDiscoveryJobRowSchema } from './bq-rows.ts'
+} from './discovery-jobs.ts'
 
 /**
  * Minimal Firestore surface we depend on. Typing the methods we use

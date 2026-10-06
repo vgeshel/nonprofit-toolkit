@@ -22,7 +22,7 @@ Branch: `feat/compliance-mcp-and-plugin`
 - [x] Add Zod schema + types for `discovery_jobs` rows in `src/compliance/types/` (or extend existing types module).
 - [x] Add `job_id STRING NULLABLE` column to `discovery_runs` schema (existing migration code).
 - [x] Add `discovery_jobs` table to migration (`src/compliance/skills/migrate.ts` + tests).
-- [x] Implement `createDiscoveryJobsAccessor` in `src/compliance/state/bq-jobs.ts` (write + read job rows).
+- [x] Implement the jobs accessor (write + read job rows). Lifecycle moved to Firestore (`src/compliance/state/firestore-jobs.ts`) because BigQuery streaming inserts cannot be updated promptly; the BigQuery `discovery_jobs` table remains in the migration but is not written to.
 - [x] Tests for migration + accessor (mocked BQ port).
 
 ### 2b. `discover-job` pure backend

@@ -21,12 +21,12 @@ import { errAsync, okAsync } from 'neverthrow'
 import { v4 as uuidv4 } from 'uuid'
 import type { RunRecorder } from '../sources/runner.ts'
 import type { FindingsAccessor } from '../state/bq-findings.ts'
-import type { DiscoveryJobsAccessor } from '../state/bq-jobs.ts'
 import type {
   ComplianceDiscoveryJobRow,
   ComplianceDiscoveryRunRow,
 } from '../state/bq-rows.ts'
 import type { DiscoveryRunsAccessor } from '../state/bq-runs.ts'
+import type { DiscoveryJobsAccessor } from '../state/discovery-jobs.ts'
 import type { Finding } from '../types/index.ts'
 import type { DiscoveryError, DiscoveryReport } from './discover.ts'
 

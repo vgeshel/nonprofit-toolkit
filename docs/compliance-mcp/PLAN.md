@@ -75,6 +75,8 @@ Tools refuse without it. Read tools omit the field entirely.
 
 ### New BigQuery table: `discovery_jobs`
 
+The job lifecycle itself is stored in the Firestore collection `mcp_compliance_jobs` (one document per job, same fields), because rows streamed into BigQuery cannot be updated for up to 90 minutes. The BigQuery table stays in the migration so the schema is defined in code, but nothing writes to it.
+
 ```
 job_id            STRING NOT NULL
 started_at        TIMESTAMP NOT NULL
@@ -202,12 +204,13 @@ src/compliance/skills/
   discover-job.ts            # startDiscoveryJob / readDiscoveryJob / writeDiscoveryJob (pure)
   discover-job-wiring.ts     # production wiring of the above
 src/compliance/state/
-  bq-jobs.ts                 # createDiscoveryJobsAccessor (BQ adapter for discovery_jobs)
+  discovery-jobs.ts          # DiscoveryJobsAccessor contract
+  firestore-jobs.ts          # createFirestoreDiscoveryJobsAccessor (job lifecycle in Firestore)
 
 src/compliance/tests/
   onboard-update.test.ts
   discover-job.test.ts
-  bq-jobs.test.ts
+  firestore-jobs.test.ts
 
 # schema changes go through existing migrate.ts / ensure-schema.ts
 
@@ -247,7 +250,7 @@ docs/compliance-mcp/
 ## Sequencing
 
 1. **Branch + scaffold** (this commit) — write PLAN + CHECKLIST, create branch.
-2. **Backend extensions** — `onboard-update.ts`, `discover-job.ts`, `bq-jobs.ts`, schema migration. TDD.
+2. **Backend extensions** — `onboard-update.ts`, `discover-job.ts`, the jobs accessor, schema migration. TDD.
 3. **MCP read surface** — `compliance-status` tool, `compliance://status` resource, `compliance://sources/registry` resource, `compliance://onboarding/interview-questions` resource. Smallest end-to-end loop validating the integration pattern.
 4. **MCP write surface (onboarding)** — `compliance-onboard`, `compliance-onboard-update`. Both with `confirm: true`.
 5. **MCP write surface (evidence)** — `compliance://sources/{sourceId}/manual-evidence-instructions` resource + `compliance-record-evidence` tool.
