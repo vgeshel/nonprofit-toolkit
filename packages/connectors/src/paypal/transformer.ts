@@ -130,6 +130,23 @@ export function mapPayPalPaymentMethod(eventCode: string | undefined): string {
 }
 
 /**
+ * Derive is_recurring from the PayPal transaction event code.
+ *
+ * Per PayPal's T-code reference, T0002 is a subscription payment and T0003 a
+ * preapproved payment for a recurring bill; every other T00xx code is a
+ * payment with no recurring arrangement. Codes outside T00xx are not payments
+ * at all (T02xx is currency conversion, T11xx reversals), so they carry no
+ * signal. https://developer.paypal.com/docs/reports/reference/tcodes/
+ */
+export function mapPayPalRecurring(
+  eventCode: string | undefined,
+): boolean | null {
+  if (eventCode === 'T0002' || eventCode === 'T0003') return true
+  if (eventCode?.startsWith('T00')) return false
+  return null
+}
+
+/**
  * Check if a transaction is an incoming payment (credit).
  *
  * Requires a positive amount and an event code in PayPal's "Payments received
@@ -222,6 +239,7 @@ export function transformPayPalTransaction(
     // Attribution from cart item details
     attribution: extractAttribution(tx.cart_info),
     attribution_human: extractAttributionHuman(tx.cart_info),
+    is_recurring: mapPayPalRecurring(info.transaction_event_code),
     source_metadata: {
       paypal_account_id: info.paypal_account_id,
       payer_account_id: payerInfo?.account_id,

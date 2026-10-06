@@ -705,8 +705,10 @@ describe('check-lint-exceptions entrypoint', () => {
       mockExecSync.mockReturnValue('')
       vi.resetModules()
       await import('./check-lint-exceptions')
-      // Give time for the async main() to complete
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      // Keep process.exit mocked until async main() reaches it
+      await vi.waitFor(() => {
+        expect(exitSpy).toHaveBeenCalled()
+      })
     } finally {
       exitSpy.mockRestore()
       if (originalRunMain === undefined) {
@@ -759,11 +761,11 @@ describe('check-lint-exceptions entrypoint', () => {
 
       await import('./check-lint-exceptions')
 
-      // Give time for the async main() to complete and hit the catch
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
+      // Keep process.exit mocked until async main() hits the catch
+      await vi.waitFor(() => {
+        expect(exitCodes).toContain(1)
+      })
       expect(consoleSpy).toHaveBeenCalledWith('Error:', expect.any(Error))
-      expect(exitCodes).toContain(1)
     } finally {
       consoleSpy.mockRestore()
       exitSpy.mockRestore()

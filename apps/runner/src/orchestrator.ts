@@ -296,7 +296,7 @@ export class Orchestrator {
    * Runs each source concurrently with its own fetching strategy:
    * - Mercury: Supports date filtering, uses chunking
    * - PayPal: Has 3-year limit, uses chunking within limit
-   * - Givebutter: No API date filtering, fetches all and filters client-side
+   * - Givebutter: Supports date filtering, uses chunking
    * - Funraise: CSV file, no date filtering (reads entire file)
    */
   runBackfill(

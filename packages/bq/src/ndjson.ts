@@ -35,6 +35,7 @@ export function eventToNdjsonLine(event: DonationEvent): string {
     description: event.description,
     attribution: event.attribution,
     attribution_human: event.attribution_human,
+    is_recurring: event.is_recurring,
     source_metadata: event.source_metadata,
   }
 

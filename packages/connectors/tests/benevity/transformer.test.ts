@@ -13,6 +13,7 @@ import {
   buildDonorName,
   buildSourceMetadata,
   extractEmail,
+  mapDonationFrequency,
   transformBenevityReport,
   transformBenevityRow,
 } from '../../src/benevity/transformer'
@@ -187,6 +188,27 @@ describe('buildSourceMetadata', () => {
   })
 })
 
+describe('mapDonationFrequency', () => {
+  it('maps Recurring to true', () => {
+    expect(mapDonationFrequency('Recurring')).toBe(true)
+  })
+
+  it('maps One Time to false', () => {
+    expect(mapDonationFrequency('One Time')).toBe(false)
+  })
+
+  it('ignores case and surrounding whitespace', () => {
+    expect(mapDonationFrequency(' recurring ')).toBe(true)
+    expect(mapDonationFrequency('ONE TIME')).toBe(false)
+  })
+
+  it('maps Unspecified, blank and unknown values to null', () => {
+    expect(mapDonationFrequency('Unspecified')).toBeNull()
+    expect(mapDonationFrequency('')).toBeNull()
+    expect(mapDonationFrequency('Weekly')).toBeNull()
+  })
+})
+
 describe('transformBenevityRow', () => {
   it('transforms a donation with a corporate match', () => {
     const result = transformBenevityRow(row(), META, RUN_ID)
@@ -210,7 +232,28 @@ describe('transformBenevityRow', () => {
     expect(event.description).toBe('Thank you')
     expect(event.attribution).toBe('Continued Support for Ukraine')
     expect(event.attribution_human).toBe('Continued Support for Ukraine')
+    expect(event.is_recurring).toBe(true)
     expect(event.run_id).toBe(RUN_ID)
+  })
+
+  it('marks a one-time gift as not recurring', () => {
+    const event = transformBenevityRow(
+      row({ 'Donation Frequency': 'One Time' }),
+      META,
+      RUN_ID,
+    )._unsafeUnwrap()
+    expect(event.is_recurring).toBe(false)
+    expect(event.source_metadata.donation_frequency).toBe('One Time')
+  })
+
+  it('leaves is_recurring null when the frequency is Unspecified', () => {
+    const event = transformBenevityRow(
+      row({ 'Donation Frequency': 'Unspecified' }),
+      META,
+      RUN_ID,
+    )._unsafeUnwrap()
+    expect(event.is_recurring).toBeNull()
+    expect(event.source_metadata.donation_frequency).toBe('Unspecified')
   })
 
   it('handles a pure match row where the donor total is zero', () => {

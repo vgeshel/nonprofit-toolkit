@@ -231,6 +231,8 @@ describe('transformGivebutterTransaction', () => {
     donated: 100.0,
     payout: 96.5,
     currency: 'usd',
+    is_recurring: false,
+    plan_id: null,
     transacted_at: '2024-01-15T10:30:00Z',
     created_at: '2024-01-15T10:30:00Z',
     ...overrides,
@@ -313,6 +315,27 @@ describe('transformGivebutterTransaction', () => {
       fee_covered: false,
       donated: 100.0,
       payout: 96.5,
+    })
+  })
+
+  it('marks a one-off gift as not recurring', () => {
+    const result = transformGivebutterTransaction(createBaseTx(), runId)
+
+    expect(result.is_recurring).toBe(false)
+    expect(result.source_metadata).toMatchObject({
+      is_recurring: false,
+      plan_id: null,
+    })
+  })
+
+  it('marks a plan charge as recurring and keeps its plan_id', () => {
+    const tx = createBaseTx({ is_recurring: true, plan_id: 'plan_abc123' })
+    const result = transformGivebutterTransaction(tx, runId)
+
+    expect(result.is_recurring).toBe(true)
+    expect(result.source_metadata).toMatchObject({
+      is_recurring: true,
+      plan_id: 'plan_abc123',
     })
   })
 
@@ -435,6 +458,8 @@ describe('transformGivebutterTransactions', () => {
     donated: id * 10,
     payout: id * 10 - 0.5,
     currency: 'USD',
+    is_recurring: false,
+    plan_id: null,
     transacted_at: '2024-01-15T10:30:00Z',
     created_at: '2024-01-15T10:30:00Z',
   })

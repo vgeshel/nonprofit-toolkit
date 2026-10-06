@@ -141,6 +141,7 @@ export function transformCheckDepositRow(
     description: null,
     attribution: null,
     attribution_human: null,
+    is_recurring: null, // No recurrence signal in this source
     source_metadata: {
       check_number: row.check_number,
       check_date: row.check_date,

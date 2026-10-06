@@ -182,6 +182,21 @@ export function extractPhone(phone: string): string | null {
 }
 
 /**
+ * Map Funraise's `Recurring` column to is_recurring. A blank value (the column
+ * is missing from the export) says nothing, so it stays null.
+ */
+export function mapFunraiseRecurring(recurring: string): boolean | null {
+  switch (recurring) {
+    case 'true':
+      return true
+    case 'false':
+      return false
+    default:
+      return null
+  }
+}
+
+/**
  * Build source metadata from remaining CSV fields.
  */
 export function buildSourceMetadata(
@@ -283,6 +298,7 @@ export function transformFunraiseRow(
     description: row.Comment?.trim() || row.Note?.trim() || null,
     attribution: row['UTM Source']?.trim() || null,
     attribution_human: row.Form?.trim() || null,
+    is_recurring: mapFunraiseRecurring(row.Recurring),
     source_metadata: buildSourceMetadata(row),
     run_id: runId,
   })

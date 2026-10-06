@@ -261,6 +261,7 @@ describe('transformPatreonPledgeEvent', () => {
     expect(result.payer_name).toBeNull()
     expect(result.status).toBe('succeeded')
     expect(result.payment_method).toBe('patreon')
+    expect(result.is_recurring).toBe(true)
     expect(result.description).toBe('subscription')
     expect(result.attribution).toBeNull()
     expect(result.attribution_human).toBeNull()

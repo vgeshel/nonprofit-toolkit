@@ -34,6 +34,7 @@ describe('NDJSON utilities', () => {
     currency: 'USD',
     donor_name: 'John Doe',
     payer_name: null,
+    is_recurring: null,
     donor_email: 'john@example.com',
     donor_phone: null,
     donor_address: {

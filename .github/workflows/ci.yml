@@ -31,3 +31,6 @@ jobs:
 
       - name: Run tests with coverage
         run: bun test:coverage
+
+      - name: Verify coverage measured files
+        run: bun run scripts/check-coverage-report.ts

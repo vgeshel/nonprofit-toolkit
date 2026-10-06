@@ -3,7 +3,9 @@
  *
  * Bun's fetch() uses IPv6 when available, but some APIs (like Mercury)
  * only whitelist IPv4 addresses. This wrapper resolves hostnames to
- * IPv4 first, then makes requests to the IP with the Host header set.
+ * IPv4 first, then makes requests to the IP with the Host header and TLS
+ * server name set to the original hostname, so certificates are still
+ * verified against that hostname.
  *
  * Works in both Bun and Node.js environments.
  */
@@ -70,7 +72,7 @@ async function getIPv4Address(hostname: string): Promise<string | null> {
  */
 export async function fetchIPv4(
   input: string | URL | Request,
-  init?: RequestInit,
+  init?: BunFetchRequestInit,
 ): Promise<Response> {
   // Parse the URL
   const url = new URL(input instanceof Request ? input.url : input.toString())
@@ -93,12 +95,17 @@ export async function fetchIPv4(
       const headers = new Headers(init?.headers)
       headers.set('Host', originalHostname)
 
-      // Make request with modified URL and Host header
+      // Make request with modified URL, Host header and TLS server name.
+      // Bun verifies the certificate against tls.serverName (and sends it as
+      // SNI); without it Bun checks against the IP in the URL and the
+      // handshake fails. This is Bun's documented way to connect to an
+      // address you resolved yourself.
       // On connection error, invalidate cache so next request tries fresh DNS
       // This handles cases where the IP changed (DNS updated but cache is stale)
       return fetch(url.toString(), {
         ...init,
         headers,
+        tls: { ...init?.tls, serverName: originalHostname },
       }).catch((error: unknown) => {
         invalidateIPv4Cache(originalHostname)
         return Promise.reject(
