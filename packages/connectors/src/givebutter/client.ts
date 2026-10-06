@@ -16,9 +16,19 @@ import {
 export const GIVEBUTTER_BASE_URL = 'https://api.givebutter.com/v1'
 export const GIVEBUTTER_DEFAULT_PAGE_SIZE = 100
 
-interface PaginationOptions {
+/**
+ * Which transaction timestamp the date range filters on.
+ *
+ * - transacted: when the donor made the payment (the event date)
+ * - updated: when Givebutter last changed the record, e.g. when a pending ACH
+ *   payment settled and became succeeded several days after it was transacted
+ */
+export type GivebutterDateField = 'transacted' | 'updated'
+
+interface TransactionQueryOptions {
   page?: number
   perPage?: number
+  dateField?: GivebutterDateField
 }
 
 /**
@@ -126,21 +136,23 @@ export class GivebutterClient {
   /**
    * Fetch transactions within a date range.
    *
-   * Uses Givebutter's date filtering parameters:
-   * - transactedAfter: Filter transactions on or after this date (inclusive)
-   * - transactedBefore: Filter transactions before this date (exclusive)
+   * Uses Givebutter's date filtering parameters for the chosen date field
+   * (transactedAfter/transactedBefore or updatedAfter/updatedBefore):
+   * - *After: on or after this date (inclusive)
+   * - *Before: before this date (exclusive)
    *
    * @param from Start date for transactions (inclusive)
    * @param to End date for transactions (inclusive - we add 1 day for API's exclusive filter)
-   * @param options Pagination options
+   * @param options Pagination options and the date field to filter on
    */
   getTransactions(
     from: DateTime,
     to: DateTime,
-    options: PaginationOptions = {},
+    options: TransactionQueryOptions = {},
   ): ResultAsync<GivebutterTransactionResponse, ConnectorError> {
     const page = options.page ?? 1
     const perPage = options.perPage ?? GIVEBUTTER_DEFAULT_PAGE_SIZE
+    const dateField = options.dateField ?? 'transacted'
 
     // Build query parameters
     const params = new URLSearchParams({
@@ -148,21 +160,18 @@ export class GivebutterClient {
       per_page: perPage.toString(),
     })
 
-    // Add Givebutter date filter parameters
-    // transactedAfter: transactions with transacted date on or after this value (inclusive)
-    // transactedBefore: transactions with transacted date before this value (exclusive)
-    // We add 1 day to 'to' because transactedBefore is exclusive and we want to include
-    // transactions from the 'to' date
+    // We add 1 day to 'to' because the *Before filter is exclusive and we want
+    // to include transactions from the 'to' date
     const startDate = from.toISODate()
     const endDate = to.plus({ days: 1 }).toISODate()
 
     /* istanbul ignore else -- @preserve valid DateTime always returns ISO date */
     if (startDate) {
-      params.set('transactedAfter', startDate)
+      params.set(`${dateField}After`, startDate)
     }
     /* istanbul ignore else -- @preserve valid DateTime always returns ISO date */
     if (endDate) {
-      params.set('transactedBefore', endDate)
+      params.set(`${dateField}Before`, endDate)
     }
 
     return this.request(
