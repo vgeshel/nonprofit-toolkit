@@ -59,7 +59,9 @@ RUNTIME_SA="${RUNTIME_SA:-donations-etl-sa}"
 RUNTIME_SA_EMAIL="${RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID must be set}"
-GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET must be set}"
+# Optional once MCP_GOOGLE_CLIENT_SECRET exists in Secret Manager: an unset
+# value keeps the stored secret.
+GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"
 MCP_ALLOWED_DOMAIN="${MCP_ALLOWED_DOMAIN:?MCP_ALLOWED_DOMAIN must be set}"
 
 SERVICE_NAME="mcp-server"
@@ -131,6 +133,8 @@ if [[ "$SKIP_SECRETS" == "true" ]]; then
 else
   log "Ensuring secrets in Secret Manager..."
 
+  # Never blanks a secret: an unset value keeps the current version, and an
+  # unchanged value adds nothing. Logic lives in scripts/secret-lib.ts.
   ensure_secret() {
     local name="$1"
     local value="$2"
@@ -140,15 +144,8 @@ else
       return
     fi
 
-    gcloud secrets create "${name}" \
-      --project="${PROJECT_ID}" \
-      --replication-policy="automatic" 2>/dev/null || true
-
-    echo -n "${value}" | gcloud secrets versions add "${name}" \
-      --project="${PROJECT_ID}" \
-      --data-file=- >/dev/null 2>&1
-
-    log "  ${name} — set"
+    __SECRET_VALUE="${value}" bun scripts/ensure-secret.ts \
+      --project "${PROJECT_ID}" --name "${name}" --from-env __SECRET_VALUE
   }
 
   ensure_secret "MCP_GOOGLE_CLIENT_SECRET" "${GOOGLE_CLIENT_SECRET}"

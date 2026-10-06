@@ -12,8 +12,9 @@ set -euo pipefail
 #   DATASET_RAW, DATASET_CANON, RUNTIME_SA, SCHEDULER_SA,
 #   SCHEDULER_JOB_NAME, SCHEDULE, TIME_ZONE,
 #   SKIP_BUILD, SKIP_SCHEMA, SKIP_SECRETS, SKIP_SCHEDULER, SKIP_MONITORING,
-#   ALERT_SLACK_CHANNEL (Slack channel for Cloud Monitoring alerts),
-#   SECRET_* (optional initial secret values)
+#   ALERT_SLACK_CHANNEL (Slack channel for alerts), REPORT_TIME_ZONE,
+#   SECRET_* (connector credentials; a source is enabled by setting its secret.
+#   An unset value never overwrites a secret already in Secret Manager.)
 
 log() { echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $*"; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required command: $1" >&2; exit 1; }; }
@@ -32,11 +33,9 @@ DATASET_CANON="${DATASET_CANON:-donations}"
 
 RUNTIME_SA="${RUNTIME_SA:-donations-etl-sa}"
 SCHEDULER_SA="${SCHEDULER_SA:-donations-etl-scheduler-sa}"
-QUERY_SA="${QUERY_SA:-donations-etl-query-sa}"
 
 RUNTIME_SA_EMAIL="${RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 SCHEDULER_SA_EMAIL="${SCHEDULER_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
-QUERY_SA_EMAIL="${QUERY_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 SCHEDULER_JOB_NAME="${SCHEDULER_JOB_NAME:-${JOB_NAME}-daily}"
 SCHEDULE="${SCHEDULE:-0 9 * * *}"
@@ -44,6 +43,10 @@ TIME_ZONE="${TIME_ZONE:-America/Los_Angeles}"
 
 # Google Sheets - Check Deposits source
 CHECK_DEPOSITS_SPREADSHEET_ID="${CHECK_DEPOSITS_SPREADSHEET_ID:-}"
+CHECK_DEPOSITS_SHEET_NAME="${CHECK_DEPOSITS_SHEET_NAME:-}"
+
+# Patreon campaign (the access token is the PATREON_ACCESS_TOKEN secret)
+PATREON_CAMPAIGN_ID="${PATREON_CAMPAIGN_ID:-}"
 
 # Wise API settings
 WISE_PROFILE_ID="${WISE_PROFILE_ID:-}"
@@ -51,6 +54,7 @@ WISE_PROFILE_ID="${WISE_PROFILE_ID:-}"
 # Slack and donation reports (optional)
 SLACK_BOT_TOKEN="${SLACK_BOT_TOKEN:-}"
 REPORT_SLACK_CHANNEL="${REPORT_SLACK_CHANNEL:-}"
+REPORT_TIME_ZONE="${REPORT_TIME_ZONE:-${TIME_ZONE}}"
 
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SCHEMA="${SKIP_SCHEMA:-0}"
@@ -64,8 +68,6 @@ SCHEMA_SQL_PATH="${SCHEMA_SQL_PATH:-packages/bq/src/schema.sql}"
 IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:latest"
 RUN_URL="https://run.googleapis.com/v2/projects/${PROJECT_ID}/locations/${REGION}/jobs/${JOB_NAME}:run"
 
-# If SECRET_* not set, create placeholder secret versions.
-PLACEHOLDER_SECRET_VALUE="${PLACEHOLDER_SECRET_VALUE:-REPLACE_ME}"
 
 ensure_project() {
   log "Setting gcloud project: ${PROJECT_ID}"
@@ -82,6 +84,7 @@ enable_apis() {
     cloudscheduler.googleapis.com \
     secretmanager.googleapis.com \
     monitoring.googleapis.com \
+    aiplatform.googleapis.com \
     logging.googleapis.com \
     sheets.googleapis.com \
     iam.googleapis.com >/dev/null
@@ -98,6 +101,16 @@ ensure_ar_repo() {
       --description="Docker images for donations ETL" >/dev/null
     log "Artifact Registry repo created."
   fi
+}
+
+# Keep the newest image versions and delete the rest after a grace period,
+# so the registry does not grow without bound. Policy: infra/artifact-cleanup-policy.json
+ensure_ar_cleanup_policy() {
+  log "Ensuring Artifact Registry cleanup policy on ${AR_REPO}"
+  gcloud artifacts repositories set-cleanup-policies "${AR_REPO}" \
+    --location="${REGION}" \
+    --policy=infra/artifact-cleanup-policy.json \
+    --no-dry-run >/dev/null
 }
 
 ensure_bucket() {
@@ -165,10 +178,6 @@ ensure_iam() {
   ensure_project_role "serviceAccount:${RUNTIME_SA_EMAIL}" "roles/storage.objectAdmin"
   ensure_project_role "serviceAccount:${RUNTIME_SA_EMAIL}" "roles/aiplatform.user"
 
-  # Query SA: read-only BigQuery access (for donation query bot)
-  ensure_project_role "serviceAccount:${QUERY_SA_EMAIL}" "roles/bigquery.jobUser"
-  ensure_project_role "serviceAccount:${QUERY_SA_EMAIL}" "roles/bigquery.dataViewer"
-
   # Scheduler SA: permission to run Cloud Run Jobs
   ensure_project_role "serviceAccount:${SCHEDULER_SA_EMAIL}" "roles/run.developer"
 
@@ -180,33 +189,12 @@ ensure_iam() {
   ensure_sa_role_on_sa "${SCHEDULER_SA_EMAIL}" "serviceAccount:${scheduler_agent}" "roles/iam.serviceAccountTokenCreator"
 }
 
+# Write a secret from an env var. An unset/empty value keeps whatever Secret
+# Manager already holds, and an unchanged value adds no version.
+# Logic lives in scripts/secret-lib.ts.
 ensure_secret() {
   local name="$1" envvar="$2"
-
-  if gcloud secrets describe "${name}" >/dev/null 2>&1; then
-    log "Secret ${name} exists."
-  else
-    log "Creating secret ${name}..."
-    gcloud secrets create "${name}" --replication-policy="automatic" >/dev/null
-  fi
-
-  # If it already has a version, do not add another (idempotent).
-  local vcount
-  vcount="$(gcloud secrets versions list "${name}" --limit=1 --format="value(name)" 2>/dev/null | wc -l | tr -d ' ')"
-  if [ "${vcount}" -ge 1 ]; then
-    log "Secret ${name} already has at least one version."
-    return
-  fi
-
-  local value="${PLACEHOLDER_SECRET_VALUE}"
-  if [ -n "${!envvar:-}" ]; then
-    value="${!envvar}"
-    log "Adding initial version for ${name} from env var ${envvar}."
-  else
-    log "Adding placeholder initial version for ${name}. Set ${envvar} in .env to avoid this."
-  fi
-
-  printf "%s" "${value}" | gcloud secrets versions add "${name}" --data-file=- >/dev/null
+  bun scripts/ensure-secret.ts --project "${PROJECT_ID}" --name "${name}" --from-env "${envvar}"
 }
 
 ensure_secrets() {
@@ -216,24 +204,23 @@ ensure_secrets() {
   fi
 
   log "Ensuring secrets (idempotent)..."
-  ensure_secret "MERCURY_API_KEY" "SECRET_MERCURY_API_KEY"
-  ensure_secret "PAYPAL_CLIENT_ID" "SECRET_PAYPAL_CLIENT_ID"
-  ensure_secret "PAYPAL_SECRET" "SECRET_PAYPAL_SECRET"
-
-  # Optional: Givebutter
-  if [ -n "${SECRET_GIVEBUTTER_API_KEY:-}" ]; then
-    ensure_secret "GIVEBUTTER_API_KEY" "SECRET_GIVEBUTTER_API_KEY"
-  fi
-
-  # Optional: Wise
-  if [ -n "${SECRET_WISE_TOKEN:-}" ]; then
-    ensure_secret "WISE_TOKEN" "SECRET_WISE_TOKEN"
-  fi
-
-  # Optional: Slack Bot Token (for reports and service)
-  if [ -n "${SLACK_BOT_TOKEN:-}" ]; then
-    ensure_secret "SLACK_BOT_TOKEN" "SLACK_BOT_TOKEN"
-  fi
+  # Each source is optional: its secret is written only when set in .env,
+  # and the job mounts only the secrets that exist.
+  local pair name envvar
+  for pair in \
+    MERCURY_API_KEY:SECRET_MERCURY_API_KEY \
+    PAYPAL_CLIENT_ID:SECRET_PAYPAL_CLIENT_ID \
+    PAYPAL_SECRET:SECRET_PAYPAL_SECRET \
+    GIVEBUTTER_API_KEY:SECRET_GIVEBUTTER_API_KEY \
+    WISE_TOKEN:SECRET_WISE_TOKEN \
+    PATREON_ACCESS_TOKEN:SECRET_PATREON_ACCESS_TOKEN \
+    SLACK_BOT_TOKEN:SLACK_BOT_TOKEN; do
+    name="${pair%%:*}"
+    envvar="${pair#*:}"
+    if [ -n "${!envvar:-}" ]; then
+      ensure_secret "${name}" "${envvar}"
+    fi
+  done
 }
 
 apply_schema() {
@@ -293,64 +280,44 @@ ensure_cloud_run_job() {
   local env_vars
   env_vars="PROJECT_ID=${PROJECT_ID},DATASET_RAW=${DATASET_RAW},DATASET_CANON=${DATASET_CANON},BUCKET=${BUCKET},LOOKBACK_HOURS=48,LOG_LEVEL=info"
 
-  # Add Check Deposits spreadsheet ID if configured
-  if [ -n "${CHECK_DEPOSITS_SPREADSHEET_ID}" ]; then
-    env_vars="${env_vars},CHECK_DEPOSITS_SPREADSHEET_ID=${CHECK_DEPOSITS_SPREADSHEET_ID}"
-  fi
+  # Optional settings, passed only when configured
+  local var
+  for var in CHECK_DEPOSITS_SPREADSHEET_ID CHECK_DEPOSITS_SHEET_NAME WISE_PROFILE_ID \
+    PATREON_CAMPAIGN_ID REPORT_SLACK_CHANNEL ALERT_SLACK_CHANNEL; do
+    if [ -n "${!var:-}" ]; then
+      env_vars="${env_vars},${var}=${!var}"
+    fi
+  done
 
-  # Add Wise profile ID if configured
-  if [ -n "${WISE_PROFILE_ID}" ]; then
-    env_vars="${env_vars},WISE_PROFILE_ID=${WISE_PROFILE_ID}"
-  fi
+  # Mount every connector secret that exists
+  local secrets="" name
+  for name in MERCURY_API_KEY PAYPAL_CLIENT_ID PAYPAL_SECRET GIVEBUTTER_API_KEY \
+    WISE_TOKEN PATREON_ACCESS_TOKEN SLACK_BOT_TOKEN; do
+    if gcloud secrets describe "${name}" >/dev/null 2>&1; then
+      secrets="${secrets:+${secrets},}${name}=${name}:latest"
+    fi
+  done
 
-  # Add report Slack channel if configured
-  if [ -n "${REPORT_SLACK_CHANNEL}" ]; then
-    env_vars="${env_vars},REPORT_SLACK_CHANNEL=${REPORT_SLACK_CHANNEL}"
-  fi
-
-  local secrets
-  secrets="MERCURY_API_KEY=MERCURY_API_KEY:latest,PAYPAL_CLIENT_ID=PAYPAL_CLIENT_ID:latest,PAYPAL_SECRET=PAYPAL_SECRET:latest"
-
-  # Add Givebutter if secret exists
-  if gcloud secrets describe "GIVEBUTTER_API_KEY" >/dev/null 2>&1; then
-    secrets="${secrets},GIVEBUTTER_API_KEY=GIVEBUTTER_API_KEY:latest"
-  fi
-
-  # Add Wise if secret exists
-  if gcloud secrets describe "WISE_TOKEN" >/dev/null 2>&1; then
-    secrets="${secrets},WISE_TOKEN=WISE_TOKEN:latest"
-  fi
-
-  # Add Slack bot token if secret exists (for reports)
-  if gcloud secrets describe "SLACK_BOT_TOKEN" >/dev/null 2>&1; then
-    secrets="${secrets},SLACK_BOT_TOKEN=SLACK_BOT_TOKEN:latest"
+  local common=(
+    --region "${REGION}"
+    --image "${IMAGE_URI}"
+    --service-account "${RUNTIME_SA_EMAIL}"
+    --set-env-vars "${env_vars}"
+    --memory 1Gi
+    --cpu 1
+    --max-retries 1
+    --tasks 1
+    --task-timeout 3600s
+  )
+  if [ -n "${secrets}" ]; then
+    common+=(--set-secrets "${secrets}")
   fi
 
   if gcloud run jobs describe "${JOB_NAME}" --region "${REGION}" >/dev/null 2>&1; then
-    gcloud run jobs update "${JOB_NAME}" \
-      --region "${REGION}" \
-      --image "${IMAGE_URI}" \
-      --service-account "${RUNTIME_SA_EMAIL}" \
-      --set-env-vars "${env_vars}" \
-      --set-secrets "${secrets}" \
-      --memory 1Gi \
-      --cpu 1 \
-      --max-retries 1 \
-      --tasks 1 \
-      --task-timeout 3600s >/dev/null
+    gcloud run jobs update "${JOB_NAME}" "${common[@]}" >/dev/null
     log "Cloud Run Job updated."
   else
-    gcloud run jobs create "${JOB_NAME}" \
-      --region "${REGION}" \
-      --image "${IMAGE_URI}" \
-      --service-account "${RUNTIME_SA_EMAIL}" \
-      --set-env-vars "${env_vars}" \
-      --set-secrets "${secrets}" \
-      --memory 1Gi \
-      --cpu 1 \
-      --max-retries 1 \
-      --tasks 1 \
-      --task-timeout 3600s >/dev/null
+    gcloud run jobs create "${JOB_NAME}" "${common[@]}" >/dev/null
     log "Cloud Run Job created."
   fi
 }
@@ -425,7 +392,7 @@ ensure_report_scheduler_jobs() {
     gcloud scheduler jobs update http "${weekly_name}" \
       --location "${REGION}" \
       --schedule "${weekly_schedule}" \
-      --time-zone "${TIME_ZONE}" \
+      --time-zone "${REPORT_TIME_ZONE}" \
       --uri "${RUN_URL}" \
       --http-method POST \
       --message-body "${weekly_body}" \
@@ -437,7 +404,7 @@ ensure_report_scheduler_jobs() {
     gcloud scheduler jobs create http "${weekly_name}" \
       --location "${REGION}" \
       --schedule "${weekly_schedule}" \
-      --time-zone "${TIME_ZONE}" \
+      --time-zone "${REPORT_TIME_ZONE}" \
       --uri "${RUN_URL}" \
       --http-method POST \
       --message-body "${weekly_body}" \
@@ -455,7 +422,7 @@ ensure_report_scheduler_jobs() {
     gcloud scheduler jobs update http "${monthly_name}" \
       --location "${REGION}" \
       --schedule "${monthly_schedule}" \
-      --time-zone "${TIME_ZONE}" \
+      --time-zone "${REPORT_TIME_ZONE}" \
       --uri "${RUN_URL}" \
       --http-method POST \
       --message-body "${monthly_body}" \
@@ -467,7 +434,7 @@ ensure_report_scheduler_jobs() {
     gcloud scheduler jobs create http "${monthly_name}" \
       --location "${REGION}" \
       --schedule "${monthly_schedule}" \
-      --time-zone "${TIME_ZONE}" \
+      --time-zone "${REPORT_TIME_ZONE}" \
       --uri "${RUN_URL}" \
       --http-method POST \
       --message-body "${monthly_body}" \
@@ -489,12 +456,12 @@ main() {
   ensure_project
   enable_apis
   ensure_ar_repo
+  ensure_ar_cleanup_policy
   ensure_bucket
   ensure_bq_datasets
 
   ensure_service_account "${RUNTIME_SA}" "${RUNTIME_SA_EMAIL}" "Donations ETL runtime"
   ensure_service_account "${SCHEDULER_SA}" "${SCHEDULER_SA_EMAIL}" "Donations ETL scheduler"
-  ensure_service_account "${QUERY_SA}" "${QUERY_SA_EMAIL}" "Donations ETL query (read-only)"
   ensure_iam
 
   ensure_secrets

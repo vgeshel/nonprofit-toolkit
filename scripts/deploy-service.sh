@@ -281,6 +281,8 @@ else
   log "Ensuring secrets in Secret Manager..."
 
   # Helper to create or update a secret
+  # Never blanks a secret: an unset value keeps the current version, and an
+  # unchanged value adds nothing. Logic lives in scripts/secret-lib.ts.
   ensure_secret() {
     local name="$1"
     local value="$2"
@@ -290,22 +292,13 @@ else
       return
     fi
 
-    # Create the secret if it doesn't exist
-    gcloud secrets create "${name}" \
-      --project="${PROJECT_ID}" \
-      --replication-policy="automatic" 2>/dev/null || true
-
-    # Add the value as a new version
-    echo -n "${value}" | gcloud secrets versions add "${name}" \
-      --project="${PROJECT_ID}" \
-      --data-file=- >/dev/null 2>&1
-
-    log "  ${name} — set"
+    __SECRET_VALUE="${value}" bun scripts/ensure-secret.ts \
+      --project "${PROJECT_ID}" --name "${name}" --from-env __SECRET_VALUE
   }
 
-  ensure_secret "SLACK_BOT_TOKEN" "${SLACK_BOT_TOKEN:-placeholder}"
-  ensure_secret "SLACK_SIGNING_SECRET" "${SLACK_SIGNING_SECRET:-placeholder}"
-  ensure_secret "GOOGLE_GENERATIVE_AI_API_KEY" "${GOOGLE_GENERATIVE_AI_API_KEY:-placeholder}"
+  ensure_secret "SLACK_BOT_TOKEN" "${SLACK_BOT_TOKEN:-}"
+  ensure_secret "SLACK_SIGNING_SECRET" "${SLACK_SIGNING_SECRET:-}"
+  ensure_secret "GOOGLE_GENERATIVE_AI_API_KEY" "${GOOGLE_GENERATIVE_AI_API_KEY:-}"
   ensure_secret "ORG_NAME" "${ORG_NAME:-}"
   ensure_secret "ORG_ADDRESS" "${ORG_ADDRESS:-}"
   ensure_secret "ORG_MISSION" "${ORG_MISSION:-}"
