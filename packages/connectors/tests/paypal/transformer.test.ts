@@ -589,18 +589,18 @@ describe('transformPayPalTransactions', () => {
       createTx('DONATION_EUR', '50.00', 'T0011'),
       createTx('FX_USD', '54.12', 'T0200'),
       createTx('BANK_DEPOSIT', '1000.00', 'T0300'),
-      createTx('CARD_DEPOSIT', '110.00', 'T0700'),
-      createTx('REFUND_FROM_MERCHANT', '44.78', 'T1107'),
-      createTx('HOLD_RELEASE', '30.78', 'T1111'),
-      createTx('CORRECTION', '38.47', 'T1900'),
-      createTx('PPGF_PAYOUT', '5000.00', 'T0001'),
+      createTx('CARD_DEPOSIT', '100.00', 'T0700'),
+      createTx('REFUND_FROM_MERCHANT', '25.00', 'T1107'),
+      createTx('HOLD_RELEASE', '20.00', 'T1111'),
+      createTx('CORRECTION', '10.00', 'T1900'),
+      createTx('MASS_PAYOUT', '5000.00', 'T0001'),
     ]
 
     const result = transformPayPalTransactions(transactions, runId)
 
     expect(result.map((e) => e.external_id)).toEqual([
       'DONATION_EUR',
-      'PPGF_PAYOUT',
+      'MASS_PAYOUT',
     ])
   })
 
