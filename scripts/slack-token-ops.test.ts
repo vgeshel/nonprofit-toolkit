@@ -15,7 +15,7 @@ import {
 
 const okAuthResponse = {
   ok: true,
-  team: 'Leleka',
+  team: 'Example',
   user: 'donor-letter',
   team_id: 'T123',
   user_id: 'U123',
@@ -36,7 +36,7 @@ describe('validateSlackBotToken', () => {
     })
     expect(result).toEqual({
       ok: true,
-      team: 'Leleka',
+      team: 'Example',
       user: 'donor-letter',
       teamId: 'T123',
       userId: 'U123',
@@ -53,7 +53,7 @@ describe('validateSlackBotToken', () => {
     try {
       await expect(validateSlackBotToken('xoxb-valid-token')).resolves.toEqual({
         ok: true,
-        team: 'Leleka',
+        team: 'Example',
         user: 'donor-letter',
         teamId: 'T123',
         userId: 'U123',
@@ -103,7 +103,7 @@ describe('validateSlackBotToken', () => {
   it('returns invalid_response for malformed Slack responses and request failures', async () => {
     const malformedFetch = vi
       .fn<(url: string, init: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(Response.json({ ok: true, team: 'Leleka' }))
+      .mockResolvedValue(Response.json({ ok: true, team: 'Example' }))
     const throwingFetch = vi
       .fn<(url: string, init: RequestInit) => Promise<Response>>()
       .mockRejectedValue(new Error('network failed'))
@@ -164,7 +164,7 @@ describe('promoteSlackBotToken', () => {
       newVersion: '8',
       validation: {
         ok: true,
-        team: 'Leleka',
+        team: 'Example',
         user: 'donor-letter',
         teamId: 'T123',
         userId: 'U123',

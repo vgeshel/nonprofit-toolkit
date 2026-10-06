@@ -31,7 +31,7 @@ const IDENTIFIERS: EntityIdentifiers = {
     agCharityNumber: 'CT1234567',
     ftbEntityId: 'FTB-1234567',
     ftbEntityName: 'Foo Foundation FTB',
-    cdtfaSellerPermitNumber: '202-822944',
+    cdtfaSellerPermitNumber: '201-234567',
     cdtfaUseTaxAccountNumber: 'UT-123456',
     cdtfaSpecialTaxAccountNumber: 'ST-123456',
   },
@@ -429,7 +429,7 @@ describe('formatComplianceStatusReport', () => {
     expect(rendered).toContain('- FTB entity ID: FTB-1234567')
     expect(rendered).toContain('- FTB entity name: Foo Foundation FTB')
     expect(rendered).toContain(
-      '- CDTFA account identifiers: 202-822944, UT-123456, ST-123456',
+      '- CDTFA account identifiers: 201-234567, UT-123456, ST-123456',
     )
     expect(rendered).toContain(
       '- IRS ruling or registration date from IRS EO BMF: 2010-05',
@@ -463,7 +463,7 @@ describe('formatComplianceStatusReport', () => {
     )
     expect(rendered).toContain('CA CDTFA Online Services:')
     expect(rendered).toContain(
-      'Use CDTFA account identifier 202-822944, UT-123456, ST-123456 if the portal asks you to choose an account.',
+      'Use CDTFA account identifier 201-234567, UT-123456, ST-123456 if the portal asks you to choose an account.',
     )
     expect(rendered).toContain('CA Franchise Tax Board Entity Status Letter:')
     expect(rendered).toContain(
@@ -618,7 +618,7 @@ describe('formatComplianceStatusReport', () => {
           jurisdiction_id: 'us-ca',
           status: 'succeeded',
           payload: {
-            account_number: '202-822944',
+            account_number: '201-234567',
             account_type: 'Sellers Permit',
             verification_status: 'valid',
           },
@@ -629,8 +629,8 @@ describe('formatComplianceStatusReport', () => {
           jurisdiction_id: 'us-ca',
           status: 'succeeded',
           payload: {
-            entity_id: '6423690',
-            entity_name: 'LELEKA FOUNDATION',
+            entity_id: '1234567',
+            entity_name: 'EXAMPLE CHARITY',
             ftb_status: 'ACTIVE',
             exempt_status_verified: 'EXEMPT',
           },
@@ -656,14 +656,14 @@ describe('formatComplianceStatusReport', () => {
       overall: 'attention_required',
     })
 
-    expect(rendered).toContain('- FTB entity ID: 6423690')
-    expect(rendered).toContain('- FTB entity name: LELEKA FOUNDATION')
-    expect(rendered).toContain('- CDTFA account identifiers: 202-822944')
+    expect(rendered).toContain('- FTB entity ID: 1234567')
+    expect(rendered).toContain('- FTB entity name: EXAMPLE CHARITY')
+    expect(rendered).toContain('- CDTFA account identifiers: 201-234567')
     expect(rendered).toContain(
-      'Use CDTFA account identifier 202-822944 if the portal asks you to choose an account.',
+      'Use CDTFA account identifier 201-234567 if the portal asks you to choose an account.',
     )
     expect(rendered).toContain(
-      'Open the business account for FTB entity ID 6423690.',
+      'Open the business account for FTB entity ID 1234567.',
     )
   })
 
@@ -813,7 +813,7 @@ describe('formatComplianceStatusReport', () => {
             account_number: '999-999999',
             verification_status: 'This Sellers Permit is invalid.',
             is_valid: false,
-            owner_name: 'LELEKA FOUNDATION',
+            owner_name: 'EXAMPLE CHARITY',
             start_date: '01-Sep-2023',
           },
         },
@@ -836,7 +836,7 @@ describe('formatComplianceStatusReport', () => {
     })
 
     expect(rendered).toContain(
-      'Latest public CA CDTFA verification says Sellers Permit 999-999999 status This Sellers Permit is invalid, owner name LELEKA FOUNDATION, start date 01-Sep-2023.',
+      'Latest public CA CDTFA verification says Sellers Permit 999-999999 status This Sellers Permit is invalid, owner name EXAMPLE CHARITY, start date 01-Sep-2023.',
     )
     expect(rendered).toContain(
       'The public CDTFA verification check is automated; run compliance-discover again whenever you want to refresh this stored status.',
@@ -907,7 +907,7 @@ describe('formatComplianceStatusReport', () => {
           status: 'succeeded',
           payload: {
             matchStatus: 'found',
-            account_number: '202-822944',
+            account_number: '201-234567',
           },
         },
       ],
@@ -1073,7 +1073,7 @@ describe('formatComplianceStatusReport', () => {
       identifiers: {
         'us-federal': { ein: '12-3456789' },
         'us-ca': {
-          sosEntityNumber: '6423690',
+          sosEntityNumber: '1234567',
           ftbEntityName: 'Foo Foundation FTB',
         },
       },
@@ -1092,10 +1092,10 @@ describe('formatComplianceStatusReport', () => {
     })
 
     expect(rendered).toContain(
-      '- FTB entity ID: 6423690 (using California SOS entity number)',
+      '- FTB entity ID: 1234567 (using California SOS entity number)',
     )
     expect(rendered).toContain(
-      'Open https://webapp.ftb.ca.gov/eletter/ and search FTB entity ID 6423690.',
+      'Open https://webapp.ftb.ca.gov/eletter/ and search FTB entity ID 1234567.',
     )
   })
 

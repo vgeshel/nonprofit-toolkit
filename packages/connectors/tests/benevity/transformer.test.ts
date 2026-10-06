@@ -21,29 +21,29 @@ import {
 const RUN_ID = '3f2504e0-4f89-11d3-9a0c-0305e82c3301'
 
 const META: BenevityReportMeta = {
-  charityName: 'LELEKA FOUNDATION',
-  charityId: '840-472377309',
+  charityName: 'EXAMPLE CHARITY',
+  charityId: '840-123456789',
   periodEnding: 'Mon 17 Aug 2026 0:00:00',
   currency: 'USD',
   paymentMethod: 'EFT',
-  disbursementId: '1WAY529V7N',
+  disbursementId: 'DISB000003',
 }
 
 function row(overrides: Record<string, string> = {}) {
   return BenevityCsvRowSchema.parse({
     Company: 'Google',
-    Project: 'LELEKA FOUNDATION',
+    Project: 'EXAMPLE CHARITY',
     'Donation Date': '2026-07-06T20:56:08Z',
-    'Donor First Name': 'James',
-    'Donor Last Name': 'Duke',
-    Email: 'jamesduke@example.com',
-    Address: '16950 Bohlman Road',
-    City: 'Saratoga',
+    'Donor First Name': 'Ada',
+    'Donor Last Name': 'Lovelace',
+    Email: 'ada@example.com',
+    Address: '1 Example Road',
+    City: 'Springfield',
     'State/Province': 'CA',
-    'Postal Code': '95070',
-    Activity: 'Continued Support for Ukraine',
+    'Postal Code': '90003',
+    Activity: 'General Support',
     Comment: 'Thank you',
-    'Transaction ID': '7H9J09CK37',
+    'Transaction ID': 'TXN0000003',
     'Donation Frequency': 'Recurring',
     Currency: 'USD',
     'Project Remote ID': '',
@@ -78,7 +78,7 @@ describe('extractEmail', () => {
 
 describe('buildDonorName', () => {
   it('joins first and last name', () => {
-    expect(buildDonorName('James', 'Duke')).toBe('James Duke')
+    expect(buildDonorName('Ada', 'Lovelace')).toBe('Ada Lovelace')
   })
 
   it('returns whichever half is present', () => {
@@ -100,11 +100,11 @@ describe('buildDonorName', () => {
 describe('buildDonorAddress', () => {
   it('builds an address from the donor columns', () => {
     expect(buildDonorAddress(row())).toEqual({
-      line1: '16950 Bohlman Road',
+      line1: '1 Example Road',
       line2: null,
-      city: 'Saratoga',
+      city: 'Springfield',
       state: 'CA',
-      postal_code: '95070',
+      postal_code: '90003',
       country: null,
     })
   })
@@ -147,18 +147,18 @@ describe('buildSourceMetadata', () => {
   it('captures Benevity-specific fields alongside the disbursement', () => {
     expect(buildSourceMetadata(row(), META)).toEqual({
       company: 'Google',
-      project: 'LELEKA FOUNDATION',
-      activity: 'Continued Support for Ukraine',
+      project: 'EXAMPLE CHARITY',
+      activity: 'General Support',
       reason: 'User Donation',
       donation_source: 'Payroll',
       donation_frequency: 'Recurring',
       match_amount_cents: 2500,
       cause_support_fee_cents: 100,
       merchant_fee_cents: 50,
-      disbursement_id: '1WAY529V7N',
+      disbursement_id: 'DISB000003',
       disbursement_period_ending: 'Mon 17 Aug 2026 0:00:00',
       disbursement_payment_method: 'EFT',
-      charity_id: '840-472377309',
+      charity_id: '840-123456789',
     })
   })
 
@@ -216,7 +216,7 @@ describe('transformBenevityRow', () => {
 
     const event = result._unsafeUnwrap()
     expect(event.source).toBe('benevity')
-    expect(event.external_id).toBe('7H9J09CK37')
+    expect(event.external_id).toBe('TXN0000003')
     expect(event.event_ts).toBe('2026-07-06T20:56:08.000Z')
     expect(event.created_at).toBe('2026-07-06T20:56:08.000Z')
     // Gross is the donor's gift plus the employer match: 25.00 + 25.00.
@@ -224,14 +224,14 @@ describe('transformBenevityRow', () => {
     expect(event.fee_cents).toBe(150)
     expect(event.net_amount_cents).toBe(4850)
     expect(event.currency).toBe('USD')
-    expect(event.donor_name).toBe('James Duke')
+    expect(event.donor_name).toBe('Ada Lovelace')
     expect(event.payer_name).toBe('Google')
-    expect(event.donor_email).toBe('jamesduke@example.com')
+    expect(event.donor_email).toBe('ada@example.com')
     expect(event.status).toBe('succeeded')
     expect(event.payment_method).toBe('Payroll')
     expect(event.description).toBe('Thank you')
-    expect(event.attribution).toBe('Continued Support for Ukraine')
-    expect(event.attribution_human).toBe('Continued Support for Ukraine')
+    expect(event.attribution).toBe('General Support')
+    expect(event.attribution_human).toBe('General Support')
     expect(event.is_recurring).toBe(true)
     expect(event.run_id).toBe(RUN_ID)
   })
@@ -395,7 +395,7 @@ describe('transformBenevityRow', () => {
 describe('transformBenevityReport', () => {
   function report(overrides: Partial<BenevityReport> = {}): BenevityReport {
     return {
-      filename: '1WAY529V7N.csv',
+      filename: 'DISB000003.csv',
       meta: META,
       rows: [
         row({
@@ -442,7 +442,7 @@ describe('transformBenevityReport', () => {
       type: 'parse',
       field: 'Total Donations (Gross)',
       message:
-        '1WAY529V7N.csv: donation rows sum to 6000 cents but the report trailer reports 9999 cents',
+        'DISB000003.csv: donation rows sum to 6000 cents but the report trailer reports 9999 cents',
     })
   })
 
@@ -460,7 +460,7 @@ describe('transformBenevityReport', () => {
       type: 'parse',
       field: 'Net Total Payment',
       message:
-        '1WAY529V7N.csv: gross minus fees is 5850 cents but the report trailer reports a net of 4000 cents, a drift of 1850 cents beyond the 2 cent rounding allowance',
+        'DISB000003.csv: gross minus fees is 5850 cents but the report trailer reports a net of 4000 cents, a drift of 1850 cents beyond the 2 cent rounding allowance',
     })
   })
 

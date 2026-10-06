@@ -149,6 +149,92 @@ describe('sendFailureAlert', () => {
     })
   })
 
+  it('posts to the alert channel when one is configured', async () => {
+    const result = await sendFailureAlert(
+      { ...baseConfig, ALERT_SLACK_CHANNEL: '#alerts' },
+      'Daily ETL',
+      'x',
+      logger,
+      deps,
+    )
+
+    expect(result._unsafeUnwrap()).toBe('sent')
+    expect(postMessage).toHaveBeenCalledTimes(1)
+    expect(postMessage.mock.calls[0]?.[0].channel).toBe('#alerts')
+  })
+
+  it('falls back to the report channel when the alert channel rejects the post', async () => {
+    postMessage.mockRejectedValueOnce(new Error('not_in_channel'))
+
+    const result = await sendFailureAlert(
+      { ...baseConfig, ALERT_SLACK_CHANNEL: '#alerts' },
+      'Daily ETL',
+      'x',
+      logger,
+      deps,
+    )
+
+    expect(result._unsafeUnwrap()).toBe('sent')
+    expect(postMessage.mock.calls.map((call) => call[0].channel)).toEqual([
+      '#alerts',
+      'C123',
+    ])
+  })
+
+  it('posts once when the alert and report channels are the same', async () => {
+    postMessage.mockRejectedValueOnce(new Error('not_in_channel'))
+
+    const result = await sendFailureAlert(
+      { ...baseConfig, ALERT_SLACK_CHANNEL: 'C123' },
+      'Daily ETL',
+      'x',
+      logger,
+      deps,
+    )
+
+    expect(result._unsafeUnwrapErr().message).toBe(
+      'Failed to post failure alert to Slack: C123: not_in_channel',
+    )
+    expect(postMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports every channel when all reject the post', async () => {
+    postMessage
+      .mockRejectedValueOnce(new Error('not_in_channel'))
+      .mockRejectedValueOnce(new Error('channel_not_found'))
+
+    const result = await sendFailureAlert(
+      { ...baseConfig, ALERT_SLACK_CHANNEL: '#alerts' },
+      'Daily ETL',
+      'x',
+      logger,
+      deps,
+    )
+
+    expect(result._unsafeUnwrapErr()).toEqual({
+      type: 'slack',
+      message:
+        'Failed to post failure alert to Slack: #alerts: not_in_channel; C123: channel_not_found',
+    })
+  })
+
+  it('uses the alert channel alone when no report channel is set', async () => {
+    const result = await sendFailureAlert(
+      {
+        ...baseConfig,
+        REPORT_SLACK_CHANNEL: undefined,
+        ALERT_SLACK_CHANNEL: '#alerts',
+      },
+      'Daily ETL',
+      'x',
+      logger,
+      deps,
+    )
+
+    expect(result._unsafeUnwrap()).toBe('sent')
+    expect(postMessage.mock.calls[0]?.[0].channel).toBe('#alerts')
+  })
+
   it('skips without posting when the bot token is not configured', async () => {
     const result = await sendFailureAlert(
       { ...baseConfig, SLACK_BOT_TOKEN: undefined },
@@ -162,7 +248,7 @@ describe('sendFailureAlert', () => {
     expect(postMessage).not.toHaveBeenCalled()
   })
 
-  it('skips without posting when the channel is not configured', async () => {
+  it('skips without posting when no channel is configured', async () => {
     const result = await sendFailureAlert(
       { ...baseConfig, REPORT_SLACK_CHANNEL: undefined },
       'Daily ETL',
@@ -188,7 +274,7 @@ describe('sendFailureAlert', () => {
 
     expect(result._unsafeUnwrapErr()).toEqual({
       type: 'slack',
-      message: 'Failed to post failure alert to Slack: channel_not_found',
+      message: 'Failed to post failure alert to Slack: C123: channel_not_found',
     })
   })
 
@@ -204,7 +290,7 @@ describe('sendFailureAlert', () => {
     )
 
     expect(result._unsafeUnwrapErr().message).toBe(
-      'Failed to post failure alert to Slack: rate_limited',
+      'Failed to post failure alert to Slack: C123: rate_limited',
     )
   })
 

@@ -53,7 +53,7 @@ done
 # Configuration with defaults (loaded from .env via dotenvx)
 PROJECT_ID="${PROJECT_ID:?PROJECT_ID must be set}"
 REGION="${REGION:-us-central1}"
-AR_REPO="${AR_REPO:-donations-etl}"
+AR_REPO="${AR_REPO:-donations}"
 IMAGE_NAME="${IMAGE_NAME:-etl}"
 JOB_NAME="${JOB_NAME:-donations-etl}"
 

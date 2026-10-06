@@ -70,7 +70,7 @@ describe('parseCsvContent', () => {
   it('filters out Standard Transfer rows', () => {
     const content = `Transaction ID,Date,Time (UTC),Type,Status,Note,From,Donor email,To,Amount (total),Amount (tip),Amount (tax),Amount (net),Amount (fee),Tax Rate,Tax Exempt,Funding Source,Destination,Beginning Balance,Ending Balance,Statement Period Venmo Fees,Terminal Location,Year to Date Venmo Fees,Disclaimer
 """123""",01/01/2025,01:00:00,Payment,Complete,Test,Donor,test@test.com,Test Organization,+ $100.00,0,0,$98.00,$2.00,0,FALSE,(None),Venmo balance,0,0,0,Venmo,0,(None)
-"""456""",01/02/2025,02:00:00,Standard Transfer,Issued,(None),(None),,,(None),- $98.00,0,,,0,,,(None),Mercury *8072,0,0,0,Venmo,0,(None)`
+"""456""",01/02/2025,02:00:00,Standard Transfer,Issued,(None),(None),,,(None),- $98.00,0,,,0,,,(None),Mercury *0000,0,0,0,Venmo,0,(None)`
 
     const result = parseCsvContent(content, 'test.csv')
 
@@ -288,9 +288,9 @@ describe('VenmoClient', () => {
     it('handles real Venmo CSV format', async () => {
       // Mimics actual Venmo export format
       const csvContent = `Transaction ID,Date,Time (UTC),Type,Status,Note,From,Donor email,To,Amount (total),Amount (tip),Amount (tax),Amount (net),Amount (fee),Tax Rate,Tax Exempt,Funding Source,Destination,Beginning Balance,Ending Balance,Statement Period Venmo Fees,Terminal Location,Year to Date Venmo Fees,Disclaimer
-"""4235629069058725679""",01/01/2025,01:18:52,Payment,Complete,Donation,john doe,donor@example.com,Test Organization,"+ $1,000.00",0,0,$980.90,$19.10,0,FALSE,(None),Venmo balance,0,0,0,Venmo,0,(None)
-"""4237674292337252771""",01/03/2025,21:02:21,Payment,Complete,Charity,Steve Murillo,smxd18@gmail.com,Test Organization,+ $5.00,0,0,$4.81,$0.19,0,FALSE,(None),Venmo balance,0,0,0,Venmo,0,(None)
-"""4237686785919438989""",01/03/2025,21:27:11,Standard Transfer,Issued,(None),(None),,(None),- $985.71,0,,,0,,,(None),Mercury *8072,0,0,0,Venmo,0,(None)
+"""4000000000000000001""",01/01/2025,01:18:52,Payment,Complete,Donation,john doe,donor@example.com,Test Organization,"+ $1,000.00",0,0,$980.90,$19.10,0,FALSE,(None),Venmo balance,0,0,0,Venmo,0,(None)
+"""4000000000000000002""",01/03/2025,21:02:21,Payment,Complete,Charity,Sam Sample,sam@example.com,Test Organization,+ $5.00,0,0,$4.81,$0.19,0,FALSE,(None),Venmo balance,0,0,0,Venmo,0,(None)
+"""4000000000000000003""",01/03/2025,21:27:11,Standard Transfer,Issued,(None),(None),,(None),- $985.71,0,,,0,,,(None),Mercury *0000,0,0,0,Venmo,0,(None)
 ,,,,,,,,,,,,,,,,,,$0.00,$289.00,$19.29,,$137.98,"In case of errors
 contact us"`
 
@@ -306,12 +306,12 @@ contact us"`
       if (result.isOk()) {
         // Should have 2 Payment rows (skip Standard Transfer and footer)
         expect(result.value).toHaveLength(2)
-        // csv-parse unescapes quotes: """4235629069058725679""" becomes "4235629069058725679"
+        // csv-parse unescapes quotes: """4000000000000000001""" becomes "4000000000000000001"
         expect(result.value[0]?.['Transaction ID']).toBe(
-          '"4235629069058725679"',
+          '"4000000000000000001"',
         )
         expect(result.value[0]?.['Amount (total)']).toBe('+ $1,000.00')
-        expect(result.value[1]?.From).toBe('Steve Murillo')
+        expect(result.value[1]?.From).toBe('Sam Sample')
       }
     })
   })

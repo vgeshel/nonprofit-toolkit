@@ -279,6 +279,14 @@ After deploy, tell Claude (or whatever host) how to find the server. For Claude 
 }
 ```
 
+This repo is public and forkable, so its `.mcp.json` never contains a deployment's real URL. The `donations` entry reads it from the environment — `"url": "${DONATIONS_MCP_URL:-https://donations-mcp.invalid/mcp}"` — and falls back to an unresolvable placeholder. To connect Claude Code to the deployed server, run this yourself (it writes to the user's untracked `~/.claude.json`, and a local-scope entry takes precedence over the project one):
+
+```bash
+claude mcp add --transport http --scope local donations "$SERVICE_URL/mcp"
+```
+
+Setting `DONATIONS_MCP_URL` in the shell that launches Claude Code works too. Never commit the real URL to `.mcp.json`.
+
 For Claude.ai remote connectors, paste the URL in the UI. If OAuth is enabled, the client will discover the auth endpoints via `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server` and walk the user through the flow.
 
 **Exact config format changes across Claude Code versions.** If things don't show up, verify the current file location (project `.mcp.json`, user `~/.claude.json`, or settings.json) and key name (`type: "http"` vs `type: "url"` vs `type: "sse"`) by checking the current Claude Code docs, not your training data.

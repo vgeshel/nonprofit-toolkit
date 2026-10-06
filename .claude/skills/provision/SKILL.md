@@ -229,8 +229,6 @@ If yes:
    - Go to Slack app settings > OAuth & Permissions > add `app_mentions:read`
    - Go to Event Subscriptions > enable > subscribe to `app_mention` bot event
    - Set Request URL to `https://<service-url>/slack/events`
-4. Provisioning automatically creates a read-only BigQuery service account (`donations-etl-query-sa`)
-   with only `bigquery.dataViewer` and `bigquery.jobUser` permissions
 
 If no: skip. The query bot activates automatically when `AI_GATEWAY_API_KEY` is set.
 

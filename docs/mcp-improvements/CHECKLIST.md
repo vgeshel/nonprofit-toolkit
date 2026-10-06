@@ -2,7 +2,7 @@
 
 Companion to `PLAN.md`. Tick items as they land.
 
-PR: [leleka-foundation/nonprofit-toolkit#18](https://github.com/leleka-foundation/nonprofit-toolkit/pull/18) (draft).
+PR: #18 (draft).
 
 ## Diagnostic logging — shipped 2026-05-18 (commit `66dd3c6`)
 

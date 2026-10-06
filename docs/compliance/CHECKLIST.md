@@ -452,7 +452,7 @@ prints exact evidence instructions instead of guessing or mutating portal state.
       `created_tables=0`, `skipped_tables=4`, `added_columns=0`, and
       `updated_views=1` on rerun.
 - [x] Run `compliance-discover` against the currently onboarded nonprofit.
-      Verified Leleka Foundation discovery produced 9 source runs.
+      Verified discovery for the onboarded nonprofit produced 9 source runs.
 - [x] Confirm Phase 2 public sources still produce live/cache-backed results.
       Verified `us-federal/irs-teos`, `us-federal/irs-eo-bmf`, and
       `us-ca/ca-ag-registry` returned `success`.

@@ -77,31 +77,38 @@ The script is **idempotent** - safe to run multiple times.
 
 Set to `1` to skip specific provisioning steps:
 
-| Variable         | Description                   |
-| ---------------- | ----------------------------- |
-| `SKIP_BUILD`     | Skip Docker build and push    |
-| `SKIP_SCHEMA`    | Skip BigQuery schema creation |
-| `SKIP_SECRETS`   | Skip Secret Manager setup     |
-| `SKIP_SCHEDULER` | Skip Cloud Scheduler setup    |
+| Variable          | Description                          |
+| ----------------- | ------------------------------------ |
+| `SKIP_BUILD`      | Skip Docker build and push           |
+| `SKIP_SCHEMA`     | Skip BigQuery schema creation        |
+| `SKIP_SECRETS`    | Skip Secret Manager setup            |
+| `SKIP_SCHEDULER`  | Skip Cloud Scheduler setup           |
+| `SKIP_MONITORING` | Skip Cloud Monitoring alert policies |
 
-### Initial Secrets
+### Secrets
 
-Optionally provide initial secret values (otherwise placeholders are created):
+Each source is enabled by setting its credential in `.env`; provisioning
+writes it to Secret Manager and the job mounts every secret that exists. An
+unset value never overwrites a secret already in Secret Manager, and an
+unchanged value adds no new version, so re-running with a partial `.env` is
+safe.
 
-| Variable                      | Description                |
-| ----------------------------- | -------------------------- |
-| `SECRET_MERCURY_API_KEY`      | Mercury API key            |
-| `SECRET_PAYPAL_CLIENT_ID`     | PayPal OAuth client ID     |
-| `SECRET_PAYPAL_CLIENT_SECRET` | PayPal OAuth client secret |
-| `SECRET_GIVEBUTTER_API_KEY`   | Givebutter API key         |
+| Variable                      | Secret                 | Description                |
+| ----------------------------- | ---------------------- | -------------------------- |
+| `SECRET_MERCURY_API_KEY`      | `MERCURY_API_KEY`      | Mercury API key            |
+| `SECRET_PAYPAL_CLIENT_ID`     | `PAYPAL_CLIENT_ID`     | PayPal OAuth client ID     |
+| `SECRET_PAYPAL_SECRET`        | `PAYPAL_SECRET`        | PayPal OAuth client secret |
+| `SECRET_GIVEBUTTER_API_KEY`   | `GIVEBUTTER_API_KEY`   | Givebutter API key         |
+| `SECRET_WISE_TOKEN`           | `WISE_TOKEN`           | Wise API token             |
+| `SECRET_PATREON_ACCESS_TOKEN` | `PATREON_ACCESS_TOKEN` | Patreon creator token      |
+| `SLACK_BOT_TOKEN`             | `SLACK_BOT_TOKEN`      | Slack bot (reports/alerts) |
 
 ## Manual Steps After Provisioning
 
-1. **Update secrets** if you used placeholders:
-
-   ```bash
-   echo -n "your-actual-api-key" | gcloud secrets versions add mercury-api-key --data-file=-
-   ```
+1. **Connect Slack to Cloud Monitoring** (one-time, console only — Slack
+   OAuth has no API): Monitoring > Alerting > Edit notification channels >
+   Slack > Add new, choose `ALERT_SLACK_CHANNEL`, then re-run provisioning.
+   Invite the Slack bot to that channel too, so job failure alerts reach it.
 
 2. **Verify the job** runs correctly:
 

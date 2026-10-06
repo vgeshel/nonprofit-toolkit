@@ -16,8 +16,8 @@ const config: Config = {
   DATASET_CANON: 'donations',
   SLACK_BOT_TOKEN: 'xoxb-valid-token',
   SLACK_SIGNING_SECRET: 'test-signing-secret',
-  ORG_NAME: 'Leleka Foundation',
-  ORG_ADDRESS: '380 Hamilton Ave',
+  ORG_NAME: 'Example Charity',
+  ORG_ADDRESS: '100 Example St',
   ORG_MISSION: 'Humanitarian aid',
   ORG_TAX_STATUS: '501(c)(3)',
   DEFAULT_SIGNER_NAME: 'Test Signer',
@@ -31,7 +31,7 @@ describe('checkSlackAuth', () => {
       .mockResolvedValue(
         Response.json({
           ok: true,
-          team: 'Leleka',
+          team: 'Example',
           user: 'donor-letter',
           team_id: 'T123',
           user_id: 'U123',
@@ -47,7 +47,7 @@ describe('checkSlackAuth', () => {
     })
     expect(result).toEqual({
       ok: true,
-      team: 'Leleka',
+      team: 'Example',
       user: 'donor-letter',
       teamId: 'T123',
       userId: 'U123',
@@ -61,7 +61,7 @@ describe('checkSlackAuth', () => {
       .mockResolvedValue(
         Response.json({
           ok: true,
-          team: 'Leleka',
+          team: 'Example',
           user: 'donor-letter',
         }),
       )
@@ -70,7 +70,7 @@ describe('checkSlackAuth', () => {
     try {
       await expect(checkSlackAuth('xoxb-valid-token')).resolves.toEqual({
         ok: true,
-        team: 'Leleka',
+        team: 'Example',
         user: 'donor-letter',
         teamId: undefined,
         userId: undefined,
@@ -104,7 +104,7 @@ describe('checkSlackAuth', () => {
   it('returns a sanitized error when Slack returns an unexpected schema', async () => {
     const fetchFn = vi
       .fn<(url: string, init: RequestInit) => Promise<Response>>()
-      .mockResolvedValue(Response.json({ ok: true, team: 'Leleka' }))
+      .mockResolvedValue(Response.json({ ok: true, team: 'Example' }))
 
     const result = await checkSlackAuth('xoxb-valid-token', fetchFn)
 
@@ -119,7 +119,7 @@ describe('handleSlackHealth', () => {
       .mockResolvedValue(
         Response.json({
           ok: true,
-          team: 'Leleka',
+          team: 'Example',
           user: 'donor-letter',
           team_id: 'T123',
           user_id: 'U123',
@@ -145,7 +145,7 @@ describe('handleSlackHealth', () => {
       .mockResolvedValue(
         Response.json({
           ok: true,
-          team: 'Leleka',
+          team: 'Example',
           user: 'donor-letter',
         }),
       )
