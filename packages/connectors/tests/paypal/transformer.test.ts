@@ -12,6 +12,7 @@ import {
   extractDonorAddress,
   isIncomingPayment,
   mapPayPalPaymentMethod,
+  mapPayPalRecurring,
   mapPayPalStatus,
   parsePayPalMoney,
   transformPayPalTransaction,
@@ -237,6 +238,29 @@ describe('mapPayPalPaymentMethod', () => {
   })
 })
 
+describe('mapPayPalRecurring', () => {
+  it('treats subscription (T0002) and preapproved recurring-bill (T0003) payments as recurring', () => {
+    expect(mapPayPalRecurring('T0002')).toBe(true)
+    expect(mapPayPalRecurring('T0003')).toBe(true)
+  })
+
+  it('treats other T00xx payments as one-off', () => {
+    for (const code of ['T0000', 'T0001', 'T0006', 'T0007']) {
+      expect(mapPayPalRecurring(code)).toBe(false)
+    }
+  })
+
+  it('returns null for non-payment codes, including T0200 currency conversion', () => {
+    for (const code of ['T0200', 'T0400', 'T1106', 'T1201']) {
+      expect(mapPayPalRecurring(code)).toBeNull()
+    }
+  })
+
+  it('returns null when the event code is missing', () => {
+    expect(mapPayPalRecurring(undefined)).toBeNull()
+  })
+})
+
 describe('extractAttribution', () => {
   it('returns item_name from first cart item', () => {
     const cartInfo = {
@@ -429,7 +453,25 @@ describe('transformPayPalTransaction', () => {
     expect(result.status).toBe('succeeded')
     expect(result.payment_method).toBe('bank_transfer')
     expect(result.description).toBe('Monthly Donation')
+    expect(result.is_recurring).toBe(false)
     expect(result.run_id).toBe(runId)
+  })
+
+  it('marks a subscription payment as recurring', () => {
+    const base = createBaseTx()
+    const result = transformPayPalTransaction(
+      {
+        ...base,
+        transaction_info: {
+          ...base.transaction_info,
+          transaction_event_code: 'T0002',
+        },
+      },
+      runId,
+    )
+
+    expect(result.is_recurring).toBe(true)
+    expect(result.source_metadata.transaction_event_code).toBe('T0002')
   })
 
   it('extracts donor address correctly', () => {

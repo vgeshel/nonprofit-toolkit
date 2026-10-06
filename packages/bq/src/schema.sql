@@ -72,6 +72,9 @@ CREATE TABLE IF NOT EXISTS donations_raw.stg_events (
   description STRING,
   attribution STRING,
   attribution_human STRING,
+  -- true = recurring gift, false = known one-off, NULL = source has no signal.
+  -- Derived from source_metadata, which keeps the raw value.
+  is_recurring BOOL,
   source_metadata JSON NOT NULL,
   _loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 )
@@ -99,6 +102,9 @@ CREATE TABLE IF NOT EXISTS donations.events (
   description STRING,
   attribution STRING,
   attribution_human STRING,
+  -- true = recurring gift, false = known one-off, NULL = source has no signal.
+  -- Derived from source_metadata, which keeps the raw value.
+  is_recurring BOOL,
   source_metadata JSON NOT NULL,
   _inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
   _updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()

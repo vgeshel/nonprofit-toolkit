@@ -72,18 +72,19 @@ WHEN MATCHED THEN UPDATE SET
   description = source.description,
   attribution = source.attribution,
   attribution_human = source.attribution_human,
+  is_recurring = source.is_recurring,
   source_metadata = source.source_metadata,
   _updated_at = CURRENT_TIMESTAMP()
 WHEN NOT MATCHED THEN INSERT (
   source, external_id, event_ts, created_at, ingested_at,
   amount_cents, fee_cents, net_amount_cents, currency,
   donor_name, payer_name, donor_email, donor_phone, donor_address,
-  status, payment_method, description, attribution, attribution_human, source_metadata
+  status, payment_method, description, attribution, attribution_human, is_recurring, source_metadata
 ) VALUES (
   source.source, source.external_id, source.event_ts, source.created_at, source.ingested_at,
   source.amount_cents, source.fee_cents, source.net_amount_cents, source.currency,
   source.donor_name, source.payer_name, source.donor_email, source.donor_phone, source.donor_address,
-  source.status, source.payment_method, source.description, source.attribution, source.attribution_human, source.source_metadata
+  source.status, source.payment_method, source.description, source.attribution, source.attribution_human, source.is_recurring, source.source_metadata
 )`.trim()
 }
 

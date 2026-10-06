@@ -305,6 +305,7 @@ describe('transformVenmoRow', () => {
     if (result.isOk()) {
       const event = result.value
       expect(event.source).toBe('venmo')
+      expect(event.is_recurring).toBeNull()
       expect(event.external_id).toBe('4235629069058725679')
       expect(event.event_ts).toBe('2025-01-01T01:18:52.000Z')
       expect(event.amount_cents).toBe(100000)

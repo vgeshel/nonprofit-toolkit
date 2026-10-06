@@ -104,6 +104,8 @@ describe('GivebutterTransactionSchema', () => {
     donated: 100.0,
     payout: 96.5,
     currency: 'USD',
+    is_recurring: false,
+    plan_id: null,
     transacted_at: '2024-01-15T10:30:00Z',
     created_at: '2024-01-15T10:30:00Z',
   })
@@ -189,6 +191,38 @@ describe('GivebutterTransactionSchema', () => {
     expect(() =>
       GivebutterTransactionSchema.parse(incompleteTransaction),
     ).toThrow()
+  })
+
+  it('keeps is_recurring and plan_id for a recurring plan charge', () => {
+    const result = GivebutterTransactionSchema.parse({
+      ...createValidTransaction(),
+      is_recurring: true,
+      plan_id: 'plan_abc123',
+    })
+    expect(result.is_recurring).toBe(true)
+    expect(result.plan_id).toBe('plan_abc123')
+  })
+
+  it('keeps is_recurring false and a null plan_id for a one-off gift', () => {
+    const result = GivebutterTransactionSchema.parse(createValidTransaction())
+    expect(result.is_recurring).toBe(false)
+    expect(result.plan_id).toBeNull()
+  })
+
+  it('rejects a transaction without is_recurring', () => {
+    const tx: Record<string, unknown> = createValidTransaction()
+    delete tx.is_recurring
+    const result = GivebutterTransactionSchema.safeParse(tx)
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0]?.path).toEqual(['is_recurring'])
+  })
+
+  it('rejects a transaction without plan_id', () => {
+    const tx: Record<string, unknown> = createValidTransaction()
+    delete tx.plan_id
+    const result = GivebutterTransactionSchema.safeParse(tx)
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0]?.path).toEqual(['plan_id'])
   })
 
   it('accepts unknown status values for resilience', () => {
@@ -305,6 +339,8 @@ describe('GivebutterTransactionResponseSchema', () => {
           donated: 50.0,
           payout: 48.5,
           currency: 'USD',
+          is_recurring: false,
+          plan_id: null,
           transacted_at: '2024-01-15T10:30:00Z',
           created_at: '2024-01-15T10:30:00Z',
         },
@@ -367,6 +403,8 @@ describe('GivebutterTransactionResponseSchema', () => {
           donated: 1000.0,
           payout: 999.2,
           currency: 'USD',
+          is_recurring: true,
+          plan_id: 'plan_final',
           transacted_at: '2024-01-20T15:00:00Z',
           created_at: '2024-01-20T15:00:00Z',
         },

@@ -145,6 +145,7 @@ export function transformGivebutterTransaction(
     attribution: tx.campaign_code ?? null,
     // Attribution human: campaign_code is also the human-readable campaign name
     attribution_human: tx.campaign_code ?? null,
+    is_recurring: tx.is_recurring,
     run_id: runId,
     source_metadata: {
       number: tx.number,
@@ -154,6 +155,8 @@ export function transformGivebutterTransaction(
       fee_covered: tx.fee_covered,
       donated: tx.donated,
       payout: tx.payout,
+      is_recurring: tx.is_recurring,
+      plan_id: tx.plan_id,
     },
   }
 }

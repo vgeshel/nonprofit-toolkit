@@ -264,6 +264,8 @@ describe('transformCheckDepositRow', () => {
     const result = transformCheckDepositRow(baseRow, runId)
 
     expect(result.source).toBe('check_deposits')
+
+    expect(result.is_recurring).toBeNull()
     expect(result.external_id).toMatch(/^check_/)
     expect(result.amount_cents).toBe(200000)
     expect(result.fee_cents).toBe(0)

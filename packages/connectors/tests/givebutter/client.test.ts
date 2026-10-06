@@ -74,6 +74,8 @@ describe('GivebutterClient', () => {
           donated: 50.0,
           payout: 48.5,
           currency: 'USD',
+          is_recurring: false,
+          plan_id: null,
           transacted_at: '2024-01-15T10:30:00Z',
           created_at: '2024-01-15T10:30:00Z',
         },

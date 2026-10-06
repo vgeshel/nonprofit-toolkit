@@ -132,18 +132,27 @@ export function mapPayPalPaymentMethod(
     if (eventCode === 'T0007') return 'bank_transfer'
     return 'paypal'
   }
-  /* istanbul ignore next -- @preserve uncommon event code prefixes */
-  if (eventCode.startsWith('T01')) return 'paypal' // Mass payments
-  /* istanbul ignore next -- @preserve uncommon event code prefixes */
-  if (eventCode.startsWith('T02')) return 'paypal' // Subscription payments
-  /* istanbul ignore next -- @preserve uncommon event code prefixes */
-  if (eventCode.startsWith('T03')) return 'paypal' // Pre-approved payments
-  /* istanbul ignore next -- @preserve uncommon event code prefixes */
-  if (eventCode.startsWith('T04')) return 'paypal' // eBay auction payments
   if (eventCode.startsWith('T05')) return 'debit_card' // Debit card payments
   if (eventCode.startsWith('T06')) return 'credit_card' // Credit card payments
 
   return 'paypal'
+}
+
+/**
+ * Derive is_recurring from the PayPal transaction event code.
+ *
+ * Per PayPal's T-code reference, T0002 is a subscription payment and T0003 a
+ * preapproved payment for a recurring bill; every other T00xx code is a
+ * payment with no recurring arrangement. Codes outside T00xx are not payments
+ * at all (T02xx is currency conversion, T11xx reversals), so they carry no
+ * signal. https://developer.paypal.com/docs/reports/reference/tcodes/
+ */
+export function mapPayPalRecurring(
+  eventCode: string | undefined,
+): boolean | null {
+  if (eventCode === 'T0002' || eventCode === 'T0003') return true
+  if (eventCode?.startsWith('T00')) return false
+  return null
 }
 
 /**
@@ -234,6 +243,7 @@ export function transformPayPalTransaction(
     // Attribution from cart item details
     attribution: extractAttribution(tx.cart_info),
     attribution_human: extractAttributionHuman(tx.cart_info),
+    is_recurring: mapPayPalRecurring(info.transaction_event_code),
     source_metadata: {
       paypal_account_id: info.paypal_account_id,
       payer_account_id: payerInfo?.account_id,

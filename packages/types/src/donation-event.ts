@@ -97,6 +97,10 @@ export const DonationEventSchema = z.object({
   description: z.string().nullable(),
   attribution: z.string().nullable(),
   attribution_human: z.string().nullable(),
+  // true = part of a recurring gift (subscription, monthly plan), false = the
+  // source says it is a one-off, null = the source carries no signal. Required
+  // so every connector states which of the three it is.
+  is_recurring: z.boolean().nullable(),
 
   // === Source-Specific Data ===
   source_metadata: z.record(z.string(), z.unknown()),
