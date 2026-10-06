@@ -73,7 +73,11 @@ const EnsureMonitoringOptionsSchema = z.object({
   serviceUrl: z.string().url(),
   schedule: z.string().default('*/10 * * * *'),
   timeZone: z.string().default('Etc/UTC'),
-  notificationChannels: z.array(z.string()).default([]),
+  // Slack channel name for alerts (e.g. #alerts); empty means none.
+  slackChannel: z
+    .string()
+    .optional()
+    .transform((value) => (value === '' ? undefined : value)),
 })
 
 const SmokeOptionsSchema = z.object({
@@ -307,7 +311,9 @@ function serviceHealthUrl(serviceUrl: string): string {
 }
 
 export async function ensureSlackMonitoring(
-  options: Omit<EnsureMonitoringOptions, 'command'>,
+  options: Omit<EnsureMonitoringOptions, 'command' | 'slackChannel'> & {
+    notificationChannels: string[]
+  },
   deps: {
     run: CommandRunner
     writeFile: (policy: unknown) => Promise<string>
@@ -493,8 +499,8 @@ export function parseArgs(args: string[]): CliOptions {
     )
     .option('--time-zone <tz>', 'Cloud Scheduler time zone', 'Etc/UTC')
     .option(
-      '--notification-channel <channel...>',
-      'Monitoring notification channel',
+      '--slack-channel <name>',
+      'Slack channel connected to Cloud Monitoring, e.g. #alerts',
     )
     .action((options: Record<string, unknown>) => {
       parsed = EnsureMonitoringOptionsSchema.parse({
@@ -505,7 +511,7 @@ export function parseArgs(args: string[]): CliOptions {
         serviceUrl: options.serviceUrl,
         schedule: options.schedule,
         timeZone: options.timeZone,
-        notificationChannels: options.notificationChannel ?? [],
+        slackChannel: options.slackChannel,
       })
     })
 

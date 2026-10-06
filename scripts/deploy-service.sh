@@ -478,15 +478,8 @@ MANIFEST_EOF
       --service-url "${SERVICE_URL}"
       --schedule "${SLACK_HEALTH_CHECK_SCHEDULE:-*/10 * * * *}"
       --time-zone "${SLACK_HEALTH_CHECK_TIME_ZONE:-Etc/UTC}"
+      --slack-channel "${ALERT_SLACK_CHANNEL:-}"
     )
-
-    if [[ -n "${SLACK_MONITORING_NOTIFICATION_CHANNEL:-}" ]]; then
-      MONITORING_ARGS+=(--notification-channel)
-      IFS=',' read -r -a CHANNELS <<< "${SLACK_MONITORING_NOTIFICATION_CHANNEL}"
-      for CHANNEL in "${CHANNELS[@]}"; do
-        MONITORING_ARGS+=("${CHANNEL}")
-      done
-    fi
 
     bun scripts/slack-token-ops.ts "${MONITORING_ARGS[@]}"
   fi

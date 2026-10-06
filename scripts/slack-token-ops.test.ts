@@ -150,7 +150,7 @@ describe('promoteSlackBotToken', () => {
 
     const result = await promoteSlackBotToken(
       {
-        projectId: 'leleka-data-373104',
+        projectId: 'example-project',
         secretName: 'SLACK_BOT_TOKEN',
         token: 'xoxb-valid-token',
         disablePreviousLatest: true,
@@ -176,7 +176,7 @@ describe('promoteSlackBotToken', () => {
       'versions',
       'list',
       'SLACK_BOT_TOKEN',
-      '--project=leleka-data-373104',
+      '--project=example-project',
       '--filter=state=enabled',
       '--sort-by=~createTime',
       '--limit=1',
@@ -190,7 +190,7 @@ describe('promoteSlackBotToken', () => {
         'versions',
         'add',
         'SLACK_BOT_TOKEN',
-        '--project=leleka-data-373104',
+        '--project=example-project',
         '--data-file=-',
       ],
       { input: 'xoxb-valid-token' },
@@ -201,7 +201,7 @@ describe('promoteSlackBotToken', () => {
       'disable',
       '7',
       '--secret=SLACK_BOT_TOKEN',
-      '--project=leleka-data-373104',
+      '--project=example-project',
       '--quiet',
     ])
   })
@@ -221,7 +221,7 @@ describe('promoteSlackBotToken', () => {
 
     const result = await promoteSlackBotToken(
       {
-        projectId: 'leleka-data-373104',
+        projectId: 'example-project',
         secretName: 'SLACK_BOT_TOKEN',
         token: 'xoxb-bad-token',
         disablePreviousLatest: true,
@@ -252,7 +252,7 @@ describe('promoteSlackBotToken', () => {
 
     const result = await promoteSlackBotToken(
       {
-        projectId: 'leleka-data-373104',
+        projectId: 'example-project',
         secretName: 'SLACK_BOT_TOKEN',
         token: 'xoxb-valid-token',
         disablePreviousLatest: false,
@@ -291,7 +291,7 @@ describe('promoteSlackBotToken', () => {
 
     const result = await promoteSlackBotToken(
       {
-        projectId: 'leleka-data-373104',
+        projectId: 'example-project',
         secretName: 'SLACK_BOT_TOKEN',
         token: 'xoxb-valid-token',
         disablePreviousLatest: true,
@@ -330,7 +330,7 @@ describe('promoteSlackBotToken', () => {
 
     const result = await promoteSlackBotToken(
       {
-        projectId: 'leleka-data-373104',
+        projectId: 'example-project',
         secretName: 'SLACK_BOT_TOKEN',
         token: 'xoxb-valid-token',
         disablePreviousLatest: true,
@@ -364,7 +364,7 @@ describe('promoteSlackBotToken', () => {
     await expect(
       promoteSlackBotToken(
         {
-          projectId: 'leleka-data-373104',
+          projectId: 'example-project',
           secretName: 'SLACK_BOT_TOKEN',
           token: 'xoxb-valid-token',
           disablePreviousLatest: false,
@@ -391,7 +391,7 @@ describe('promoteSlackBotToken', () => {
     await expect(
       promoteSlackBotToken(
         {
-          projectId: 'leleka-data-373104',
+          projectId: 'example-project',
           secretName: 'SLACK_BOT_TOKEN',
           token: 'xoxb-valid-token',
           disablePreviousLatest: false,
@@ -424,7 +424,7 @@ describe('promoteSlackBotToken', () => {
     await expect(
       promoteSlackBotToken(
         {
-          projectId: 'leleka-data-373104',
+          projectId: 'example-project',
           secretName: 'SLACK_BOT_TOKEN',
           token: 'xoxb-valid-token',
           disablePreviousLatest: true,
@@ -457,7 +457,7 @@ describe('promoteSlackBotToken', () => {
     await expect(
       promoteSlackBotToken(
         {
-          projectId: 'leleka-data-373104',
+          projectId: 'example-project',
           secretName: 'SLACK_BOT_TOKEN',
           token: 'xoxb-valid-token',
           disablePreviousLatest: true,
@@ -530,7 +530,7 @@ describe('monitoring helpers', () => {
 
     await ensureSlackMonitoring(
       {
-        projectId: 'leleka-data-373104',
+        projectId: 'example-project',
         region: 'us-central1',
         serviceName: 'letter-service',
         serviceUrl: 'https://letter-service.example.com',
@@ -542,16 +542,16 @@ describe('monitoring helpers', () => {
     )
 
     expect(commands).toContain(
-      'gcloud services enable monitoring.googleapis.com logging.googleapis.com cloudscheduler.googleapis.com --project=leleka-data-373104',
+      'gcloud services enable monitoring.googleapis.com logging.googleapis.com cloudscheduler.googleapis.com --project=example-project',
     )
     expect(commands).toContain(
-      'gcloud logging metrics create letter_service_slack_invalid_auth --project=leleka-data-373104 --description=Slack authorization failures for letter-service --log-filter=resource.type="cloud_run_revision" AND resource.labels.service_name="letter-service" AND ("slack_bolt_authorization_error" OR "invalid_auth")',
+      'gcloud logging metrics create letter_service_slack_invalid_auth --project=example-project --description=Slack authorization failures for letter-service --log-filter=resource.type="cloud_run_revision" AND resource.labels.service_name="letter-service" AND ("slack_bolt_authorization_error" OR "invalid_auth")',
     )
     expect(commands).toContain(
-      'gcloud monitoring policies create --project=leleka-data-373104 --policy-from-file=/tmp/policy.json',
+      'gcloud monitoring policies create --project=example-project --policy-from-file=/tmp/policy.json',
     )
     expect(commands).toContain(
-      'gcloud scheduler jobs create http letter-service-slack-health --project=leleka-data-373104 --location=us-central1 --schedule=*/10 * * * * --time-zone=Etc/UTC --uri=https://letter-service.example.com/health/slack --http-method=GET --attempt-deadline=30s',
+      'gcloud scheduler jobs create http letter-service-slack-health --project=example-project --location=us-central1 --schedule=*/10 * * * * --time-zone=Etc/UTC --uri=https://letter-service.example.com/health/slack --http-method=GET --attempt-deadline=30s',
     )
     expect(writeFile).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -582,7 +582,7 @@ describe('monitoring helpers', () => {
 
     await ensureSlackMonitoring(
       {
-        projectId: 'leleka-data-373104',
+        projectId: 'example-project',
         region: 'us-central1',
         serviceName: 'letter-service',
         serviceUrl: 'https://letter-service.example.com/',
@@ -594,13 +594,13 @@ describe('monitoring helpers', () => {
     )
 
     expect(commands).toContain(
-      'gcloud logging metrics update letter_service_slack_invalid_auth --project=leleka-data-373104 --description=Slack authorization failures for letter-service --log-filter=resource.type="cloud_run_revision" AND resource.labels.service_name="letter-service" AND ("slack_bolt_authorization_error" OR "invalid_auth")',
+      'gcloud logging metrics update letter_service_slack_invalid_auth --project=example-project --description=Slack authorization failures for letter-service --log-filter=resource.type="cloud_run_revision" AND resource.labels.service_name="letter-service" AND ("slack_bolt_authorization_error" OR "invalid_auth")',
     )
     expect(commands).toContain(
-      'gcloud monitoring policies update projects/p/alertPolicies/abc --project=leleka-data-373104 --policy-from-file=/tmp/policy.json',
+      'gcloud monitoring policies update projects/p/alertPolicies/abc --project=example-project --policy-from-file=/tmp/policy.json',
     )
     expect(commands).toContain(
-      'gcloud scheduler jobs update http letter-service-slack-health --project=leleka-data-373104 --location=us-central1 --schedule=*/5 * * * * --time-zone=America/Los_Angeles --uri=https://letter-service.example.com/health/slack --http-method=GET --attempt-deadline=30s',
+      'gcloud scheduler jobs update http letter-service-slack-health --project=example-project --location=us-central1 --schedule=*/5 * * * * --time-zone=America/Los_Angeles --uri=https://letter-service.example.com/health/slack --http-method=GET --attempt-deadline=30s',
     )
   })
 })
@@ -686,14 +686,14 @@ describe('parseArgs', () => {
       parseArgs([
         'promote',
         '--project',
-        'leleka-data-373104',
+        'example-project',
         '--token-env',
         'SLACK_BOT_TOKEN',
         '--disable-previous-latest',
       ]),
     ).toEqual({
       command: 'promote',
-      projectId: 'leleka-data-373104',
+      projectId: 'example-project',
       secretName: 'SLACK_BOT_TOKEN',
       tokenEnv: 'SLACK_BOT_TOKEN',
       disablePreviousLatest: true,
@@ -704,7 +704,7 @@ describe('parseArgs', () => {
       parseArgs([
         'ensure-monitoring',
         '--project',
-        'leleka-data-373104',
+        'example-project',
         '--region',
         'us-central1',
         '--service-url',
@@ -712,14 +712,42 @@ describe('parseArgs', () => {
       ]),
     ).toEqual({
       command: 'ensure-monitoring',
-      projectId: 'leleka-data-373104',
+      projectId: 'example-project',
       region: 'us-central1',
       serviceName: 'letter-service',
       serviceUrl: 'https://letter-service.example.com',
       schedule: '*/10 * * * *',
       timeZone: 'Etc/UTC',
-      notificationChannels: [],
+      slackChannel: undefined,
     })
+
+    expect(
+      parseArgs([
+        'ensure-monitoring',
+        '--project',
+        'example-project',
+        '--region',
+        'us-central1',
+        '--service-url',
+        'https://letter-service.example.com',
+        '--slack-channel',
+        '#alerts',
+      ]),
+    ).toMatchObject({ command: 'ensure-monitoring', slackChannel: '#alerts' })
+
+    expect(
+      parseArgs([
+        'ensure-monitoring',
+        '--project',
+        'example-project',
+        '--region',
+        'us-central1',
+        '--service-url',
+        'https://letter-service.example.com',
+        '--slack-channel',
+        '',
+      ]),
+    ).toMatchObject({ command: 'ensure-monitoring', slackChannel: undefined })
 
     expect(
       parseArgs([
