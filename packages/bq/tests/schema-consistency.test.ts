@@ -134,6 +134,21 @@ describe('migration 004', () => {
   })
 })
 
+describe('migration 005', () => {
+  const migration = readFileSync(
+    join(srcDir, 'migrations', '005_donor_report_view.sql'),
+    'utf8',
+  )
+
+  it('recreates the donor report view idempotently from canonical events', () => {
+    expect(migration).toContain(
+      'CREATE OR REPLACE VIEW donations.donor_report AS',
+    )
+    expect(migration).toContain('FROM donations.events e')
+    expect(migration).toContain("WHERE status = 'succeeded'")
+  })
+})
+
 describe('generateMergeSql column coverage', () => {
   it('updates every data column except the MERGE key', () => {
     const assignments = splitList(

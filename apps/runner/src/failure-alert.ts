@@ -7,7 +7,7 @@
  * silent.
  */
 import { WebClient } from '@slack/web-api'
-import { ResultAsync, okAsync } from 'neverthrow'
+import { ResultAsync, errAsync, okAsync } from 'neverthrow'
 import type { Logger } from 'pino'
 import { z } from 'zod'
 import type { Config } from './config'
@@ -123,10 +123,12 @@ export function formatFailureAlert(
 }
 
 /**
- * Post a failure alert to the report channel.
+ * Post a failure alert to ALERT_SLACK_CHANNEL, falling back to
+ * REPORT_SLACK_CHANNEL if Slack rejects the post (e.g. the bot was never
+ * invited to the alert channel), so an alert is not lost to a config slip.
  *
  * Returns 'skipped' when Slack is not configured, so deployments without a
- * report channel behave exactly as before.
+ * channel behave exactly as before.
  */
 export function sendFailureAlert(
   config: Config,
@@ -136,10 +138,16 @@ export function sendFailureAlert(
   deps?: FailureAlertDeps,
 ): ResultAsync<'sent' | 'skipped', FailureAlertError> {
   const token = config.SLACK_BOT_TOKEN
-  const channel = config.REPORT_SLACK_CHANNEL
-  if (!token || !channel) {
+  const channels = [
+    ...new Set(
+      [config.ALERT_SLACK_CHANNEL, config.REPORT_SLACK_CHANNEL].filter(
+        (channel): channel is string => !!channel,
+      ),
+    ),
+  ]
+  if (!token || channels.length === 0) {
     logger.warn(
-      'SLACK_BOT_TOKEN or REPORT_SLACK_CHANNEL not set; skipping failure alert',
+      'SLACK_BOT_TOKEN or a Slack channel (ALERT_SLACK_CHANNEL / REPORT_SLACK_CHANNEL) not set; skipping failure alert',
     )
     return okAsync('skipped')
   }
@@ -147,11 +155,28 @@ export function sendFailureAlert(
   const slackClient = deps?.slackClient ?? new WebClient(token)
   const text = formatFailureAlert(job, error, config)
 
-  return ResultAsync.fromPromise(
-    slackClient.chat.postMessage({ channel, text }),
-    (cause): FailureAlertError => ({
-      type: 'slack',
-      message: `Failed to post failure alert to Slack: ${cause instanceof Error ? cause.message : String(cause)}`,
-    }),
-  ).map(() => 'sent' as const)
+  const attempt = (
+    index: number,
+    failures: string[],
+  ): ResultAsync<'sent', FailureAlertError> => {
+    const channel = channels[index]
+    if (channel === undefined) {
+      return errAsync({
+        type: 'slack',
+        message: `Failed to post failure alert to Slack: ${failures.join('; ')}`,
+      })
+    }
+    return ResultAsync.fromPromise(
+      slackClient.chat.postMessage({ channel, text }),
+      (cause) =>
+        `${channel}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    )
+      .map(() => 'sent' as const)
+      .orElse((failure) => {
+        logger.warn({ channel, failure }, 'Failure alert post rejected')
+        return attempt(index + 1, [...failures, failure])
+      })
+  }
+
+  return attempt(0, [])
 }

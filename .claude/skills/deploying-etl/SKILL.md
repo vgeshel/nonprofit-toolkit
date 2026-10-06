@@ -70,6 +70,6 @@ The script reads from `.env`:
 | ------------ | -------- | --------------- | ---------------------------- |
 | `PROJECT_ID` | Yes      | -               | GCP project ID               |
 | `REGION`     | No       | `us-central1`   | GCP region                   |
-| `AR_REPO`    | No       | `donations-etl` | Artifact Registry repository |
+| `AR_REPO`    | No       | `donations`     | Artifact Registry repository |
 | `IMAGE_NAME` | No       | `etl`           | Docker image name            |
 | `JOB_NAME`   | No       | `donations-etl` | Cloud Run Job name           |
