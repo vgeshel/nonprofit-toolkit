@@ -19,9 +19,9 @@
  * hood, so an IAM regression on either backend would surface here.
  *
  * Run with: bun scripts/smoke-test-compliance-mcp.ts \
- *   --base-url https://mcp-server-u5atmmvqqq-uc.a.run.app \
- *   --project leleka-data-373104 \
- *   --user-email vadim@leleka.care
+ *   --base-url https://your-mcp-server.example.com \
+ *   --project your-gcp-project \
+ *   --user-email you@your-org.example
  */
 import { Command } from 'commander'
 import { z } from 'zod'

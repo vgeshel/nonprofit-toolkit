@@ -84,17 +84,17 @@ function buildReport(
       fiscal_year_end_month: 12,
       fiscal_year_end_day: 31,
       formation_date: '2014-12-14',
-      mailing_address_line1: '380 Hamilton Ave',
-      mailing_address_line2: 'Unit 291',
-      mailing_address_city: 'Palo Alto',
+      mailing_address_line1: '100 Example St',
+      mailing_address_line2: 'Suite 100',
+      mailing_address_city: 'Springfield',
       mailing_address_region: 'CA',
-      mailing_address_postal_code: '94302-2405',
+      mailing_address_postal_code: '90000-0001',
       mailing_address_country: 'US',
       updated_at: '2026-05-01T00:00:00Z',
     },
     identifiers: {
-      'us-federal': { ein: '47-2377309' },
-      'us-ca': { sosEntityNumber: '6423690', agCharityNumber: 'CT0292660' },
+      'us-federal': { ein: '12-3456789' },
+      'us-ca': { sosEntityNumber: '1234567', agCharityNumber: 'CT0123456' },
     },
     sources: SOURCES,
     latestRuns: [],
@@ -115,7 +115,7 @@ describe('renderComplianceStatusMarkdown — structure', () => {
     const out = renderComplianceStatusMarkdown(buildReport())
     expect(out).toContain('## Entity')
     expect(out).toContain(
-      '380 Hamilton Ave, Unit 291, Palo Alto, CA, 94302-2405',
+      '100 Example St, Suite 100, Springfield, CA, 90000-0001',
     )
   })
 
@@ -128,7 +128,7 @@ describe('renderComplianceStatusMarkdown — structure', () => {
         },
       }),
     )
-    expect(out).toContain('380 Hamilton Ave, Palo Alto, CA, 94302-2405')
+    expect(out).toContain('100 Example St, Springfield, CA, 90000-0001')
     expect(out).not.toContain('null')
   })
 
@@ -175,7 +175,7 @@ describe('renderComplianceStatusMarkdown — per-source rows', () => {
                 'https://rct.doj.ca.gov/Verification/Web/Details.aspx?result=abc',
               renewalDueDate: '5/15/2026',
               registryStatus: 'Current',
-              stateCharityRegistrationNumber: 'CT0292660',
+              stateCharityRegistrationNumber: 'CT0123456',
             },
             job_id: null,
           },
@@ -189,7 +189,7 @@ describe('renderComplianceStatusMarkdown — per-source rows', () => {
     expect(out).not.toContain('result=abc')
     // The RCT number is surfaced in the row summary so the user can
     // paste it into the search.
-    expect(out).toContain('CT0292660')
+    expect(out).toContain('CT0123456')
   })
 
   it('falls back to the source accessUrl when payload has no detailUrl', () => {
@@ -671,8 +671,8 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
                 deductibility: 'Contributions are deductible',
               },
               row: {
-                revenueAmount: '2907823',
-                assetAmount: '958949',
+                revenueAmount: '1500000',
+                assetAmount: '250000',
                 taxPeriod: '202412',
               },
             },
@@ -686,8 +686,8 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
     expect(out).toContain('Public charity')
     expect(out).toContain('Contributions are deductible')
     expect(out).toContain('Tax period 2024-12')
-    expect(out).toContain('revenue $2,907,823')
-    expect(out).toContain('assets $958,949')
+    expect(out).toContain('revenue $1,500,000')
+    expect(out).toContain('assets $250,000')
   })
 
   it('summarises irs-eo-bmf with revenue but missing assets', () => {
@@ -935,7 +935,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
               standing: 'Good Standing',
               entity_type: 'Nonprofit Corporation - Out of State',
               formed_in: 'DISTRICT OF COLUMBIA',
-              sos_entity_number: '6423690',
+              sos_entity_number: '1234567',
               initial_filing_date: '10/14/2024',
             },
             job_id: null,
@@ -947,7 +947,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
       'Active · Good Standing · Nonprofit Corporation - Out of State',
     )
     expect(out).toContain('formed in DISTRICT OF COLUMBIA')
-    expect(out).toContain('Entity #6423690')
+    expect(out).toContain('Entity #1234567')
     expect(out).toContain('initial filing 10/14/2024')
   })
 
@@ -1017,7 +1017,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
             error_message: null,
             payload: {
               registryStatus: 'Current',
-              stateCharityRegistrationNumber: 'CT0292660',
+              stateCharityRegistrationNumber: 'CT0123456',
               renewalDueDate: '5/15/2026',
               lastRenewal: '3/4/2026',
             },
@@ -1027,7 +1027,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
       }),
     )
     expect(out).toContain('Registry status: **Current**')
-    expect(out).toContain('CT0292660')
+    expect(out).toContain('CT0123456')
     expect(out).toContain('Next renewal: 5/15/2026')
     expect(out).toContain('Overdue by 6 days')
     expect(out).toContain('Last renewal filed: 3/4/2026')
@@ -1293,8 +1293,8 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
             error_message: null,
             payload: {
               account_type: 'Sellers Permit',
-              account_number: '202-822944',
-              owner_name: 'LELEKA FOUNDATION',
+              account_number: '100-000001',
+              owner_name: 'TEST FOUNDATION',
               start_date: '01-Sep-2023',
               is_valid: true,
             },
@@ -1303,8 +1303,8 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
         ],
       }),
     )
-    expect(out).toContain('**Valid** Sellers Permit #202-822944')
-    expect(out).toContain('Owner: LELEKA FOUNDATION')
+    expect(out).toContain('**Valid** Sellers Permit #100-000001')
+    expect(out).toContain('Owner: TEST FOUNDATION')
     expect(out).toContain('Start date: 01-Sep-2023')
   })
 
@@ -1324,7 +1324,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
             error_message: null,
             payload: {
               account_type: 'Sellers Permit',
-              owner_name: 'LELEKA FOUNDATION',
+              owner_name: 'TEST FOUNDATION',
             },
             job_id: null,
           },
@@ -1334,7 +1334,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
     // account_type present but account_number missing → no "Sellers
     // Permit #..." line. Owner line still renders.
     expect(out).not.toMatch(/Sellers Permit #/)
-    expect(out).toContain('Owner: LELEKA FOUNDATION')
+    expect(out).toContain('Owner: TEST FOUNDATION')
   })
 
   it('omits the "Valid" prefix when is_valid is false', () => {
@@ -1353,7 +1353,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
             error_message: null,
             payload: {
               account_type: 'Sellers Permit',
-              account_number: '202-822944',
+              account_number: '100-000001',
               owner_name: null,
               start_date: null,
               is_valid: false,
@@ -1363,7 +1363,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
         ],
       }),
     )
-    expect(out).toContain('Sellers Permit #202-822944')
+    expect(out).toContain('Sellers Permit #100-000001')
     expect(out).not.toContain('**Valid** Sellers Permit')
     expect(out).not.toContain('Owner:')
     expect(out).not.toContain('Start date:')
@@ -1456,7 +1456,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
             error_message: null,
             payload: {
               renewalDueDate: '5/15/2026',
-              stateCharityRegistrationNumber: 'CT0292660',
+              stateCharityRegistrationNumber: 'CT0123456',
             },
             job_id: null,
           },
@@ -1464,7 +1464,7 @@ describe('renderComplianceStatusMarkdown — per-source payload summaries', () =
       }),
     )
     expect(out).toContain('Overdue by 6 days')
-    expect(out).toContain('(RCT #CT0292660)')
+    expect(out).toContain('(RCT #CT0123456)')
   })
 
   it('action-item link omits the RCT # hint when the payload does not carry one', () => {

@@ -21,11 +21,9 @@ bun test:run         # Run tests once
 
 ## Pre-commit Hooks
 
-Pre-commit runs automatically via husky:
-
-- typecheck
-- lint
-- format
+Husky runs the checks in `.husky/pre-commit` on every commit. It is slow — it
+runs the full test suite with coverage — so run the relevant checks yourself as
+you go rather than discovering failures at commit time.
 
 ## Principles
 

@@ -36,6 +36,11 @@ OPTIONS (description = 'Per-source watermarks for incremental fetching');
 -- excludes disbursements after the source's coverage start date.
 CREATE TABLE IF NOT EXISTS donations_raw.source_coverage (
   source STRING NOT NULL,
+  -- Bank description prefix this source's disbursements arrive under, when it
+  -- differs from the source name. NULL means the bank uses the source name.
+  -- One row per alias: Benevity banks as both "AMER ONLINE GIV1" and
+  -- "THE UK ONLINE GIVING FOUNDATION".
+  description_pattern STRING,
   covers_from TIMESTAMP NOT NULL,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 )
@@ -67,6 +72,9 @@ CREATE TABLE IF NOT EXISTS donations_raw.stg_events (
   description STRING,
   attribution STRING,
   attribution_human STRING,
+  -- true = recurring gift, false = known one-off, NULL = source has no signal.
+  -- Derived from source_metadata, which keeps the raw value.
+  is_recurring BOOL,
   source_metadata JSON NOT NULL,
   _loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 )
@@ -94,6 +102,9 @@ CREATE TABLE IF NOT EXISTS donations.events (
   description STRING,
   attribution STRING,
   attribution_human STRING,
+  -- true = recurring gift, false = known one-off, NULL = source has no signal.
+  -- Derived from source_metadata, which keeps the raw value.
+  is_recurring BOOL,
   source_metadata JSON NOT NULL,
   _inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
   _updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()

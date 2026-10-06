@@ -14,6 +14,12 @@ import type { BigQueryConfig } from './types'
  *
  * Applies source-specific filtering:
  * - Mercury: Only external incoming donations (excludes internal transfers and debits)
+ *
+ * Disbursement deduplication matches a Mercury description against
+ * `source_coverage.description_pattern`, falling back to the source name. A
+ * platform does not necessarily reach the bank under its own name — Benevity
+ * disbursements arrive as "AMER ONLINE GIV1" or "THE UK ONLINE GIVING
+ * FOUNDATION" — so the alias has to be registered explicitly.
  */
 export function generateMergeSql(config: BigQueryConfig): string {
   const { datasetRaw, datasetCanon } = config
@@ -28,7 +34,7 @@ USING (
     LEFT JOIN \`${datasetRaw}.source_coverage\` AS sc
       ON stg.source = 'mercury'
       AND sc.source != 'mercury'
-      AND LOWER(stg.description) LIKE CONCAT(LOWER(sc.source), ';%')
+      AND LOWER(stg.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')
       AND stg.event_ts >= sc.covers_from
     WHERE stg.run_id = @run_id
       -- Mercury-specific filtering: only external incoming donations
@@ -66,18 +72,19 @@ WHEN MATCHED THEN UPDATE SET
   description = source.description,
   attribution = source.attribution,
   attribution_human = source.attribution_human,
+  is_recurring = source.is_recurring,
   source_metadata = source.source_metadata,
   _updated_at = CURRENT_TIMESTAMP()
 WHEN NOT MATCHED THEN INSERT (
   source, external_id, event_ts, created_at, ingested_at,
   amount_cents, fee_cents, net_amount_cents, currency,
   donor_name, payer_name, donor_email, donor_phone, donor_address,
-  status, payment_method, description, attribution, attribution_human, source_metadata
+  status, payment_method, description, attribution, attribution_human, is_recurring, source_metadata
 ) VALUES (
   source.source, source.external_id, source.event_ts, source.created_at, source.ingested_at,
   source.amount_cents, source.fee_cents, source.net_amount_cents, source.currency,
   source.donor_name, source.payer_name, source.donor_email, source.donor_phone, source.donor_address,
-  source.status, source.payment_method, source.description, source.attribution, source.attribution_human, source.source_metadata
+  source.status, source.payment_method, source.description, source.attribution, source.attribution_human, source.is_recurring, source.source_metadata
 )`.trim()
 }
 
@@ -152,6 +159,51 @@ SELECT run_id, mode, status, started_at, completed_at, from_ts, to_ts, metrics, 
 FROM \`${datasetRaw}.etl_runs\`
 WHERE run_id = @run_id
 LIMIT 1`.trim()
+}
+
+/**
+ * Generate SQL to remove canonical Mercury rows that a platform source now
+ * covers.
+ *
+ * The merge filter refuses to insert a bank lump sum once the platform's own
+ * donor-level data covers that period, but it only applies to rows arriving in
+ * staging. A row merged *before* its coverage existed — because the source was
+ * added later, or backfilled further back — stays in the canonical table and
+ * double-counts. This removes those, using the same condition as the filter so
+ * the two can never disagree.
+ */
+export function generateCountSupersededSql(config: BigQueryConfig): string {
+  const { datasetRaw, datasetCanon } = config
+
+  return `
+SELECT COUNT(*) AS n
+FROM \`${datasetCanon}.events\` AS e
+JOIN \`${datasetRaw}.source_coverage\` AS sc
+  ON LOWER(e.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')
+ AND e.event_ts >= sc.covers_from
+WHERE e.source = 'mercury'
+  AND sc.source != 'mercury'`.trim()
+}
+
+export function generateDeleteSupersededSql(config: BigQueryConfig): string {
+  const { datasetRaw, datasetCanon } = config
+
+  // BigQuery rejects EXISTS whose only predicates are non-equalities: it plans
+  // a LEFT SEMI JOIN and demands an equality between the two sides. Matching
+  // by external_id supplies that equality, and the inner join carries the
+  // description and date conditions.
+  return `
+DELETE FROM \`${datasetCanon}.events\`
+WHERE source = 'mercury'
+  AND external_id IN (
+    SELECT e.external_id
+    FROM \`${datasetCanon}.events\` AS e
+    JOIN \`${datasetRaw}.source_coverage\` AS sc
+      ON LOWER(e.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')
+     AND e.event_ts >= sc.covers_from
+    WHERE e.source = 'mercury'
+      AND sc.source != 'mercury'
+  )`.trim()
 }
 
 /**

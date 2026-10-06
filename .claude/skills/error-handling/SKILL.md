@@ -1,6 +1,13 @@
+---
+name: error-handling
+description: Use when writing or reviewing code that can fail — API calls, file I/O, external commands, parsing — or when deciding between throwing and returning a Result. Covers the neverthrow Result pattern used throughout this codebase, the shared error types in packages/types/src/result.ts, chaining with andThen/map, and where to unwrap. Triggers on "error handling", "Result type", "neverthrow", "should this throw", "how do I handle this failure".
+---
+
 # Error Handling with Result Types
 
 We use the `neverthrow` library for explicit error handling. This makes error paths visible to code coverage tools and forces us to handle all failure modes.
+
+Shared Result helpers and error types live in `packages/types/src/result.ts`.
 
 ## Why Result Types?
 
@@ -24,35 +31,34 @@ async function getUser(id: string): ResultAsync<User, ApiError> {
 
 ## Error Types
 
-All errors use discriminated union types defined in `actions/shared/result.ts`:
+Errors use discriminated union types so the `type` field narrows the payload:
 
 ```typescript
-type GitHubError = { type: 'github'; status?: number; message: string }
 type ValidationError = { type: 'validation'; field?: string; message: string }
-type SDKError = { type: 'sdk'; subtype?: string; message: string }
+type ApiError = { type: 'api'; status?: number; message: string }
 type FileSystemError = {
   type: 'filesystem'
   code?: string
   path?: string
   message: string
 }
-type GitError = { type: 'git'; command?: string; message: string }
 ```
+
+Check `packages/types/src/result.ts` for the types this codebase actually
+defines before adding a new one — reuse beats inventing a parallel error shape.
 
 ## Patterns
 
 ### Wrap external APIs at boundaries
 
 ```typescript
-export function getIssue(
-  octokit,
-  owner,
-  repo,
-  number,
-): ResultAsync<Issue, GitHubError> {
+export function fetchDonations(
+  client: Client,
+  since: DateTime,
+): ResultAsync<Donation[], ApiError> {
   return ResultAsync.fromPromise(
-    octokit.issues.get({ owner, repo, issue_number: number }),
-    toGitHubError,
+    client.listTransactions({ since: since.toISO() }),
+    toApiError,
   ).map((response) => response.data)
 }
 ```
@@ -60,30 +66,30 @@ export function getIssue(
 ### Chain operations with `.andThen()` and `.map()`
 
 ```typescript
-return getIssue(octokit, owner, repo, number)
-  .andThen((issue) => validateIssue(issue)) // Returns Result
-  .map((validIssue) => formatIssue(validIssue)) // Returns plain value
+return fetchDonations(client, since)
+  .andThen((donations) => validateDonations(donations)) // Returns Result
+  .map((valid) => normalizeDonations(valid)) // Returns plain value
 ```
 
 ### Unwrap at entry points
 
 ```typescript
 async function run(): Promise<void> {
-  const result = await runWorkflow({...})
+  const result = await runPipeline({...})
 
   if (result.isErr()) {
-    logger.error({ error: result.error }, 'Workflow failed')
-    core.setFailed(result.error.message)
+    logger.error({ error: result.error }, 'Pipeline failed')
+    process.exitCode = 1
     return
   }
 
-  core.setOutput('output', result.value)
+  logger.info({ count: result.value.length }, 'Pipeline complete')
 }
 ```
 
 ## Rules
 
 1. **No `throw` in production code** - Use `err()` or `errAsync()` instead
-2. **Entry points unwrap Results** - `actions/*/index.ts` files use `try/catch` for unexpected errors
+2. **Entry points unwrap Results** - top-level `main`/CLI entry points use `try/catch` for genuinely unexpected errors
 3. **Always handle errors** - The `neverthrow/must-use-result` ESLint rule enforces this
 4. **Test all error paths** - With Result types, coverage tools see error branches

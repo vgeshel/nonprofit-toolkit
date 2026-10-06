@@ -184,6 +184,9 @@ export function transformPatreonPledgeEvent(
     description: attrs.type ?? null,
     attribution: null,
     attribution_human: null,
+    // Patreon only bills memberships: every charge is part of a recurring
+    // pledge, and only subscription charges reach this point.
+    is_recurring: true,
     source_metadata: {
       pledge_event_type: attrs.type ?? null,
       payment_status: attrs.payment_status ?? null,

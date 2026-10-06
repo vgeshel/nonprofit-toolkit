@@ -79,10 +79,11 @@ class FakeLocator {
         ? `${prefix} ${this.selector}`
         : `${prefix} ${String(this.textFilter)}`,
     )
-    this.page.stage =
-      this.selector === 'button[title="Search for an Entity."]'
-        ? 'result'
-        : 'summary'
+    if (this.selector === 'button[title="Search for an Entity."]') {
+      this.page.submit()
+    } else {
+      this.page.stage = 'summary'
+    }
     return Promise.resolve()
   }
 
@@ -93,12 +94,13 @@ class FakeLocator {
 
   inputValue(): Promise<string> {
     this.page.actions.push(`inputValue ${this.selector}`)
-    return Promise.resolve('')
+    return Promise.resolve(this.page.filledValues.get(this.selector) ?? '')
   }
 }
 
 class FakePage {
   readonly actions: string[] = []
+  readonly filledValues = new Map<string, string>()
   stage: 'search' | 'result' | 'summary' = 'search'
 
   constructor(
@@ -109,7 +111,27 @@ class FakePage {
     readonly loadError: unknown = null,
     private staleResultReads = 0,
     private staleSummaryReads = 0,
+    private discardedSubmits = 0,
+    private readonly challengeNeverClears = false,
   ) {}
+
+  /**
+   * Mimics the FTB bot challenge swallowing a search submission: the challenge
+   * page renders an empty body, then the empty search form comes back.
+   */
+  submit(): void {
+    this.applySubmit()
+  }
+
+  private applySubmit(): void {
+    if (this.discardedSubmits > 0) {
+      this.discardedSubmits -= 1
+      this.filledValues.clear()
+      this.stage = 'search'
+      return
+    }
+    this.stage = 'result'
+  }
 
   setDefaultTimeout(timeoutMs: number): void {
     this.actions.push(`timeout ${String(timeoutMs)}`)
@@ -139,12 +161,13 @@ class FakePage {
 
   fill(selector: string, value: string): Promise<void> {
     this.actions.push(`fill ${selector}=${value}`)
+    this.filledValues.set(selector, value)
     return Promise.resolve()
   }
 
   click(selector: string): Promise<void> {
     this.actions.push(`click ${selector}`)
-    this.stage = 'result'
+    this.applySubmit()
     return Promise.resolve()
   }
 
@@ -169,6 +192,9 @@ class FakePage {
   }
 
   innerText(): string {
+    if (this.challengeNeverClears) {
+      return ''
+    }
     if (this.stage === 'summary') {
       if (this.staleSummaryReads > 0) {
         this.staleSummaryReads -= 1
@@ -478,6 +504,96 @@ describe('caFtbEntityStatusLetterSource.run', () => {
       ftb_status: 'ACTIVE',
       exempt_status_verified: 'NOT EXEMPT',
     })
+  })
+
+  it('resubmits the search when the FTB bot challenge discards the submission and returns the empty search form', async () => {
+    const page = new FakePage(
+      resultText(),
+      summaryText(),
+      true,
+      null,
+      null,
+      0,
+      0,
+      1,
+    )
+
+    const result = await caFtbEntityStatusLetterSource.run(
+      ENTITY,
+      contextWithPage(page),
+    )
+
+    expect(result.isOk()).toBe(true)
+    if (!result.isOk()) return
+    expect(
+      page.actions.filter((action) => action === 'fill #EntityId=6423690')
+        .length,
+    ).toBe(2)
+    expect(result.value.record.payload).toMatchObject({
+      matchStatus: 'found',
+      entity_id: '6423690',
+      ftb_status: 'ACTIVE',
+      exempt_status_verified: 'NOT EXEMPT',
+    })
+  })
+
+  it('returns a parse error when every search submission is discarded by the FTB bot challenge', async () => {
+    const page = new FakePage(
+      resultText(),
+      summaryText(),
+      true,
+      null,
+      null,
+      0,
+      0,
+      5,
+    )
+
+    const result = await caFtbEntityStatusLetterSource.run(
+      ENTITY,
+      contextWithPage(page),
+    )
+
+    expect(result.isErr()).toBe(true)
+    if (!result.isErr()) return
+    expect(result.error.type).toBe('parse')
+    expect(result.error.message).toContain('discarded')
+    expect(result.error.message).toContain('3')
+    expect(
+      page.actions.filter((action) => action === 'fill #EntityId=6423690')
+        .length,
+    ).toBe(3)
+  })
+
+  it('returns a parse error when the FTB bot challenge never clears and the page stays blank', async () => {
+    vi.useFakeTimers()
+    try {
+      const page = new FakePage(
+        resultText(),
+        summaryText(),
+        true,
+        null,
+        null,
+        0,
+        0,
+        0,
+        true,
+      )
+
+      const pending = caFtbEntityStatusLetterSource.run(
+        ENTITY,
+        contextWithPage(page),
+      )
+      await vi.advanceTimersByTimeAsync(60_000)
+      const result = await pending
+
+      expect(result.isErr()).toBe(true)
+      if (!result.isErr()) return
+      expect(result.error.type).toBe('parse')
+      expect(result.error.message).toContain('blank page')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('waits for FTB pages to finish replacing stale body text after clicks', async () => {

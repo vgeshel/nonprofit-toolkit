@@ -66,6 +66,34 @@ describe('fetchIPv4', () => {
     }
   })
 
+  it('verifies TLS against the original hostname, not the IP', async () => {
+    mockLookup.mockResolvedValueOnce({ address: '192.168.1.1', family: 4 })
+
+    await fetchIPv4('https://api.example11.com/path')
+
+    // Without serverName, Bun checks the certificate against the IP in the
+    // URL and fails with "unknown certificate verification error".
+    expect(fetch).toHaveBeenCalledWith(
+      'https://192.168.1.1/path',
+      expect.objectContaining({ tls: { serverName: 'api.example11.com' } }),
+    )
+  })
+
+  it('keeps caller TLS options while setting serverName', async () => {
+    mockLookup.mockResolvedValueOnce({ address: '192.168.1.1', family: 4 })
+
+    await fetchIPv4('https://api.example12.com/path', {
+      tls: { rejectUnauthorized: true },
+    })
+
+    expect(fetch).toHaveBeenCalledWith(
+      'https://192.168.1.1/path',
+      expect.objectContaining({
+        tls: { rejectUnauthorized: true, serverName: 'api.example12.com' },
+      }),
+    )
+  })
+
   it('preserves existing headers when adding Host header', async () => {
     mockLookup.mockResolvedValueOnce({ address: '10.0.0.1', family: 4 })
 

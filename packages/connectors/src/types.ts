@@ -131,6 +131,11 @@ export interface PatreonConfig {
   baseUrl?: string
 }
 
+export interface BenevityConfig {
+  /** Directory of per-disbursement Benevity Donations Report CSVs */
+  reportDirPath: string
+}
+
 export interface ConnectorConfigs {
   mercury?: MercuryConfig
   paypal?: PayPalConfig
@@ -140,6 +145,7 @@ export interface ConnectorConfigs {
   venmo?: VenmoConfig
   wise?: WiseConfig
   patreon?: PatreonConfig
+  benevity?: BenevityConfig
 }
 
 /**

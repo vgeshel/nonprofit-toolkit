@@ -65,6 +65,7 @@ const mockBqClient = {
   loadFromGcs: vi.fn<LoadFromGcsFn>(),
   merge: vi.fn<MergeFn>(),
   updateSourceCoverage: vi.fn<() => ResultAsync<void, BigQueryError>>(),
+  deleteSupersededEvents: vi.fn<() => ResultAsync<number, BigQueryError>>(),
   healthCheck: vi.fn<HealthCheckFn>(),
 }
 
@@ -76,6 +77,7 @@ const mockFunraiseConnector = { fetchAll: vi.fn<FetchAllFn>() }
 const mockVenmoConnector = { fetchAll: vi.fn<FetchAllFn>() }
 const mockWiseConnector = { fetchAll: vi.fn<FetchAllFn>() }
 const mockPatreonConnector = { fetchAll: vi.fn<FetchAllFn>() }
+const mockBenevityConnector = { fetchAll: vi.fn<FetchAllFn>() }
 
 // Mock dependencies with class-based implementations
 vi.mock('@donations-etl/connectors', () => ({
@@ -103,6 +105,9 @@ vi.mock('@donations-etl/connectors', () => ({
   PatreonConnector: class MockPatreonConnector {
     fetchAll = mockPatreonConnector.fetchAll
   },
+  BenevityConnector: class MockBenevityConnector {
+    fetchAll = mockBenevityConnector.fetchAll
+  },
 }))
 
 vi.mock('@donations-etl/bq', () => ({
@@ -115,6 +120,7 @@ vi.mock('@donations-etl/bq', () => ({
     loadFromGcs = mockBqClient.loadFromGcs
     merge = mockBqClient.merge
     updateSourceCoverage = mockBqClient.updateSourceCoverage
+    deleteSupersededEvents = mockBqClient.deleteSupersededEvents
     healthCheck = mockBqClient.healthCheck
   },
 }))
@@ -158,6 +164,7 @@ describe('Orchestrator', () => {
       okAsync({ rowsInserted: 10, rowsUpdated: 5 }),
     )
     mockBqClient.updateSourceCoverage.mockReturnValue(okAsync(undefined))
+    mockBqClient.deleteSupersededEvents.mockReturnValue(okAsync(0))
     mockBqClient.healthCheck.mockReturnValue(okAsync(undefined))
 
     mockMercuryConnector.fetchAll.mockReturnValue(okAsync([]))
@@ -297,6 +304,7 @@ describe('Orchestrator', () => {
           currency: 'USD',
           donor_name: 'John Doe',
           payer_name: null,
+          is_recurring: null,
           donor_email: 'john@example.com',
           donor_phone: null,
           donor_address: null,
@@ -391,6 +399,7 @@ describe('Orchestrator', () => {
           currency: 'USD',
           donor_name: 'Test Donor',
           payer_name: null,
+          is_recurring: null,
           donor_email: 'test@example.com',
           donor_phone: null,
           donor_address: null,
@@ -431,6 +440,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'John Doe',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'john@example.com',
             donor_phone: null,
             donor_address: null,
@@ -471,6 +481,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'John Doe',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'john@example.com',
             donor_phone: null,
             donor_address: null,
@@ -493,6 +504,85 @@ describe('Orchestrator', () => {
       expect(mockBqClient.updateSourceCoverage).toHaveBeenCalled()
     })
 
+    it('clears bank rows superseded by platform data after merge', async () => {
+      mockMercuryConnector.fetchAll.mockReturnValue(
+        okAsync([
+          {
+            source: 'mercury',
+            external_id: 'txn-cleanup',
+            event_ts: '2024-01-15T10:00:00Z',
+            created_at: '2024-01-15T10:00:00Z',
+            ingested_at: '2024-01-15T10:05:00Z',
+            amount_cents: 10000,
+            fee_cents: 0,
+            net_amount_cents: 10000,
+            currency: 'USD',
+            donor_name: 'John Doe',
+            payer_name: null,
+            is_recurring: null,
+            donor_email: 'john@example.com',
+            donor_phone: null,
+            donor_address: null,
+            status: 'succeeded',
+            payment_method: 'ach',
+            description: 'Test donation',
+            attribution: null,
+            attribution_human: null,
+            source_metadata: {},
+            run_id: '00000000-0000-0000-0000-000000000001',
+          },
+        ]),
+      )
+      mockBqClient.deleteSupersededEvents.mockReturnValue(okAsync(128))
+
+      const orchestrator = new Orchestrator(config, logger)
+      const result = await orchestrator.runDaily({ sources: ['mercury'] })
+
+      expect(result.isOk()).toBe(true)
+      expect(mockBqClient.deleteSupersededEvents).toHaveBeenCalled()
+    })
+
+    it('fails the run when the superseded cleanup fails', async () => {
+      mockMercuryConnector.fetchAll.mockReturnValue(
+        okAsync([
+          {
+            source: 'mercury',
+            external_id: 'txn-cleanup',
+            event_ts: '2024-01-15T10:00:00Z',
+            created_at: '2024-01-15T10:00:00Z',
+            ingested_at: '2024-01-15T10:05:00Z',
+            amount_cents: 10000,
+            fee_cents: 0,
+            net_amount_cents: 10000,
+            currency: 'USD',
+            donor_name: 'John Doe',
+            payer_name: null,
+            is_recurring: null,
+            donor_email: 'john@example.com',
+            donor_phone: null,
+            donor_address: null,
+            status: 'succeeded',
+            payment_method: 'ach',
+            description: 'Test donation',
+            attribution: null,
+            attribution_human: null,
+            source_metadata: {},
+            run_id: '00000000-0000-0000-0000-000000000001',
+          },
+        ]),
+      )
+      mockBqClient.deleteSupersededEvents.mockReturnValue(
+        errAsync({ type: 'query', message: 'cleanup failed' }),
+      )
+
+      const orchestrator = new Orchestrator(config, logger)
+      const result = await orchestrator.runDaily({ sources: ['mercury'] })
+
+      expect(result.isErr()).toBe(true)
+      expect(result._unsafeUnwrapErr().type).toBe('bigquery')
+      expect(result._unsafeUnwrapErr().message).toContain('cleanup failed')
+    })
+
     it('returns error when source coverage update fails', async () => {
       mockMercuryConnector.fetchAll.mockReturnValue(
         okAsync([
@@ -508,6 +598,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'John Doe',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'john@example.com',
             donor_phone: null,
             donor_address: null,
@@ -625,6 +716,7 @@ describe('Orchestrator', () => {
           currency: 'USD',
           donor_name: 'Load Test Donor',
           payer_name: null,
+          is_recurring: null,
           donor_email: 'load@example.com',
           donor_phone: null,
           donor_address: null,
@@ -668,6 +760,7 @@ describe('Orchestrator', () => {
           currency: 'USD',
           donor_name: 'Test Donor',
           payer_name: null,
+          is_recurring: null,
           donor_email: 'test@example.com',
           donor_phone: null,
           donor_address: null,
@@ -712,6 +805,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'Skip Merge Donor',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'skip@example.com',
             donor_phone: null,
             donor_address: null,
@@ -907,6 +1001,55 @@ describe('Orchestrator', () => {
         expect(mockVenmoConnector.fetchAll).toHaveBeenCalled()
       })
     })
+
+    describe('Benevity report support', () => {
+      it('adds Benevity connector when benevityDir is provided', async () => {
+        mockBenevityConnector.fetchAll.mockReset()
+        mockBqClient.getWatermark.mockReset()
+
+        mockBqClient.getWatermark.mockReturnValue(okAsync(null))
+        mockBenevityConnector.fetchAll.mockReturnValue(okAsync([]))
+
+        const configNoSources: Config = {
+          ...config,
+          MERCURY_API_KEY: undefined,
+          PAYPAL_CLIENT_ID: undefined,
+          PAYPAL_SECRET: undefined,
+        }
+
+        const orchestrator = new Orchestrator(configNoSources, logger)
+
+        const result = await orchestrator.runDaily({
+          benevityDir: '/path/to/benevity',
+        })
+
+        expect(result.isOk()).toBe(true)
+        expect(mockBenevityConnector.fetchAll).toHaveBeenCalled()
+      })
+
+      it('auto-adds benevity to sources when benevityDir is provided', async () => {
+        mockMercuryConnector.fetchAll.mockReset()
+        mockBenevityConnector.fetchAll.mockReset()
+        mockBqClient.getWatermark.mockReset()
+        mockBqClient.updateWatermark.mockReset()
+
+        mockBqClient.getWatermark.mockReturnValue(okAsync(null))
+        mockBqClient.updateWatermark.mockReturnValue(okAsync(undefined))
+        mockMercuryConnector.fetchAll.mockReturnValue(okAsync([]))
+        mockBenevityConnector.fetchAll.mockReturnValue(okAsync([]))
+
+        const orchestrator = new Orchestrator(config, logger)
+
+        const result = await orchestrator.runDaily({
+          sources: ['mercury'],
+          benevityDir: '/path/to/benevity',
+        })
+
+        expect(result.isOk()).toBe(true)
+        expect(mockMercuryConnector.fetchAll).toHaveBeenCalled()
+        expect(mockBenevityConnector.fetchAll).toHaveBeenCalled()
+      })
+    })
   })
 
   describe('runBackfill', () => {
@@ -1084,6 +1227,7 @@ describe('Orchestrator', () => {
           currency: 'USD',
           donor_name: 'Backfill Donor',
           payer_name: null,
+          is_recurring: null,
           donor_email: 'backfill@example.com',
           donor_phone: null,
           donor_address: null,
@@ -1146,6 +1290,7 @@ describe('Orchestrator', () => {
           currency: 'USD',
           donor_name: 'Backfill Load Donor',
           payer_name: null,
+          is_recurring: null,
           donor_email: 'backfill-load@example.com',
           donor_phone: null,
           donor_address: null,
@@ -1193,6 +1338,7 @@ describe('Orchestrator', () => {
           currency: 'USD',
           donor_name: 'Test Donor',
           payer_name: null,
+          is_recurring: null,
           donor_email: 'test@example.com',
           donor_phone: null,
           donor_address: null,
@@ -1320,6 +1466,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'Backfill Skip Merge Donor',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'backfill-skip@example.com',
             donor_phone: null,
             donor_address: null,
@@ -1502,6 +1649,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'In Range Donor',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'inrange@example.com',
             donor_phone: null,
             donor_address: null,
@@ -1525,6 +1673,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'In Range Donor 2',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'inrange2@example.com',
             donor_phone: null,
             donor_address: null,
@@ -1681,6 +1830,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'GCS Fail Donor',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'gcsfail@example.com',
             donor_phone: null,
             donor_address: null,
@@ -1793,6 +1943,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'Mercury Donor',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'merc@example.com',
             donor_phone: null,
             donor_address: null,
@@ -1856,6 +2007,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'PayPal Donor',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'paypal@example.com',
             donor_phone: null,
             donor_address: null,
@@ -1986,6 +2138,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'Clamp Test Donor',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'clamp@example.com',
             donor_phone: null,
             donor_address: null,
@@ -2167,6 +2320,73 @@ describe('Orchestrator', () => {
       })
     })
 
+    describe('Benevity report support', () => {
+      it('adds Benevity connector when benevityDir is provided', async () => {
+        mockBenevityConnector.fetchAll.mockReset()
+        mockBqClient.insertRun.mockReset()
+        mockBqClient.updateRun.mockReset()
+
+        mockBqClient.insertRun.mockReturnValue(okAsync(undefined))
+        mockBqClient.updateRun.mockReturnValue(okAsync(undefined))
+        mockBenevityConnector.fetchAll.mockReturnValue(okAsync([]))
+
+        const configNoSources: Config = {
+          ...config,
+          MERCURY_API_KEY: undefined,
+          PAYPAL_CLIENT_ID: undefined,
+          PAYPAL_SECRET: undefined,
+        }
+
+        const orchestrator = new Orchestrator(configNoSources, logger)
+
+        const result = await orchestrator.runBackfill({
+          from: '2024-01-01',
+          to: '2024-02-01',
+          chunk: 'month',
+          benevityDir: '/path/to/benevity',
+        })
+
+        expect(result.isOk()).toBe(true)
+        expect(mockBenevityConnector.fetchAll).toHaveBeenCalled()
+      })
+
+      it('auto-adds benevity to sources when benevityDir is provided', async () => {
+        mockMercuryConnector.fetchAll.mockReset()
+        mockBenevityConnector.fetchAll.mockReset()
+        mockBqClient.writeEventsToGcs.mockReset()
+        mockBqClient.loadFromGcs.mockReset()
+        mockBqClient.merge.mockReset()
+        mockBqClient.insertRun.mockReset()
+        mockBqClient.updateRun.mockReset()
+
+        mockBqClient.insertRun.mockReturnValue(okAsync(undefined))
+        mockBqClient.updateRun.mockReturnValue(okAsync(undefined))
+        mockBqClient.writeEventsToGcs.mockReturnValue(okAsync(['path1.ndjson']))
+        mockBqClient.loadFromGcs.mockReturnValue(
+          okAsync({ rowsLoaded: 1, bytesProcessed: 500 }),
+        )
+        mockBqClient.merge.mockReturnValue(
+          okAsync({ rowsInserted: 1, rowsUpdated: 0 }),
+        )
+        mockMercuryConnector.fetchAll.mockReturnValue(okAsync([]))
+        mockBenevityConnector.fetchAll.mockReturnValue(okAsync([]))
+
+        const orchestrator = new Orchestrator(config, logger)
+
+        const result = await orchestrator.runBackfill({
+          from: '2024-01-01',
+          to: '2024-02-01',
+          chunk: 'month',
+          sources: ['mercury'],
+          benevityDir: '/path/to/benevity',
+        })
+
+        expect(result.isOk()).toBe(true)
+        expect(mockMercuryConnector.fetchAll).toHaveBeenCalled()
+        expect(mockBenevityConnector.fetchAll).toHaveBeenCalled()
+      })
+    })
+
     describe('concurrent source processing', () => {
       it('processes multiple sources concurrently', async () => {
         // Reset mocks
@@ -2202,6 +2422,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'Mercury Concurrent',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'merc@example.com',
             donor_phone: null,
             donor_address: null,
@@ -2228,6 +2449,7 @@ describe('Orchestrator', () => {
             currency: 'USD',
             donor_name: 'PayPal Concurrent',
             payer_name: null,
+            is_recurring: null,
             donor_email: 'paypal@example.com',
             donor_phone: null,
             donor_address: null,

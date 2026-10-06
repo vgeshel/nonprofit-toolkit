@@ -69,6 +69,14 @@ describe('buildDonationsPrompt', () => {
     }
   })
 
+  it('documents is_recurring and that NULL means unknown', () => {
+    const prompt = buildDonationsPrompt(testConfig)
+    expect(prompt).toContain('| is_recurring | BOOL |')
+    expect(prompt).toContain(
+      '**Recurring** means `is_recurring = TRUE`. NULL means the source has no signal',
+    )
+  })
+
   it('includes all source values', () => {
     const prompt = buildDonationsPrompt(testConfig)
     const sources = [

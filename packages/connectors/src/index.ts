@@ -6,6 +6,7 @@
 
 // Connector interface and types
 export type {
+  BenevityConfig,
   CheckDepositsConfig,
   Connector,
   ConnectorConfigs,
@@ -89,3 +90,18 @@ export {
   type IPatreonClient,
   type PatreonConnectorOptions,
 } from './patreon'
+
+// Benevity connector (Donations Report CSV exports)
+export {
+  BenevityClient,
+  BenevityConnector,
+  createBenevityConnector,
+  parseBenevityReport,
+  transformBenevityReport,
+  transformBenevityRow,
+  type BenevityCsvRow,
+  type BenevityReport,
+  type BenevityReportMeta,
+  type BenevityReportTotals,
+  type IBenevityClient,
+} from './benevity'

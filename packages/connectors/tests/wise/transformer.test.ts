@@ -85,6 +85,8 @@ describe('transformWiseTransaction', () => {
     const event = transformWiseTransaction(baseTransaction, runId)
 
     expect(event.source).toBe('wise')
+
+    expect(event.is_recurring).toBeNull()
     expect(event.external_id).toBe('TRANSFER-12345678')
     expect(event.event_ts).toBe('2025-01-15T10:30:00.000Z')
     expect(event.created_at).toBe('2025-01-15T10:30:00.000Z')

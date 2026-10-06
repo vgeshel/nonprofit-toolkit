@@ -74,6 +74,8 @@ describe('GivebutterClient', () => {
           donated: 50.0,
           payout: 48.5,
           currency: 'USD',
+          is_recurring: false,
+          plan_id: null,
           transacted_at: '2024-01-15T10:30:00Z',
           created_at: '2024-01-15T10:30:00Z',
         },
@@ -136,6 +138,20 @@ describe('GivebutterClient', () => {
       // So to include transactions from Jan 31, we need transactedBefore=Feb 1
       expect(calledUrl).toContain('transactedAfter=2024-01-01')
       expect(calledUrl).toContain('transactedBefore=2024-02-01')
+      expect(calledUrl).not.toContain('updated')
+    })
+
+    it('filters by updated date when dateField is "updated"', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify(mockTransactionsResponse), { status: 200 }),
+      )
+
+      await client.getTransactions(from, to, { dateField: 'updated' })
+
+      const calledUrl = fetchSpy.mock.calls[0]?.[0]
+      expect(calledUrl).toContain('updatedAfter=2024-01-01')
+      expect(calledUrl).toContain('updatedBefore=2024-02-01')
+      expect(calledUrl).not.toContain('transacted')
     })
 
     it('includes pagination params', async () => {

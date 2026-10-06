@@ -36,12 +36,22 @@ We prioritize correctness, never speed. Cutting corners is forbidden.
 
 ## 4. Always Verify With Tools
 
-Without exception, use all available tools to ensure code correctness:
+Without exception, use all available tools to ensure code correctness. Typecheck,
+lint, and the test suite must all pass with zero errors — see
+`.claude/rules/code-style.md` for the commands.
 
-```bash
-bun typecheck  # Must pass with zero errors
-bun lint       # Must pass with zero errors
-bun test:run   # All tests must pass
-```
+Run them after EVERY change. No exceptions. No "I'll run them later."
 
-Run these after EVERY change. No exceptions. No "I'll run them later."
+## 5. Non-Negotiable Coding Rules
+
+These apply everywhere. The how-to for each lives in a skill that loads when you
+need it — these one-line mandates do not.
+
+- **No `throw` in production code.** Return a `neverthrow` `Result` instead.
+  See the `error-handling` skill.
+- **All external data is validated with Zod** before use — API responses, file
+  contents, env vars, CLI args, database rows. No `as` casts on external data.
+  See the `external-data-validation` skill.
+- **All CLI utilities parse arguments with `commander`.** No manual `process.argv`
+  parsing, no alternative parsing libraries. See the `cli-utility-creation` skill.
+- **Search before you implement.** See the `code-reuse` skill.

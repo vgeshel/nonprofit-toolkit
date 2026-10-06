@@ -18,6 +18,8 @@ import {
 } from './ndjson'
 import { generateReportSql } from './report-sql'
 import {
+  generateCountSupersededSql,
+  generateDeleteSupersededSql,
   generateGetRunSql,
   generateGetWatermarkSql,
   generateInsertRunSql,
@@ -82,9 +84,44 @@ function describeQueryFailure(cause: unknown): string {
 }
 
 /**
+ * Column schema for loading NDJSON into stg_events. Must list the same columns,
+ * in the same order, as the stg_events DDL in schema.sql.
+ */
+export const STG_EVENTS_LOAD_FIELDS = [
+  { name: 'run_id', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'source', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'external_id', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'event_ts', type: 'TIMESTAMP', mode: 'REQUIRED' },
+  { name: 'created_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
+  { name: 'ingested_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
+  { name: 'amount_cents', type: 'INT64', mode: 'REQUIRED' },
+  { name: 'fee_cents', type: 'INT64', mode: 'REQUIRED' },
+  { name: 'net_amount_cents', type: 'INT64', mode: 'REQUIRED' },
+  { name: 'currency', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'donor_name', type: 'STRING' },
+  { name: 'payer_name', type: 'STRING' },
+  { name: 'donor_email', type: 'STRING' },
+  { name: 'donor_phone', type: 'STRING' },
+  { name: 'donor_address', type: 'JSON' },
+  { name: 'status', type: 'STRING', mode: 'REQUIRED' },
+  { name: 'payment_method', type: 'STRING' },
+  { name: 'description', type: 'STRING' },
+  { name: 'attribution', type: 'STRING' },
+  { name: 'attribution_human', type: 'STRING' },
+  { name: 'is_recurring', type: 'BOOL' },
+  { name: 'source_metadata', type: 'JSON', mode: 'REQUIRED' },
+] as const
+
+/**
  * Default chunk size for NDJSON files.
  */
 const DEFAULT_CHUNK_SIZE = 10000
+
+/**
+ * COUNT(*) comes back as a BigQuery INT64, which the client surfaces as a
+ * string or a BigQueryInt depending on size.
+ */
+const SupersededCountSchema = z.object({ n: z.coerce.number().int() })
 
 const LoadJobMetadataSchema = z.object({
   status: z
@@ -334,31 +371,7 @@ export class BigQueryClient {
             sourceFormat: 'NEWLINE_DELIMITED_JSON',
             sourceUris: [fullUri],
             writeDisposition: 'WRITE_APPEND',
-            schema: {
-              fields: [
-                { name: 'run_id', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'source', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'external_id', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'event_ts', type: 'TIMESTAMP', mode: 'REQUIRED' },
-                { name: 'created_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
-                { name: 'ingested_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
-                { name: 'amount_cents', type: 'INT64', mode: 'REQUIRED' },
-                { name: 'fee_cents', type: 'INT64', mode: 'REQUIRED' },
-                { name: 'net_amount_cents', type: 'INT64', mode: 'REQUIRED' },
-                { name: 'currency', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'donor_name', type: 'STRING' },
-                { name: 'payer_name', type: 'STRING' },
-                { name: 'donor_email', type: 'STRING' },
-                { name: 'donor_phone', type: 'STRING' },
-                { name: 'donor_address', type: 'JSON' },
-                { name: 'status', type: 'STRING', mode: 'REQUIRED' },
-                { name: 'payment_method', type: 'STRING' },
-                { name: 'description', type: 'STRING' },
-                { name: 'attribution', type: 'STRING' },
-                { name: 'attribution_human', type: 'STRING' },
-                { name: 'source_metadata', type: 'JSON', mode: 'REQUIRED' },
-              ],
-            },
+            schema: { fields: [...STG_EVENTS_LOAD_FIELDS] },
           },
         },
       }),
@@ -453,6 +466,37 @@ export class BigQueryClient {
           rowsUpdated: stats?.updatedRowCount ?? 0,
         })
       })
+  }
+
+  /**
+   * Remove canonical Mercury rows that a platform source now covers.
+   *
+   * The merge filter stops these arriving, but a row merged before its
+   * coverage existed stays behind and double-counts. Counting first keeps the
+   * operation auditable: a delete against the canonical table should never be
+   * silent about how much it removed.
+   */
+  deleteSupersededEvents(): ResultAsync<number, BigQueryError> {
+    const countSql = generateCountSupersededSql(this.config)
+
+    return ResultAsync.fromPromise(
+      this.bq.query({ query: countSql }),
+      (error) =>
+        createError('query', 'Failed to count superseded events', error),
+    ).andThen(([rows]) => {
+      const parsed = SupersededCountSchema.safeParse(rows[0])
+      const count = parsed.success ? parsed.data.n : 0
+      if (count === 0) {
+        return okAsync(0)
+      }
+
+      const deleteSql = generateDeleteSupersededSql(this.config)
+      return ResultAsync.fromPromise(
+        this.bq.query({ query: deleteSql }),
+        (error) =>
+          createError('query', 'Failed to delete superseded events', error),
+      ).map(() => count)
+    })
   }
 
   /**

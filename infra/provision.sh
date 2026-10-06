@@ -11,7 +11,8 @@ set -euo pipefail
 #   PROJECT_ID, REGION, LOCATION, BUCKET, AR_REPO, IMAGE_NAME, JOB_NAME,
 #   DATASET_RAW, DATASET_CANON, RUNTIME_SA, SCHEDULER_SA,
 #   SCHEDULER_JOB_NAME, SCHEDULE, TIME_ZONE,
-#   SKIP_BUILD, SKIP_SCHEMA, SKIP_SECRETS, SKIP_SCHEDULER,
+#   SKIP_BUILD, SKIP_SCHEMA, SKIP_SECRETS, SKIP_SCHEDULER, SKIP_MONITORING,
+#   ALERT_SLACK_CHANNEL (Slack channel for Cloud Monitoring alerts),
 #   SECRET_* (optional initial secret values)
 
 log() { echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $*"; }
@@ -55,6 +56,8 @@ SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SCHEMA="${SKIP_SCHEMA:-0}"
 SKIP_SECRETS="${SKIP_SECRETS:-0}"
 SKIP_SCHEDULER="${SKIP_SCHEDULER:-0}"
+SKIP_MONITORING="${SKIP_MONITORING:-0}"
+ALERT_SLACK_CHANNEL="${ALERT_SLACK_CHANNEL:-}"
 
 SCHEMA_SQL_PATH="${SCHEMA_SQL_PATH:-packages/bq/src/schema.sql}"
 
@@ -78,6 +81,8 @@ enable_apis() {
     bigquery.googleapis.com \
     cloudscheduler.googleapis.com \
     secretmanager.googleapis.com \
+    monitoring.googleapis.com \
+    logging.googleapis.com \
     sheets.googleapis.com \
     iam.googleapis.com >/dev/null
 }
@@ -385,6 +390,17 @@ ensure_scheduler_job() {
   fi
 }
 
+# Alert policies for failed jobs and scheduler triggers, sent to
+# ALERT_SLACK_CHANNEL. Logic lives in scripts/monitoring-lib.ts.
+ensure_monitoring() {
+  if [ "${SKIP_MONITORING}" = "1" ]; then
+    log "SKIP_MONITORING=1; skipping alert policies."
+    return
+  fi
+  log "Ensuring Cloud Monitoring alert policies..."
+  bun scripts/provision-monitoring.ts --project "${PROJECT_ID}" --slack-channel "${ALERT_SLACK_CHANNEL}"
+}
+
 ensure_report_scheduler_jobs() {
   if [ "${SKIP_SCHEDULER}" = "1" ]; then
     log "SKIP_SCHEDULER=1; skipping report schedulers."
@@ -464,6 +480,7 @@ ensure_report_scheduler_jobs() {
 
 main() {
   need_cmd gcloud
+  need_cmd bun
   need_cmd bq
   need_cmd gsutil
 
@@ -488,6 +505,7 @@ main() {
   ensure_cloud_run_job
   ensure_scheduler_job
   ensure_report_scheduler_jobs
+  ensure_monitoring
 
   log "Provisioning complete."
   log "Next commands:"

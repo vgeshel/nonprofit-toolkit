@@ -187,6 +187,20 @@ describe('ConfigSchema', () => {
       expect(result.PATREON_ACCESS_TOKEN).toBe('patreon-token')
       expect(result.PATREON_CAMPAIGN_ID).toBe('cmp_42')
     })
+
+    it('keeps the Cloud Run job variables as raw strings', () => {
+      const result = ConfigSchema.parse({
+        PROJECT_ID: 'my-project',
+        BUCKET: 'my-bucket',
+        CLOUD_RUN_JOB: 'donations-etl',
+        CLOUD_RUN_EXECUTION: 'donations-etl-abc12',
+        CLOUD_RUN_TASK_ATTEMPT: 'not-a-number',
+      })
+
+      expect(result.CLOUD_RUN_JOB).toBe('donations-etl')
+      expect(result.CLOUD_RUN_EXECUTION).toBe('donations-etl-abc12')
+      expect(result.CLOUD_RUN_TASK_ATTEMPT).toBe('not-a-number')
+    })
   })
 
   describe('LOOKBACK_HOURS coercion', () => {

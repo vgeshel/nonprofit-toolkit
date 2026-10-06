@@ -44,3 +44,7 @@ data
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Benevity Causes Portal session state and downloaded reports
+.benevity-session.json
+data/benevity/

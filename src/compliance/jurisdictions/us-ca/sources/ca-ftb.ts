@@ -26,6 +26,14 @@ const TEXT_EVIDENCE_MAX_CHARS = 4000
 const BROWSER_TIMEOUT_MS = 120_000
 const PAGE_UPDATE_TIMEOUT_MS = 45_000
 const PAGE_UPDATE_POLL_INTERVAL_MS = 250
+/**
+ * FTB fronts the Entity Status Letter with a bot challenge that swallows the
+ * first search submission: it renders a blank challenge page for ~25 seconds,
+ * then returns the empty search form instead of the results. Re-submitting
+ * once the challenge has cleared succeeds, so the search is retried rather
+ * than reported as a site-shape change.
+ */
+const MAX_SEARCH_SUBMIT_ATTEMPTS = 3
 
 type SearchQuery =
   | {
@@ -99,18 +107,12 @@ async function inspectEntityStatusLetter(
   page.setDefaultTimeout(BROWSER_TIMEOUT_MS)
   await page.goto(ACCESS_URL, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('#EntityId')
-  await page.fill(query.selector, query.value)
-  await clickAndWait(page, () =>
-    page
-      .locator('button[title="Search for an Entity."]')
-      .first()
-      .click({ force: true }),
-  )
 
-  const resultText = await readBodyTextAfterPageUpdate(
-    page,
-    isEntitySearchFormPage,
-  )
+  const search = await submitSearchWithRetry(page, query)
+  if (search.isErr()) {
+    return err(search.error)
+  }
+  const resultText = search.value
   if (isChallengePage(resultText)) {
     return err({
       type: 'parse',
@@ -156,6 +158,64 @@ async function inspectEntityStatusLetter(
     return err(summary.error)
   }
   return ok(buildFoundOutput(ctx, query, summary.value))
+}
+
+/**
+ * Submits the entity search, retrying whenever the bot challenge discards the
+ * submission and hands back the empty search form.
+ */
+async function submitSearchWithRetry(
+  page: BrowserPage,
+  query: SearchQuery,
+): Promise<Result<string, SourceError>> {
+  for (let attempt = 1; attempt <= MAX_SEARCH_SUBMIT_ATTEMPTS; attempt += 1) {
+    const text = await submitSearch(page, query)
+    if (text.trim().length === 0) {
+      return err({
+        type: 'parse',
+        message: `CA FTB Entity Status Letter returned a blank page for ${String(
+          PAGE_UPDATE_TIMEOUT_MS / 1000,
+        )}s after the search, which is how its bot challenge presents. Complete the search manually at ${ACCESS_URL}.`,
+      })
+    }
+    if (!isEntitySearchFormPage(text)) {
+      return ok(text)
+    }
+  }
+  return err({
+    type: 'parse',
+    message: `CA FTB Entity Status Letter discarded ${String(
+      MAX_SEARCH_SUBMIT_ATTEMPTS,
+    )} search submissions and returned the empty search form each time, which is how its bot challenge presents. Complete the search manually at ${ACCESS_URL}.`,
+  })
+}
+
+async function submitSearch(
+  page: BrowserPage,
+  query: SearchQuery,
+): Promise<string> {
+  await page.fill(query.selector, query.value)
+  await clickAndWait(page, () =>
+    page
+      .locator('button[title="Search for an Entity."]')
+      .first()
+      .click({ force: true }),
+  )
+  return readBodyTextAfterPageUpdate(page, isEntitySearchFormPage, () =>
+    isSearchFieldCleared(page, query),
+  )
+}
+
+/**
+ * A reloaded, empty search field means the challenge discarded the submission,
+ * as opposed to the results simply not having rendered yet.
+ */
+async function isSearchFieldCleared(
+  page: BrowserPage,
+  query: SearchQuery,
+): Promise<boolean> {
+  const value = await page.locator(query.selector).inputValue()
+  return value.trim().length === 0
 }
 
 async function clickAndWait(
@@ -209,11 +269,16 @@ function isChallengePage(text: string): boolean {
 async function readBodyTextAfterPageUpdate(
   page: BrowserPage,
   isPreviousPage: (text: string) => boolean,
+  isSubmissionDiscarded?: () => Promise<boolean>,
 ): Promise<string> {
   let text = await page.locator('body').innerText()
   const deadline = Date.now() + PAGE_UPDATE_TIMEOUT_MS
   while (
-    shouldWaitForPageUpdate(text, isPreviousPage) &&
+    (await shouldWaitForPageUpdate(
+      text,
+      isPreviousPage,
+      isSubmissionDiscarded,
+    )) &&
     Date.now() < deadline
   ) {
     await sleep(PAGE_UPDATE_POLL_INTERVAL_MS)
@@ -222,11 +287,22 @@ async function readBodyTextAfterPageUpdate(
   return text
 }
 
-function shouldWaitForPageUpdate(
+async function shouldWaitForPageUpdate(
   text: string,
   isPreviousPage: (text: string) => boolean,
-): boolean {
-  return text.trim().length === 0 || isPreviousPage(text)
+  isSubmissionDiscarded?: () => Promise<boolean>,
+): Promise<boolean> {
+  if (text.trim().length === 0) {
+    return true
+  }
+  if (!isPreviousPage(text)) {
+    return false
+  }
+  // The previous page is still showing: keep waiting unless the submission was
+  // discarded, in which case waiting can only time out.
+  return isSubmissionDiscarded === undefined
+    ? true
+    : !(await isSubmissionDiscarded())
 }
 
 function sleep(timeoutMs: number): Promise<void> {

@@ -6,7 +6,7 @@ This is a toolkit for AI coding assistants to set up and manage donation ETL for
 
 **Think before you act.** Before writing code, editing files, or agreeing with the user, stop and consider: Is this correct? Is there a simpler way? Does this conflict with anything established? Will this need to be undone? If you see a problem with what the user is asking, say so. Do not implement something you believe is wrong.
 
-**Zero sycophancy.** If your output contains "you're right", "good point", "great idea", "that makes sense", or any similar agreement phrase — STOP. Re-examine your entire output and thinking. Sycophancy is a canary for shallow work: if you're agreeing reflexively, you probably haven't evaluated deeply enough. Remove the phrase, then check whether your reasoning actually holds up. If the user is wrong, say so. If you don't know, say so. A Stop hook (`v1-plugin/`) mechanically enforces this — if it blocks you, rephrase without agreement phrases.
+**Zero sycophancy.** If your output contains "you're right", "good point", "great idea", "that makes sense", or any similar agreement phrase — STOP. Re-examine your entire output and thinking. Sycophancy is a canary for shallow work: if you're agreeing reflexively, you probably haven't evaluated deeply enough. Remove the phrase, then check whether your reasoning actually holds up. If the user is wrong, say so. If you don't know, say so.
 
 **Verify your own work.** Re-read your output before moving on. Run checks after every file, not just at the end. Do not rely on the user or pre-commit hooks to catch your mistakes.
 
@@ -36,21 +36,4 @@ A toolkit for nonprofit donation management: ETL from multiple payment platforms
 
 See files in [docs/](docs/) for product specs and requirements.
 
-## Quick Reference
-
-### Key Commands
-
-```bash
-bun typecheck        # Run TypeScript type checking
-bun lint             # Run ESLint
-bun test:coverage    # Run tests once
-bun format           # Format code with Prettier
-bun build            # Build for production
-```
-
-### Technology Stack
-
-- **Runtime**: Bun (not Node.js)
-- **Language**: TypeScript in strict mode
-- **Testing**: Vitest
-- **Validation**: Zod for runtime validation
+Commands and the dependency list are in `package.json`; see `.claude/rules/code-style.md` for the ones that matter day to day.

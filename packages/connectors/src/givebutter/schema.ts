@@ -65,6 +65,11 @@ export const GivebutterTransactionSchema = z.object({
   payout: z.number(), // Amount to be paid out in dollars
   currency: z.string(),
 
+  // Recurrence: plan_id groups a donor's charges under one recurring plan and
+  // is null exactly when is_recurring is false.
+  is_recurring: z.boolean(),
+  plan_id: z.string().nullable(),
+
   // Timestamps
   transacted_at: z.string(),
   created_at: z.string(),

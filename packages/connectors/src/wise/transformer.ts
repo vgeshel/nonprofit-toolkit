@@ -74,6 +74,7 @@ export function transformWiseTransaction(
     description: tx.details.description ?? tx.details.paymentReference ?? null,
     attribution: null, // Wise doesn't have campaign/attribution info
     attribution_human: null,
+    is_recurring: null, // No recurrence signal in this source
     source_metadata: {
       senderAccount: tx.details.senderAccount,
       paymentReference: tx.details.paymentReference,

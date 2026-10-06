@@ -59,6 +59,14 @@ describe('buildAgentPrompt', () => {
     expect(prompt).toContain('attribution_human')
   })
 
+  it('documents is_recurring and that NULL means unknown', () => {
+    const prompt = buildAgentPrompt(config)
+    expect(prompt).toContain('| is_recurring | BOOL |')
+    expect(prompt).toContain(
+      '**Recurring** means `is_recurring = TRUE`. NULL means the source has no signal',
+    )
+  })
+
   it('includes SQL rules', () => {
     const prompt = buildAgentPrompt(config)
     expect(prompt).toContain('divide by 100')

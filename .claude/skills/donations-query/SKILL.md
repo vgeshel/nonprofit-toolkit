@@ -48,30 +48,31 @@ For large result sets, add `--max_rows=100` to avoid overwhelming output, and le
 
 The `donations.events` table has the following columns:
 
-| Column              | Type             | Description                                                                                     |
-| ------------------- | ---------------- | ----------------------------------------------------------------------------------------------- |
-| `source`            | STRING           | Source system: `mercury`, `paypal`, `givebutter`, `check_deposits`, `funraise`, `venmo`, `wise` |
-| `external_id`       | STRING           | Unique ID from the source system                                                                |
-| `event_ts`          | TIMESTAMP        | When the transaction occurred (UTC). Table is partitioned by `DATE(event_ts)`.                  |
-| `created_at`        | TIMESTAMP        | When the transaction was created at the source                                                  |
-| `ingested_at`       | TIMESTAMP        | When the ETL ingested this record                                                               |
-| `amount_cents`      | INT64            | Gross amount in cents (e.g., 5000 = $50.00)                                                     |
-| `fee_cents`         | INT64            | Transaction fee in cents                                                                        |
-| `net_amount_cents`  | INT64            | Net amount after fees, in cents                                                                 |
-| `currency`          | STRING           | 3-letter ISO 4217 code (mostly `USD`, but Wise can have `EUR`, `UAH`, etc.)                     |
-| `donor_name`        | STRING, nullable | Donor's full name                                                                               |
-| `payer_name`        | STRING, nullable | Institutional payer (e.g., "Vanguard Charitable" for DAF checks)                                |
-| `donor_email`       | STRING, nullable | Donor's email                                                                                   |
-| `donor_phone`       | STRING, nullable | Donor's phone                                                                                   |
-| `donor_address`     | JSON, nullable   | Structured: `{line1, line2, city, state, postal_code, country}`                                 |
-| `status`            | STRING           | `pending`, `succeeded`, `failed`, `cancelled`, `refunded`                                       |
-| `payment_method`    | STRING, nullable | `card`, `ach`, `wire`, `check`, `venmo`, `bank_transfer`, `internal`, etc.                      |
-| `description`       | STRING, nullable | Transaction description or memo                                                                 |
-| `attribution`       | STRING, nullable | Campaign or attribution code                                                                    |
-| `attribution_human` | STRING, nullable | Human-readable campaign name                                                                    |
-| `source_metadata`   | JSON             | Source-specific data (varies by source)                                                         |
-| `_inserted_at`      | TIMESTAMP        | When this row was first inserted                                                                |
-| `_updated_at`       | TIMESTAMP        | When this row was last updated                                                                  |
+| Column              | Type             | Description                                                                                        |
+| ------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
+| `source`            | STRING           | Source system: `mercury`, `paypal`, `givebutter`, `check_deposits`, `funraise`, `venmo`, `wise`    |
+| `external_id`       | STRING           | Unique ID from the source system                                                                   |
+| `event_ts`          | TIMESTAMP        | When the transaction occurred (UTC). Table is partitioned by `DATE(event_ts)`.                     |
+| `created_at`        | TIMESTAMP        | When the transaction was created at the source                                                     |
+| `ingested_at`       | TIMESTAMP        | When the ETL ingested this record                                                                  |
+| `amount_cents`      | INT64            | Gross amount in cents (e.g., 5000 = $50.00)                                                        |
+| `fee_cents`         | INT64            | Transaction fee in cents                                                                           |
+| `net_amount_cents`  | INT64            | Net amount after fees, in cents                                                                    |
+| `currency`          | STRING           | 3-letter ISO 4217 code (mostly `USD`, but Wise can have `EUR`, `UAH`, etc.)                        |
+| `donor_name`        | STRING, nullable | Donor's full name                                                                                  |
+| `payer_name`        | STRING, nullable | Institutional payer (e.g., "Vanguard Charitable" for DAF checks)                                   |
+| `donor_email`       | STRING, nullable | Donor's email                                                                                      |
+| `donor_phone`       | STRING, nullable | Donor's phone                                                                                      |
+| `donor_address`     | JSON, nullable   | Structured: `{line1, line2, city, state, postal_code, country}`                                    |
+| `status`            | STRING           | `pending`, `succeeded`, `failed`, `cancelled`, `refunded`                                          |
+| `payment_method`    | STRING, nullable | `card`, `ach`, `wire`, `check`, `venmo`, `bank_transfer`, `internal`, etc.                         |
+| `description`       | STRING, nullable | Transaction description or memo                                                                    |
+| `attribution`       | STRING, nullable | Campaign or attribution code                                                                       |
+| `attribution_human` | STRING, nullable | Human-readable campaign name                                                                       |
+| `is_recurring`      | BOOL, nullable   | `TRUE` recurring gift, `FALSE` known one-off, `NULL` source has no signal (never treat as one-off) |
+| `source_metadata`   | JSON             | Source-specific data (varies by source)                                                            |
+| `_inserted_at`      | TIMESTAMP        | When this row was first inserted                                                                   |
+| `_updated_at`       | TIMESTAMP        | When this row was last updated                                                                     |
 
 **Partitioning**: `DATE(event_ts)` -- always include a date filter on `event_ts` to avoid full table scans.
 

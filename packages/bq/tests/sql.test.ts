@@ -3,6 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
+  generateDeleteSupersededSql,
   generateGetRunSql,
   generateGetWatermarkSql,
   generateInsertRunSql,
@@ -205,10 +206,14 @@ describe('SQL generation', () => {
       expect(sql).toContain('sc.covers_from')
     })
 
-    it('matches Mercury description against source names in JOIN', () => {
+    it('matches Mercury description against the coverage pattern in JOIN', () => {
+      // A platform can reach the bank under a name that is not its own: a
+      // Benevity disbursement arrives as "AMER ONLINE GIV1", never
+      // "benevity". description_pattern carries that alias, falling back to
+      // the source name when there is none.
       const sql = generateMergeSql(config)
       expect(sql).toContain(
-        "LOWER(stg.description) LIKE CONCAT(LOWER(sc.source), ';%')",
+        "LOWER(stg.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')",
       )
     })
 
@@ -222,6 +227,63 @@ describe('SQL generation', () => {
       expect(sql).toContain('AS stg')
       expect(sql).toContain('stg.run_id')
       expect(sql).toContain('stg.source')
+    })
+  })
+
+  describe('generateDeleteSupersededSql', () => {
+    it('deletes only mercury rows', () => {
+      const sql = generateDeleteSupersededSql(config)
+      expect(sql).toContain('DELETE FROM `donations.events`')
+      expect(sql).toContain("source = 'mercury'")
+    })
+
+    it('matches by external_id so BigQuery can plan the semi-join', () => {
+      // EXISTS with only LIKE and >= predicates is rejected: BigQuery plans a
+      // LEFT SEMI JOIN and requires an equality between the two sides.
+      const sql = generateDeleteSupersededSql(config)
+      expect(sql).toContain('external_id IN (')
+      expect(sql).not.toContain('EXISTS')
+    })
+
+    it('matches the same condition the merge filter uses', () => {
+      // The merge refuses to insert these rows; this removes ones that were
+      // merged before their coverage existed. The two must agree exactly, or
+      // the cleanup deletes rows the pipeline would happily re-add.
+      const sql = generateDeleteSupersededSql(config)
+      expect(sql).toContain(
+        "LOWER(e.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')",
+      )
+      expect(sql).toContain('e.event_ts >= sc.covers_from')
+    })
+
+    it('never treats mercury as covering itself', () => {
+      const sql = generateDeleteSupersededSql(config)
+      expect(sql).toContain("sc.source != 'mercury'")
+    })
+
+    it('uses the configured datasets', () => {
+      const sql = generateDeleteSupersededSql({
+        projectId: 'p',
+        datasetRaw: 'raw_x',
+        datasetCanon: 'canon_x',
+      })
+      expect(sql).toContain('`canon_x.events`')
+      expect(sql).toContain('`raw_x.source_coverage`')
+    })
+  })
+
+  describe('generateUpdateSourceCoverageSql - alias rows', () => {
+    it('keys the upsert on source so every alias row tracks the same start', () => {
+      // benevity has one row per bank alias; all of them move together with
+      // the source's earliest event.
+      const sql = generateUpdateSourceCoverageSql(config)
+      expect(sql).toContain('ON target.source = src.source')
+    })
+
+    it('leaves description_pattern untouched when refreshing coverage', () => {
+      // The auto-refresh must never clear a manually registered alias.
+      const sql = generateUpdateSourceCoverageSql(config)
+      expect(sql).not.toContain('description_pattern = ')
     })
   })
 
