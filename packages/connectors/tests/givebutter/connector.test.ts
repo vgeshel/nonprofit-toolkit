@@ -115,7 +115,7 @@ describe('GivebutterConnector', () => {
   })
 
   describe('fetchPage', () => {
-    it('fetches a page of transactions', async () => {
+    it('fetches a page of transactions by transacted date first', async () => {
       const mockResponse = createMockResponse([createTransaction(1)], 1, 1)
       vi.mocked(mockClient.getTransactions).mockReturnValue(
         okAsync(mockResponse),
@@ -123,18 +123,24 @@ describe('GivebutterConnector', () => {
 
       const result = await connector.fetchPage({ from, to, runId })
 
+      expect(mockClient.getTransactions).toHaveBeenCalledWith(from, to, {
+        page: 1,
+        perPage: GIVEBUTTER_DEFAULT_PAGE_SIZE,
+        dateField: 'transacted',
+      })
       expect(result.isOk()).toBe(true)
       if (result.isOk()) {
         expect(result.value.events).toHaveLength(1)
         expect(result.value.events[0]?.external_id).toBe('1')
         // createTransaction(1) has amount: 1 * 10 = $10 = 1000 cents
         expect(result.value.events[0]?.amount_cents).toBe(1000)
-        expect(result.value.hasMore).toBe(false)
-        expect(result.value.nextCursor).toBeUndefined()
+        // After the last transacted page, the updated-date pass follows
+        expect(result.value.hasMore).toBe(true)
+        expect(result.value.nextCursor).toBe('{"dateField":"updated","page":1}')
       }
     })
 
-    it('indicates hasMore when more pages exist', async () => {
+    it('indicates hasMore when more transacted pages exist', async () => {
       const mockResponse = createMockResponse([createTransaction(1)], 1, 3)
       vi.mocked(mockClient.getTransactions).mockReturnValue(
         okAsync(mockResponse),
@@ -145,7 +151,9 @@ describe('GivebutterConnector', () => {
       expect(result.isOk()).toBe(true)
       if (result.isOk()) {
         expect(result.value.hasMore).toBe(true)
-        expect(result.value.nextCursor).toBe('{"page":2}')
+        expect(result.value.nextCursor).toBe(
+          '{"dateField":"transacted","page":2}',
+        )
       }
     })
 
@@ -155,16 +163,57 @@ describe('GivebutterConnector', () => {
         okAsync(mockResponse),
       )
 
-      const cursor = JSON.stringify({ page: 2 })
+      const cursor = JSON.stringify({ dateField: 'transacted', page: 2 })
       const result = await connector.fetchPage({ from, to, runId }, cursor)
 
       expect(result.isOk()).toBe(true)
       expect(mockClient.getTransactions).toHaveBeenCalledWith(from, to, {
         page: 2,
         perPage: GIVEBUTTER_DEFAULT_PAGE_SIZE,
+        dateField: 'transacted',
       })
       if (result.isOk()) {
-        expect(result.value.nextCursor).toBe('{"page":3}')
+        expect(result.value.nextCursor).toBe(
+          '{"dateField":"transacted","page":3}',
+        )
+      }
+    })
+
+    it('fetches by updated date when the cursor is in the updated pass', async () => {
+      const mockResponse = createMockResponse([createTransaction(5)], 2, 3)
+      vi.mocked(mockClient.getTransactions).mockReturnValue(
+        okAsync(mockResponse),
+      )
+
+      const cursor = JSON.stringify({ dateField: 'updated', page: 2 })
+      const result = await connector.fetchPage({ from, to, runId }, cursor)
+
+      expect(mockClient.getTransactions).toHaveBeenCalledWith(from, to, {
+        page: 2,
+        perPage: GIVEBUTTER_DEFAULT_PAGE_SIZE,
+        dateField: 'updated',
+      })
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value.events.map((e) => e.external_id)).toEqual(['5'])
+        expect(result.value.hasMore).toBe(true)
+        expect(result.value.nextCursor).toBe('{"dateField":"updated","page":3}')
+      }
+    })
+
+    it('finishes after the last page of the updated pass', async () => {
+      const mockResponse = createMockResponse([createTransaction(5)], 3, 3)
+      vi.mocked(mockClient.getTransactions).mockReturnValue(
+        okAsync(mockResponse),
+      )
+
+      const cursor = JSON.stringify({ dateField: 'updated', page: 3 })
+      const result = await connector.fetchPage({ from, to, runId }, cursor)
+
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value.hasMore).toBe(false)
+        expect(result.value.nextCursor).toBeUndefined()
       }
     })
 
@@ -179,6 +228,7 @@ describe('GivebutterConnector', () => {
       expect(mockClient.getTransactions).toHaveBeenCalledWith(from, to, {
         page: 1,
         perPage: GIVEBUTTER_DEFAULT_PAGE_SIZE,
+        dateField: 'transacted',
       })
     })
 
@@ -190,12 +240,13 @@ describe('GivebutterConnector', () => {
 
       await connector.fetchPage(
         { from, to, runId },
-        JSON.stringify({ wrong: 'data' }),
+        JSON.stringify({ dateField: 'created', page: 2 }),
       )
 
       expect(mockClient.getTransactions).toHaveBeenCalledWith(from, to, {
         page: 1,
         perPage: GIVEBUTTER_DEFAULT_PAGE_SIZE,
+        dateField: 'transacted',
       })
     })
 
@@ -247,7 +298,10 @@ describe('GivebutterConnector', () => {
         okAsync(mockResponse),
       )
 
-      const result = await connector.fetchPage({ from, to, runId })
+      const result = await connector.fetchPage(
+        { from, to, runId },
+        JSON.stringify({ dateField: 'updated', page: 1 }),
+      )
 
       expect(result.isOk()).toBe(true)
       if (result.isOk()) {
@@ -258,21 +312,107 @@ describe('GivebutterConnector', () => {
   })
 
   describe('fetchAll', () => {
-    it('fetches all pages of transactions', async () => {
-      const page1Response = createMockResponse([createTransaction(1)], 1, 2)
-      const page2Response = createMockResponse([createTransaction(2)], 2, 2)
-
+    it('fetches all transacted pages, then all updated pages', async () => {
       vi.mocked(mockClient.getTransactions)
-        .mockReturnValueOnce(okAsync(page1Response))
-        .mockReturnValueOnce(okAsync(page2Response))
+        .mockReturnValueOnce(
+          okAsync(createMockResponse([createTransaction(1)], 1, 2)),
+        )
+        .mockReturnValueOnce(
+          okAsync(createMockResponse([createTransaction(2)], 2, 2)),
+        )
+        .mockReturnValueOnce(
+          okAsync(createMockResponse([createTransaction(3)], 1, 1)),
+        )
+
+      const result = await connector.fetchAll({ from, to, runId })
+
+      expect(vi.mocked(mockClient.getTransactions).mock.calls).toEqual([
+        [
+          from,
+          to,
+          {
+            page: 1,
+            perPage: GIVEBUTTER_DEFAULT_PAGE_SIZE,
+            dateField: 'transacted',
+          },
+        ],
+        [
+          from,
+          to,
+          {
+            page: 2,
+            perPage: GIVEBUTTER_DEFAULT_PAGE_SIZE,
+            dateField: 'transacted',
+          },
+        ],
+        [
+          from,
+          to,
+          {
+            page: 1,
+            perPage: GIVEBUTTER_DEFAULT_PAGE_SIZE,
+            dateField: 'updated',
+          },
+        ],
+      ])
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value.map((e) => e.external_id)).toEqual(['1', '2', '3'])
+      }
+    })
+
+    it('includes a transaction that settled in the window after being transacted before it', async () => {
+      // An ACH charge transacted 2023-12-28 was still pending when the window
+      // covering that date was fetched, so it was filtered out there. It
+      // settled in January, which moved its updated_at into this window.
+      const settledAch = {
+        ...createTransaction(7),
+        method: 'ach',
+        transacted_at: '2023-12-28T21:33:49Z',
+        created_at: '2023-12-28T21:33:48Z',
+      }
+      vi.mocked(mockClient.getTransactions)
+        .mockReturnValueOnce(
+          okAsync(createMockResponse([createTransaction(1)], 1, 1)),
+        )
+        .mockReturnValueOnce(okAsync(createMockResponse([settledAch], 1, 1)))
 
       const result = await connector.fetchAll({ from, to, runId })
 
       expect(result.isOk()).toBe(true)
       if (result.isOk()) {
-        expect(result.value).toHaveLength(2)
-        expect(result.value[0]?.external_id).toBe('1')
-        expect(result.value[1]?.external_id).toBe('2')
+        expect(result.value.map((e) => e.external_id)).toEqual(['1', '7'])
+        expect(result.value[1]?.event_ts).toBe('2023-12-28T21:33:49Z')
+        expect(result.value[1]?.status).toBe('succeeded')
+      }
+    })
+
+    it('returns each transaction once when both passes include it', async () => {
+      vi.mocked(mockClient.getTransactions)
+        .mockReturnValueOnce(
+          okAsync(
+            createMockResponse(
+              [createTransaction(1), createTransaction(2)],
+              1,
+              1,
+            ),
+          ),
+        )
+        .mockReturnValueOnce(
+          okAsync(
+            createMockResponse(
+              [createTransaction(2), createTransaction(3)],
+              1,
+              1,
+            ),
+          ),
+        )
+
+      const result = await connector.fetchAll({ from, to, runId })
+
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value.map((e) => e.external_id)).toEqual(['1', '2', '3'])
       }
     })
 
@@ -309,6 +449,7 @@ describe('GivebutterConnector', () => {
       if (result.isOk()) {
         expect(result.value).toEqual([])
       }
+      expect(mockClient.getTransactions).toHaveBeenCalledTimes(2)
     })
 
     it('handles many pages', async () => {
@@ -323,12 +464,14 @@ describe('GivebutterConnector', () => {
           okAsync(response),
         )
       }
+      vi.mocked(mockClient.getTransactions).mockReturnValueOnce(
+        okAsync(createMockResponse([], 1, 1)),
+      )
 
       const result = await connector.fetchAll({ from, to, runId })
 
       expect(result.isOk()).toBe(true)
       if (result.isOk()) {
-        expect(result.value).toHaveLength(5)
         expect(result.value.map((e) => e.external_id)).toEqual([
           '1',
           '2',
