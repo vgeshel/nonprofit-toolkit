@@ -22,6 +22,7 @@ dns.setDefaultResultOrder('ipv4first')
 
 import { parseCli } from './cli'
 import { loadConfig } from './config'
+import { sendFailureAlert } from './failure-alert'
 import { createLogger } from './logger'
 import { Orchestrator } from './orchestrator'
 import { runReport } from './report'
@@ -56,82 +57,110 @@ async function main(): Promise<void> {
   const logger = createLogger(config)
   const orchestrator = new Orchestrator(config, logger)
 
-  // Execute command
-  switch (command.command) {
-    case 'daily': {
-      const result = await orchestrator.runDaily(command.options)
-
-      if (result.isErr()) {
-        logger.error({ error: result.error }, 'Daily ETL failed')
-        process.exit(1)
-      }
-
-      logger.info(
-        {
-          runId: result.value.runId,
-          totalCount: result.value.metrics?.totalCount,
-          durationMs: result.value.metrics?.totalDurationMs,
-        },
-        'Daily ETL completed successfully',
-      )
-      break
+  // Alert Slack, then exit non-zero. A failed alert is logged but never
+  // changes the outcome: the run already failed.
+  const failAndExit = async (job: string, error: unknown): Promise<never> => {
+    const alert = await sendFailureAlert(config, job, error, logger)
+    if (alert.isErr()) {
+      logger.error({ error: alert.error }, 'Failure alert not sent')
     }
+    process.exit(1)
+  }
 
-    case 'backfill': {
-      const result = await orchestrator.runBackfill(command.options)
+  try {
+    await runCommand()
+  } catch (error) {
+    logger.error({ error }, 'Unexpected error')
+    await failAndExit('ETL runner', error)
+  }
 
-      if (result.isErr()) {
-        logger.error({ error: result.error }, 'Backfill failed')
-        process.exit(1)
+  async function runCommand(): Promise<void> {
+    // Execute command
+    switch (command.command) {
+      case 'daily': {
+        const result = await orchestrator.runDaily(command.options)
+
+        if (result.isErr()) {
+          logger.error({ error: result.error }, 'Daily ETL failed')
+          return failAndExit('Daily ETL', result.error)
+        }
+
+        logger.info(
+          {
+            runId: result.value.runId,
+            totalCount: result.value.metrics?.totalCount,
+            durationMs: result.value.metrics?.totalDurationMs,
+          },
+          'Daily ETL completed successfully',
+        )
+        break
       }
 
-      const succeeded = result.value.filter(
-        (r) => r.status === 'succeeded',
-      ).length
-      const failed = result.value.filter((r) => r.status === 'failed').length
-      const totalCount = result.value.reduce(
-        (sum, r) => sum + (r.metrics?.totalCount ?? 0),
-        0,
-      )
+      case 'backfill': {
+        const result = await orchestrator.runBackfill(command.options)
 
-      logger.info(
-        {
-          chunks: result.value.length,
-          succeeded,
-          failed,
-          totalCount,
-        },
-        'Backfill completed',
-      )
+        if (result.isErr()) {
+          logger.error({ error: result.error }, 'Backfill failed')
+          return failAndExit('Backfill', result.error)
+        }
 
-      if (failed > 0) {
-        process.exit(1)
-      }
-      break
-    }
+        const succeeded = result.value.filter(
+          (r) => r.status === 'succeeded',
+        ).length
+        const failed = result.value.filter((r) => r.status === 'failed').length
+        const totalCount = result.value.reduce(
+          (sum, r) => sum + (r.metrics?.totalCount ?? 0),
+          0,
+        )
 
-    case 'health': {
-      const result = await orchestrator.healthCheck()
+        logger.info(
+          {
+            chunks: result.value.length,
+            succeeded,
+            failed,
+            totalCount,
+          },
+          'Backfill completed',
+        )
 
-      if (result.isErr()) {
-        logger.error({ error: result.error }, 'Health check failed')
-        process.exit(1)
-      }
-
-      logger.info('Health check passed')
-      break
-    }
-
-    case 'report': {
-      const result = await runReport(config, command.options.period, logger)
-
-      if (result.isErr()) {
-        logger.error({ error: result.error }, 'Report generation failed')
-        process.exit(1)
+        if (failed > 0) {
+          const firstError = result.value.find(
+            (r) => r.status === 'failed',
+          )?.error
+          return failAndExit('Backfill', {
+            type: 'backfill',
+            message: `${failed} of ${result.value.length} chunks failed${firstError ? `; first: ${firstError}` : ''}`,
+          })
+        }
+        break
       }
 
-      logger.info({ period: command.options.period }, 'Report sent to Slack')
-      break
+      case 'health': {
+        const result = await orchestrator.healthCheck()
+
+        if (result.isErr()) {
+          logger.error({ error: result.error }, 'Health check failed')
+          return failAndExit('Health check', result.error)
+        }
+
+        logger.info('Health check passed')
+        break
+      }
+
+      case 'report': {
+        const result = await runReport(config, command.options.period, logger)
+
+        if (result.isErr()) {
+          logger.error({ error: result.error }, 'Report generation failed')
+          return failAndExit(
+            `${command.options.period === 'weekly' ? 'Weekly' : 'Monthly'} report`,
+            result.error,
+          )
+        }
+
+        logger.info({ period: command.options.period }, 'Report sent to Slack')
+        break
+      }
     }
   }
 }

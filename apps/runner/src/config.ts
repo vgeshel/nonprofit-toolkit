@@ -42,6 +42,12 @@ export const ConfigSchema = z.object({
   // Slack (for reports)
   SLACK_BOT_TOKEN: z.string().optional(),
   REPORT_SLACK_CHANNEL: z.string().optional(),
+
+  // Set by Cloud Run in every job task; identify a failed run in alerts.
+  // Kept as raw strings so a malformed value can never stop the job loading.
+  CLOUD_RUN_JOB: z.string().optional(),
+  CLOUD_RUN_EXECUTION: z.string().optional(),
+  CLOUD_RUN_TASK_ATTEMPT: z.string().optional(),
 })
 
 export type Config = z.infer<typeof ConfigSchema>
