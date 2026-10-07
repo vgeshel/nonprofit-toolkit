@@ -17,9 +17,9 @@ import type { BigQueryConfig } from './types'
  *
  * Disbursement deduplication matches a Mercury description against
  * `source_coverage.description_pattern`, falling back to the source name. A
- * platform does not necessarily reach the bank under its own name — Benevity
- * disbursements arrive as "AMER ONLINE GIV1" or "THE UK ONLINE GIVING
- * FOUNDATION" — so the alias has to be registered explicitly.
+ * platform does not necessarily reach the bank under its own name — its
+ * payouts may come from another entity — so such aliases are registered from
+ * config (DISBURSEMENT_ALIASES).
  */
 export function generateMergeSql(config: BigQueryConfig): string {
   const { datasetRaw, datasetCanon } = config

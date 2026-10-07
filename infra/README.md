@@ -85,6 +85,13 @@ Set to `1` to skip specific provisioning steps:
 | `SKIP_SCHEDULER`  | Skip Cloud Scheduler setup           |
 | `SKIP_MONITORING` | Skip Cloud Monitoring alert policies |
 
+### Nonprofit-specific settings
+
+Everything specific to one nonprofit lives in `.env`, never in code. For
+example, `DISBURSEMENT_ALIASES` lists the bank descriptors a platform's payouts
+arrive under (see `.env.example`); provisioning keeps BigQuery's
+`source_coverage` aliases in sync with it.
+
 ### Secrets
 
 Each source is enabled by setting its credential in `.env`; provisioning

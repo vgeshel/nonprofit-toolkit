@@ -10,17 +10,9 @@ import { Command, CommanderError } from 'commander'
 import { Result, ResultAsync, err, errAsync, ok, okAsync } from 'neverthrow'
 import { z } from 'zod'
 
-export interface CommandResult {
-  code: number
-  stdout: string
-  stderr: string
-}
+import type { CommandResult, CommandRunner } from './command-runner'
 
-export type CommandRunner = (
-  command: string,
-  args: string[],
-  options?: { input?: string },
-) => Promise<CommandResult>
+export type { CommandResult, CommandRunner }
 
 export interface SecretError {
   type: 'gcloud' | 'missing' | 'usage'
