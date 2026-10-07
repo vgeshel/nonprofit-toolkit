@@ -15,6 +15,7 @@ set -euo pipefail
 #   SCHEDULER_JOB_NAME, SCHEDULE, TIME_ZONE,
 #   SKIP_BUILD, SKIP_SCHEMA, SKIP_SECRETS, SKIP_SCHEDULER, SKIP_MONITORING,
 #   ALERT_SLACK_CHANNEL (Slack channel for alerts), REPORT_TIME_ZONE,
+#   DISBURSEMENT_ALIASES (bank descriptors platforms pay out under),
 #   SECRET_* (connector credentials; a source is enabled by setting its secret.
 #   An unset value never overwrites a secret already in Secret Manager.)
 
@@ -240,6 +241,18 @@ apply_schema() {
   log "Applying BigQuery schema from ${SCHEMA_SQL_PATH}..."
   bq query --use_legacy_sql=false < "${SCHEMA_SQL_PATH}" >/dev/null
   log "Schema applied."
+}
+
+# Make source_coverage's alias rows match DISBURSEMENT_ALIASES (per-nonprofit
+# bank descriptors). Logic lives in scripts/disbursement-aliases-lib.ts.
+sync_disbursement_aliases() {
+  if [ "${SKIP_SCHEMA}" = "1" ]; then
+    log "SKIP_SCHEMA=1; skipping disbursement aliases."
+    return
+  fi
+  log "Syncing disbursement aliases..."
+  bun scripts/sync-disbursement-aliases.ts --project "${PROJECT_ID}" \
+    --dataset-raw "${DATASET_RAW}" --dataset-canon "${DATASET_CANON}"
 }
 
 apply_migrations() {
@@ -469,6 +482,7 @@ main() {
   ensure_secrets
   apply_schema
   apply_migrations
+  sync_disbursement_aliases
   build_image
 
   ensure_cloud_run_job

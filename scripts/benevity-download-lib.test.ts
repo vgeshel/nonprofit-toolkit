@@ -28,7 +28,7 @@ function link(id: string): DisbursementLink {
     disbursementId: id,
     href: `/causesapp/reports/disbursements/${CAUSE_ID}/TOK/donations_report_download/${id}`,
     periodEndDate: 'Sep 6, 2026',
-    grantor: 'American Online Giving Foundation, Inc',
+    grantor: 'Example Giving Foundation, Inc',
   }
 }
 

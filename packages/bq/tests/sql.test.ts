@@ -207,10 +207,10 @@ describe('SQL generation', () => {
     })
 
     it('matches Mercury description against the coverage pattern in JOIN', () => {
-      // A platform can reach the bank under a name that is not its own: a
-      // Benevity disbursement arrives as "AMER ONLINE GIV1", never
-      // "benevity". description_pattern carries that alias, falling back to
-      // the source name when there is none.
+      // A platform can reach the bank under a name that is not its own (a
+      // payout entity, not the platform's name). description_pattern carries
+      // that configured alias, falling back to the source name when there is
+      // none.
       const sql = generateMergeSql(config)
       expect(sql).toContain(
         "LOWER(stg.description) LIKE CONCAT(COALESCE(LOWER(sc.description_pattern), LOWER(sc.source)), ';%')",

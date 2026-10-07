@@ -35,6 +35,7 @@
     "@actions/github": "^6.0.1",
     "@ai-sdk/google": "^3.0.64",
     "@ai-sdk/google-vertex": "^4.0.112",
+    "@donations-etl/types": "workspace:*",
     "@dotenvx/dotenvx": "^1.64.0",
     "@google-cloud/bigquery": "^8.3.0",
     "@google-cloud/firestore": "^8.5.0",
